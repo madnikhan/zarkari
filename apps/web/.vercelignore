@@ -1,0 +1,6 @@
+# Large local-only assets (not in git; avoid bloating CLI uploads)
+public/videos/hero/*.mp4
+../../zarkari-videos
+../../node_modules
+../../.next
+.next

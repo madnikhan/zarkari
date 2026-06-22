@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+zarkari-videos
+bin
+apps/web/public/videos/hero/*.mp4
+**/.env.local
