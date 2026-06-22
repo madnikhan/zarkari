@@ -27,12 +27,14 @@ export async function POST(request: Request) {
   const subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
   const orderDraftId = randomUUID();
   const cartSnapshot = cart.map((c) => ({
+    lineId: c.lineId,
     variantId: c.variantId,
     productId: c.productId,
     title: c.title,
     quantity: c.quantity,
     price: c.price,
     handle: c.handle,
+    sizeSelection: c.sizeSelection,
   }));
 
   const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
         price: c.price,
         variantId: c.variantId,
         productId: c.productId,
+        sizeSelection: c.sizeSelection,
       })),
     });
     const res = NextResponse.redirect(new URL(`/checkout/success?demo=1&order=${order.orderNumber}`, origin));

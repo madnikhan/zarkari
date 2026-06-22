@@ -58,7 +58,18 @@ export function updateProduct(
 export function createRetailOrder(input: {
   customerEmail: string;
   customerName?: string;
-  items: { title: string; quantity: number; price: string; variantId?: string; productId?: string }[];
+  items: {
+    title: string;
+    quantity: number;
+    price: string;
+    variantId?: string;
+    productId?: string;
+    sizeSelection?: {
+      mode: "standard" | "custom";
+      label: string;
+      measurements: Record<string, number>;
+    };
+  }[];
   stripeSessionId?: string;
 }): RetailOrder {
   if (input.stripeSessionId) {

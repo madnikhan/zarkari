@@ -141,6 +141,7 @@ export interface CustomerMessage {
 }
 
 export interface CartItem {
+  lineId: string;
   variantId: string;
   productId: string;
   title: string;
@@ -148,6 +149,11 @@ export interface CartItem {
   price: string;
   quantity: number;
   imageUrl?: string;
+  sizeSelection: {
+    mode: "standard" | "custom";
+    label: string;
+    measurements: Record<string, number>;
+  };
 }
 
 const SUPPLIER_1 = "sup-001";
@@ -323,7 +329,16 @@ export interface RetailOrder {
   customerName?: string;
   status: string;
   total: string;
-  items: { title: string; quantity: number; price: string }[];
+  items: {
+    title: string;
+    quantity: number;
+    price: string;
+    sizeSelection?: {
+      mode: "standard" | "custom";
+      label: string;
+      measurements: Record<string, number>;
+    };
+  }[];
   createdAt: string;
 }
 

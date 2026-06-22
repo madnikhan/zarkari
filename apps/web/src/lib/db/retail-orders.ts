@@ -2,6 +2,33 @@ import { desc, eq } from "drizzle-orm";
 import type { RetailOrder } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
 
+type OrderItemInput = {
+  title: string;
+  quantity: number;
+  price: string;
+  variantId?: string;
+  productId?: string;
+  sizeSelection?: {
+    mode: "standard" | "custom";
+    label: string;
+    measurements: Record<string, number>;
+  };
+};
+
+function mapDbItem(item: {
+  title: string;
+  quantity: number;
+  price: string;
+  measurements?: OrderItemInput["sizeSelection"] | null;
+}) {
+  return {
+    title: item.title,
+    quantity: item.quantity,
+    price: item.price,
+    ...(item.measurements ? { sizeSelection: item.measurements } : {}),
+  };
+}
+
 export async function findRetailOrderByStripeSession(sessionId: string): Promise<RetailOrder | null> {
   const db = getDb();
   if (!db) return null;
@@ -26,11 +53,7 @@ export async function findRetailOrderByStripeSession(sessionId: string): Promise
     customerName: order.customerName ?? undefined,
     status: order.status,
     total: order.total,
-    items: items.map((i) => ({
-      title: i.title,
-      quantity: i.quantity,
-      price: i.price,
-    })),
+    items: items.map((i) => mapDbItem(i)),
     createdAt: order.createdAt.toISOString(),
   };
 }
@@ -38,7 +61,7 @@ export async function findRetailOrderByStripeSession(sessionId: string): Promise
 export async function createRetailOrderDb(input: {
   customerEmail: string;
   customerName?: string;
-  items: { title: string; quantity: number; price: string; variantId?: string; productId?: string }[];
+  items: OrderItemInput[];
   stripeSessionId?: string;
 }): Promise<RetailOrder | null> {
   const db = getDb();
@@ -75,6 +98,7 @@ export async function createRetailOrderDb(input: {
         price: item.price,
         variantId: item.variantId ?? null,
         productId: item.productId ?? null,
+        measurements: item.sizeSelection ?? null,
       }))
     );
   }
@@ -86,7 +110,12 @@ export async function createRetailOrderDb(input: {
     customerName: order.customerName ?? undefined,
     status: order.status,
     total: order.total,
-    items: input.items,
+    items: input.items.map((i) => ({
+      title: i.title,
+      quantity: i.quantity,
+      price: i.price,
+      ...(i.sizeSelection ? { sizeSelection: i.sizeSelection } : {}),
+    })),
     createdAt: order.createdAt.toISOString(),
   };
 }
@@ -110,7 +139,7 @@ export async function listRetailOrdersDb(): Promise<RetailOrder[]> {
       customerName: order.customerName ?? undefined,
       status: order.status,
       total: order.total,
-      items: items.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price })),
+      items: items.map((i) => mapDbItem(i)),
       createdAt: order.createdAt.toISOString(),
     });
   }

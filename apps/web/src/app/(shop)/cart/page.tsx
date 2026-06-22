@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/utils";
-import { CartItemControls } from "@/components/cart/CartItemControls";
+import { CartItemControls, CartSizeDetails } from "@/components/cart/CartItemControls";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Your Bag" };
@@ -42,7 +42,7 @@ export default async function CartPage({ searchParams }: Props) {
           <>
             <ul className="divide-y divide-sand mb-8">
               {cart.map((item) => (
-                <li key={item.variantId} className="flex gap-4 py-6">
+                <li key={item.lineId} className="flex gap-4 py-6">
                   {item.imageUrl && (
                     <div className="relative w-24 h-32 flex-shrink-0 bg-sand/20">
                       <Image src={item.imageUrl} alt={item.title} fill sizes="96px" className="object-cover" />
@@ -52,7 +52,8 @@ export default async function CartPage({ searchParams }: Props) {
                     <Link href={`/products/${item.handle}`} className="text-sm font-medium text-charcoal hover:text-gold">
                       {item.title}
                     </Link>
-                    <CartItemControls variantId={item.variantId} quantity={item.quantity} />
+                    <CartSizeDetails item={item} />
+                    <CartItemControls lineId={item.lineId} quantity={item.quantity} />
                     <p className="text-sm text-charcoal mt-2">{formatPrice(String(parseFloat(item.price) * item.quantity))}</p>
                   </div>
                 </li>

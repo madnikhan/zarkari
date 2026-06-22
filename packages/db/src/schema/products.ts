@@ -80,4 +80,9 @@ export const retailOrderItems = pgTable("retail_order_items", {
   title: text("title").notNull(),
   quantity: integer("quantity").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  measurements: jsonb("measurements").$type<{
+    mode: "standard" | "custom";
+    label: string;
+    measurements: Record<string, number>;
+  }>(),
 });

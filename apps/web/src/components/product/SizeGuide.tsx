@@ -1,11 +1,8 @@
-const sizeChart = [
-  { uk: "6", asian: "XS", bust: "31\"", waist: "24\"", hip: "34\"" },
-  { uk: "8", asian: "S", bust: "32\"", waist: "26\"", hip: "36\"" },
-  { uk: "10", asian: "M", bust: "34\"", waist: "28\"", hip: "38\"" },
-  { uk: "12", asian: "L", bust: "36\"", waist: "30\"", hip: "40\"" },
-  { uk: "14", asian: "XL", bust: "38\"", waist: "32\"", hip: "42\"" },
-  { uk: "16", asian: "XXL", bust: "40\"", waist: "34\"", hip: "44\"" },
-];
+import {
+  MEASUREMENT_FIELDS,
+  STANDARD_SIZE_CHART,
+  formatInches,
+} from "@/lib/sizing";
 
 export function SizeGuide({ productNote }: { productNote?: string | null }) {
   return (
@@ -14,32 +11,60 @@ export function SizeGuide({ productNote }: { productNote?: string | null }) {
       {productNote && (
         <p className="text-sm text-charcoal/70 mb-6 bg-sand/30 p-4">{productNote}</p>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <p className="text-sm text-charcoal/70 mb-6 leading-relaxed">
+        ZARKARI formal wear is tailor-made. Choose a standard size below or enter your own measurements on the product page.
+        All measurements are in inches.
+      </p>
+      <div className="overflow-x-auto mb-8">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-sand">
-              <th className="text-left py-3 pr-4 text-xs tracking-widest uppercase text-charcoal/60">UK</th>
-              <th className="text-left py-3 pr-4 text-xs tracking-widest uppercase text-charcoal/60">Asian</th>
-              <th className="text-left py-3 pr-4 text-xs tracking-widest uppercase text-charcoal/60">Bust</th>
-              <th className="text-left py-3 pr-4 text-xs tracking-widest uppercase text-charcoal/60">Waist</th>
-              <th className="text-left py-3 text-xs tracking-widest uppercase text-charcoal/60">Hip</th>
+              <th className="text-left py-3 pr-3 text-xs tracking-widest uppercase text-charcoal/60 sticky left-0 bg-cream">
+                Size
+              </th>
+              <th className="text-left py-3 pr-3 text-xs tracking-widest uppercase text-charcoal/60">UK</th>
+              {MEASUREMENT_FIELDS.map((field) => (
+                <th
+                  key={field.key}
+                  className="text-left py-3 pr-3 text-xs tracking-widest uppercase text-charcoal/60 whitespace-nowrap"
+                >
+                  {field.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {sizeChart.map((row) => (
-              <tr key={row.uk} className="border-b border-sand/50">
-                <td className="py-3 pr-4 font-medium">{row.uk}</td>
-                <td className="py-3 pr-4">{row.asian}</td>
-                <td className="py-3 pr-4">{row.bust}</td>
-                <td className="py-3 pr-4">{row.waist}</td>
-                <td className="py-3">{row.hip}</td>
+            {STANDARD_SIZE_CHART.map((row) => (
+              <tr key={row.size} className="border-b border-sand/50">
+                <td className="py-3 pr-3 font-medium sticky left-0 bg-cream">{row.size}</td>
+                <td className="py-3 pr-3">{row.uk}</td>
+                {MEASUREMENT_FIELDS.map((field) => (
+                  <td key={field.key} className="py-3 pr-3 whitespace-nowrap">
+                    {formatInches(row.measurements[field.key])}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-charcoal/50 mt-4">
-        Measurements are approximate. For unstitched items, fabric is provided for custom tailoring.
+
+      <h4 className="text-xs tracking-[0.2em] uppercase text-charcoal mb-4">How to measure</h4>
+      <p className="text-sm text-charcoal/60 mb-4">
+        Measure yourself head to toe in inches, wearing fitted undergarments. Stand straight with arms relaxed.
+      </p>
+      <ol className="space-y-4">
+        {MEASUREMENT_FIELDS.map((field, index) => (
+          <li key={field.key} className="text-sm">
+            <span className="font-medium text-charcoal">
+              {index + 1}. {field.label}
+            </span>
+            <p className="text-charcoal/60 mt-0.5 leading-relaxed">{field.howTo}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-charcoal/50 mt-6">
+        Measurements are approximate for standard sizes. Custom tailoring uses your exact measurements.
       </p>
     </div>
   );

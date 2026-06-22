@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getRetailOrders } from "@/lib/data";
-import { formatPrice } from "@/lib/utils";
+import { RetailOrderRow } from "@/components/admin/RetailOrderRow";
 
 export default async function RetailOrdersPage() {
   const orders = await getRetailOrders();
@@ -12,7 +12,7 @@ export default async function RetailOrdersPage() {
       </Link>
       <h1 className="text-2xl font-semibold text-slate-900 mb-6">Online Shop Orders</h1>
 
-      <div className="boms-card overflow-hidden">
+      <div className="boms-card overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/80">
@@ -21,22 +21,12 @@ export default async function RetailOrdersPage() {
               <th className="text-left px-4 py-3 font-medium text-slate-500">Total</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Status</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Date</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-slate-50/50">
-                <td className="px-4 py-3 font-mono text-xs text-[#4C3BCF]">{order.orderNumber}</td>
-                <td className="px-4 py-3">
-                  <p className="font-medium">{order.customerName ?? order.customerEmail}</p>
-                  <p className="text-xs text-slate-400">{order.customerEmail}</p>
-                </td>
-                <td className="px-4 py-3 font-medium">{formatPrice(order.total)}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 capitalize">{order.status}</span>
-                </td>
-                <td className="px-4 py-3 text-slate-500">{new Date(order.createdAt).toLocaleDateString("en-GB")}</td>
-              </tr>
+              <RetailOrderRow key={order.id} order={order} />
             ))}
           </tbody>
         </table>

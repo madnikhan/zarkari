@@ -6,11 +6,17 @@ import { createRetailOrderDb, findRetailOrderByStripeSession } from "@/lib/db/re
 import { isDbConfigured } from "@/lib/db";
 
 interface CartSnapshotItem {
+  lineId?: string;
   variantId?: string;
   productId?: string;
   title: string;
   quantity: number;
   price: string;
+  sizeSelection?: {
+    mode: "standard" | "custom";
+    label: string;
+    measurements: Record<string, number>;
+  };
 }
 
 export async function POST(request: Request) {
@@ -81,6 +87,7 @@ export async function POST(request: Request) {
           price: i.price,
           variantId: i.variantId,
           productId: i.productId,
+          sizeSelection: i.sizeSelection,
         })),
         stripeSessionId: session.id,
       };
