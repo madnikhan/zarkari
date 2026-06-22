@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #faf8f5;
+  --charcoal: #1a1814;
+  --gold: #c9a962;
+  --sand: #e8e2d9;
+  --background: var(--cream);
+  --foreground: var(--charcoal);
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-charcoal: var(--charcoal);
+  --color-gold: var(--gold);
+  --color-sand: var(--sand);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-cormorant);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-cormorant), Georgia, serif;
+}
+
+.font-logo {
+  font-family: var(--font-logo), ui-sans-serif, sans-serif;
+  font-weight: 100;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--charcoal);
+}
+
+.hero-video {
+  transition: opacity 1.2s ease-in-out;
+}
+
+.hero-video-active {
+  opacity: 1;
+  z-index: 1;
+}
+
+.hero-video-inactive {
+  opacity: 0;
+  z-index: 0;
+}
+
+.hero-ken-burns {
+  animation: heroKenBurns 16s ease-in-out infinite alternate;
+}
+
+@keyframes heroKenBurns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-ken-burns {
+    animation: none;
+  }
+}
+
+#catalogue {
+  scroll-margin-top: 5rem;
+}
+
+/* BOMS admin / supplier / customer portal theme */
+.boms-theme {
+  --boms-primary: #4c3bcf;
+  --boms-primary-dark: #3b2db8;
+  --boms-surface: #ffffff;
+  --boms-muted: #f4f3ff;
+  --boms-sidebar: #2d2a6e;
+  --status-production: #3b82f6;
+  --status-fabric: #a78bfa;
+  --status-embroidery: #f97316;
+  --status-overdue: #ef4444;
+  --status-ready: #22c55e;
+  background: #f5f4fb;
+  color: #1a1814;
+  min-height: 100vh;
+}
+
+.boms-sidebar {
+  background: var(--boms-sidebar);
+}
+
+.boms-btn-primary {
+  background: var(--boms-primary);
+  color: white;
+}
+
+.boms-btn-primary:hover {
+  background: var(--boms-primary-dark);
+}
+
+.boms-card {
+  background: var(--boms-surface);
+  border: 1px solid #e8e6f5;
+  border-radius: 0.75rem;
+}

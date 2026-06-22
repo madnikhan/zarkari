@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+.vercel
+bin/cloudflared
+zarkari-videos/
+# Large hero source clips — host on R2/CDN for production; JPG posters ship with the repo
+apps/web/public/videos/hero/*.mp4

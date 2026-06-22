@@ -1,0 +1,56 @@
+import Link from "next/link";
+import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart } from "lucide-react";
+import { getBridalOrders, getCustomer, getDashboardStats, getSupplier } from "@/lib/data";
+import { getSession } from "@/lib/auth/session";
+import { StatCard } from "@/components/boms/StatCard";
+import { OrdersTable } from "@/components/boms/OrdersTable";
+
+export default async function AdminDashboardPage() {
+  const session = await getSession();
+  const stats = getDashboardStats();
+  const orders = await getBridalOrders();
+  const totalOrders = orders.length;
+  const now = new Date();
+  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+
+  const recent = orders.slice(0, 8);
+  const rows = await Promise.all(
+    recent.map(async (order) => ({
+      order,
+      customer: await getCustomer(order.customerId),
+      supplierName: order.supplierId ? (await getSupplier(order.supplierId))?.name : undefined,
+    }))
+  );
+
+  return (
+    <div className="p-4 lg:p-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Welcome back, {session?.name}</p>
+        </div>
+        <Link href="/admin/orders/new" className="boms-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium hidden sm:inline-flex">
+          New Order
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <StatCard label="Total Orders" value={totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
+        <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
+        <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders" icon={Clock} accent="warning" />
+        <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders" icon={AlertTriangle} accent="danger" />
+        <StatCard label="Completed" value={stats.completed} subtitle="Collected" href="/admin/orders" icon={CheckCircle} accent="success" />
+        <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders" icon={RotateCcw} />
+      </div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Recent Orders</h2>
+        <Link href="/admin/orders/retail" className="text-xs text-[#4C3BCF] hover:underline flex items-center gap-1">
+          <ShoppingCart className="h-3.5 w-3.5" />
+          Online shop orders
+        </Link>
+      </div>
+      <OrdersTable rows={rows} />
+    </div>
+  );
+}
