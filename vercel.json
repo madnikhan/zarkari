@@ -1,13 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "outputDirectory": "apps/web/.next",
-  "crons": [
-    {
-      "path": "/api/cron/deadlines",
-      "schedule": "0 8 * * *"
-    }
-  ]
+  "framework": "nextjs"
 }
