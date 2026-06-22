@@ -3,6 +3,7 @@ import {
   STANDARD_SIZE_CHART,
   formatInches,
 } from "@/lib/sizing";
+import { MeasurementGuideDiagram } from "./MeasurementGuideDiagram";
 
 export function SizeGuide({ productNote }: { productNote?: string | null }) {
   return (
@@ -15,6 +16,15 @@ export function SizeGuide({ productNote }: { productNote?: string | null }) {
         ZARKARI formal wear is tailor-made. Choose a standard size below or enter your own measurements on the product page.
         All measurements are in inches.
       </p>
+
+      <div className="mb-10 pb-8 border-b border-sand">
+        <h4 className="text-xs tracking-[0.2em] uppercase text-charcoal mb-4">Measurement guide</h4>
+        <p className="text-sm text-charcoal/60 mb-6 max-w-lg">
+          Use a soft measuring tape. Follow the numbered points on the diagram — each matches the custom size form on the product page.
+        </p>
+        <MeasurementGuideDiagram />
+      </div>
+
       <div className="overflow-x-auto mb-8">
         <table className="w-full text-sm min-w-[640px]">
           <thead>

@@ -16,6 +16,7 @@ import {
   type StandardSizeKey,
 } from "@/lib/sizing";
 import { cn } from "@/lib/utils";
+import { MeasurementGuideDiagram } from "./MeasurementGuideDiagram";
 
 interface SizeSelectorProps {
   value: SizeSelection | null;
@@ -116,14 +117,28 @@ export function SizeSelector({ value, onChange }: SizeSelectorProps) {
       </div>
 
       {mode === "custom" && (
-        <div className="border border-sand p-4 mb-4 space-y-3">
+        <div className="border border-sand p-4 mb-4 space-y-4">
           <p className="text-xs tracking-[0.15em] uppercase text-charcoal/60">
             Enter your measurements (inches)
           </p>
+          <details className="group">
+            <summary className="text-sm text-gold cursor-pointer hover:underline list-none flex items-center gap-1">
+              <span className="group-open:hidden">Show measurement guide diagram</span>
+              <span className="hidden group-open:inline">Hide measurement guide diagram</span>
+            </summary>
+            <div className="mt-4 pt-4 border-t border-sand">
+              <MeasurementGuideDiagram />
+            </div>
+          </details>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {MEASUREMENT_FIELDS.map((field) => (
+            {MEASUREMENT_FIELDS.map((field, index) => (
               <label key={field.key} className="block text-sm">
-                <span className="text-charcoal/80">{field.label}</span>
+                <span className="text-charcoal/80">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold/20 text-charcoal text-xs font-medium mr-1.5">
+                    {index + 1}
+                  </span>
+                  {field.label}
+                </span>
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="number"
