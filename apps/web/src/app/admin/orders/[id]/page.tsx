@@ -10,11 +10,13 @@ import {
   getCancellations,
   getRefunds,
   getPayments,
+  getMessages,
 } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { OrderDetailTabs } from "@/components/orders/OrderDetailTabs";
 import { OrderActionButtons } from "@/components/boms/OrderActionButtons";
+import { StaffMessageForm } from "@/components/boms/StaffMessageForm";
 import { StatusBadge } from "@/components/boms/StatusBadge";
 import { formatPrice } from "@/lib/utils";
 
@@ -28,7 +30,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   const order = await getBridalOrderById(id);
   if (!order) notFound();
 
-  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments] = await Promise.all([
+  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments, messages] =
+    await Promise.all([
     getCustomer(order.customerId),
     order.supplierId ? getSupplier(order.supplierId) : null,
     getTimeline(order.id),
@@ -37,6 +40,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     getCancellations(order.id),
     getRefunds(order.id),
     getPayments(order.id),
+    getMessages(order.id),
   ]);
 
   return (
@@ -72,11 +76,30 @@ export default async function AdminOrderDetailPage({ params }: Props) {
 
       <div className="boms-card p-6 mb-4">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Actions</h2>
-        <OrderActionButtons orderId={order.id} status={order.status} canOwnerActions={session?.role === "owner"} />
+        <OrderActionButtons
+          orderId={order.id}
+          status={order.status}
+          canOwnerActions={session?.role === "owner"}
+          remainingBalance={order.remainingBalance}
+        />
       </div>
 
       <div className="boms-card p-6">
         <OrderDetailTabs data={{ order, timeline, files, redesigns, cancellations, refunds, payments }} />
+        {messages.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 mb-2">Messages</h3>
+            <ul className="space-y-2 text-sm">
+              {messages.map((m) => (
+                <li key={m.id} className="bg-slate-50 rounded-lg px-3 py-2">
+                  <span className="text-xs text-slate-400 capitalize">{m.senderType}</span>
+                  <p>{m.message}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <StaffMessageForm orderId={order.id} senderName={session?.name} />
       </div>
     </div>
   );

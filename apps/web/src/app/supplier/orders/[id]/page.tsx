@@ -31,8 +31,9 @@ export default function SupplierOrderPage({ params }: Props) {
     deliveryDate: new Date().toISOString().slice(0, 10),
     courierName: "",
     trackingNumber: "",
-    photoUrl: "/catalog/mahnoorz/1.png",
+    photoUrl: "",
   });
+  const [uploadedPhotos, setUploadedPhotos] = useState<{ name: string; url: string }[]>([]);
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -154,8 +155,19 @@ export default function SupplierOrderPage({ params }: Props) {
               <input type="date" value={completeForm.deliveryDate} onChange={(e) => setCompleteForm({ ...completeForm, deliveryDate: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
               <input value={completeForm.courierName} onChange={(e) => setCompleteForm({ ...completeForm, courierName: e.target.value })} placeholder="Courier name (optional)" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
               <input value={completeForm.trackingNumber} onChange={(e) => setCompleteForm({ ...completeForm, trackingNumber: e.target.value })} placeholder="Tracking number (optional)" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-              <MediaUploadZone label="Upload final photos / videos" />
-              <button type="button" disabled={loading || !completeForm.billNumber} onClick={() => action("complete", completeForm)} className="w-full py-3.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+              <MediaUploadZone
+                label="Upload final photos / videos"
+                onUploaded={(files) => {
+                  setUploadedPhotos(files);
+                  setCompleteForm((f) => ({ ...f, photoUrl: files[0]?.url ?? "" }));
+                }}
+              />
+              <button
+                type="button"
+                disabled={loading || !completeForm.billNumber || !completeForm.photoUrl}
+                onClick={() => action("complete", completeForm)}
+                className="w-full py-3.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+              >
                 Mark as Completed
               </button>
             </div>

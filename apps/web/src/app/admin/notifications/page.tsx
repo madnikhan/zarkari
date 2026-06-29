@@ -1,6 +1,7 @@
 import { getNotifications } from "@/lib/data";
 import { MarkNotificationsRead } from "@/components/boms/MarkNotificationsRead";
 import Link from "next/link";
+import { notificationHref } from "@/lib/notification-link";
 
 export default async function AdminNotificationsPage() {
   const notifications = await getNotifications();
@@ -12,22 +13,25 @@ export default async function AdminNotificationsPage() {
         <MarkNotificationsRead />
       </div>
       <ul className="space-y-3">
-        {notifications.map((n) => (
-          <li key={n.id} className={`boms-card p-4 ${n.read ? "opacity-60" : "border-l-4 border-l-[#4C3BCF]"}`}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium text-slate-900">{n.title}</p>
-                {n.body && <p className="text-sm text-slate-500 mt-1">{n.body}</p>}
-                <p className="text-xs text-slate-400 mt-2">{new Date(n.createdAt).toLocaleString("en-GB")}</p>
+        {notifications.map((n) => {
+          const href = notificationHref(n);
+          return (
+            <li key={n.id} className={`boms-card p-4 ${n.read ? "opacity-60" : "border-l-4 border-l-[#4C3BCF]"}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium text-slate-900">{n.title}</p>
+                  {n.body && <p className="text-sm text-slate-500 mt-1">{n.body}</p>}
+                  <p className="text-xs text-slate-400 mt-2">{new Date(n.createdAt).toLocaleString("en-GB")}</p>
+                </div>
+                {href && (
+                  <Link href={href} className="text-xs text-[#4C3BCF] hover:underline whitespace-nowrap">
+                    {n.threadId ? "View inbox" : n.orderId ? "View order" : "Open"}
+                  </Link>
+                )}
               </div>
-              {n.orderId && (
-                <Link href={`/admin/orders/${n.orderId}`} className="text-xs text-[#4C3BCF] hover:underline whitespace-nowrap">
-                  View order
-                </Link>
-              )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
         {!notifications.length && <p className="text-slate-400 text-center py-12">No notifications.</p>}
       </ul>
     </div>

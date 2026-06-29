@@ -50,19 +50,61 @@ export function isDbConfigured(): boolean {
 }
 
 export async function getProducts(limit = 12): Promise<Product[]> {
+  if (isDbConfigured()) {
+    const { listProductsDb, countProductsDb } = await import("@/lib/db/cms-products");
+    if ((await countProductsDb()) > 0) {
+      return (await listProductsDb(limit, true)).map(sanitizeProduct);
+    }
+  }
+  return demoProducts.slice(0, limit).map(sanitizeProduct);
+}
+
+export async function getAllProducts(limit = 200): Promise<Product[]> {
+  if (isDbConfigured()) {
+    const { listProductsDb, countProductsDb } = await import("@/lib/db/cms-products");
+    if ((await countProductsDb()) > 0) {
+      return (await listProductsDb(limit, false)).map(sanitizeProduct);
+    }
+  }
   return demoProducts.slice(0, limit).map(sanitizeProduct);
 }
 
 export async function getProductByHandle(handle: string): Promise<Product | null> {
+  if (isDbConfigured()) {
+    const { getProductByHandleDb, countProductsDb } = await import("@/lib/db/cms-products");
+    if ((await countProductsDb()) > 0) {
+      const product = await getProductByHandleDb(handle);
+      return product ? sanitizeProduct(product) : null;
+    }
+  }
   const product = demoProducts.find((p) => p.handle === handle);
   return product ? sanitizeProduct(product) : null;
 }
 
 export async function getCollections(): Promise<Collection[]> {
+  if (isDbConfigured()) {
+    const { listCollectionsDb, countCollectionsDb } = await import("@/lib/db/cms-collections");
+    if ((await countCollectionsDb()) > 0) {
+      return (await listCollectionsDb()).map(sanitizeCollection);
+    }
+  }
   return demoCollections.map(sanitizeCollection);
 }
 
 export async function getCollectionByHandle(handle: string): Promise<(Collection & { products: Product[] }) | null> {
+  if (isDbConfigured()) {
+    const { getCollectionByHandleDb, countCollectionsDb } = await import("@/lib/db/cms-collections");
+    if ((await countCollectionsDb()) > 0) {
+      const col = await getCollectionByHandleDb(handle);
+      if (col) {
+        return {
+          ...sanitizeCollection(col),
+          products: col.products.map(sanitizeProduct),
+        };
+      }
+      return null;
+    }
+  }
   const collection = demoCollections.find((c) => c.handle === handle);
   if (!collection) return null;
   const products =
@@ -73,85 +115,204 @@ export async function getCollectionByHandle(handle: string): Promise<(Collection
 }
 
 export async function getBlogPosts(limit = 10): Promise<BlogPost[]> {
+  if (isDbConfigured()) {
+    const { listBlogPostsDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
+    if ((await countBlogPostsDb()) > 0) {
+      return (await listBlogPostsDb(limit, true)).map(sanitizeBlogPost);
+    }
+  }
+  return demoBlogPosts.slice(0, limit).map(sanitizeBlogPost);
+}
+
+export async function getAllBlogPosts(limit = 100): Promise<BlogPost[]> {
+  if (isDbConfigured()) {
+    const { listBlogPostsDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
+    if ((await countBlogPostsDb()) > 0) {
+      return (await listBlogPostsDb(limit, false)).map(sanitizeBlogPost);
+    }
+  }
   return demoBlogPosts.slice(0, limit).map(sanitizeBlogPost);
 }
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  if (isDbConfigured()) {
+    const { getBlogPostBySlugDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
+    if ((await countBlogPostsDb()) > 0) {
+      const post = await getBlogPostBySlugDb(slug);
+      return post ? sanitizeBlogPost(post) : null;
+    }
+  }
   const post = demoBlogPosts.find((p) => p.slug === slug);
   return post ? sanitizeBlogPost(post) : null;
 }
 
 export async function getShopSettings() {
+  if (isDbConfigured()) {
+    const { getShopSettingsDb, countShopSettingsDb } = await import("@/lib/db/shop-settings");
+    if ((await countShopSettingsDb()) > 0) {
+      return { ...demoShopSettings, ...(await getShopSettingsDb()) };
+    }
+  }
   return demoShopSettings;
 }
 
-export async function getBridalOrders(filters?: { supplierId?: string; status?: string }): Promise<BridalOrder[]> {
+export async function getBridalOrders(filters?: {
+  supplierId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<BridalOrder[]> {
+  if (isDbConfigured()) {
+    const { listBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    const dbOrders = await listBridalOrdersDb(filters);
+    if (dbOrders.length || filters?.limit) return dbOrders;
+  }
   let orders = [...demoBridalOrders];
   if (filters?.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
   if (filters?.status) orders = orders.filter((o) => o.status === filters.status);
-  return orders.sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
+  orders = orders.sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
+  if (filters?.offset) orders = orders.slice(filters.offset);
+  if (filters?.limit) orders = orders.slice(0, filters.limit);
+  return orders;
 }
 
 export async function getBridalOrderById(id: string): Promise<BridalOrder | null> {
+  if (isDbConfigured()) {
+    const { getBridalOrderDb } = await import("@/lib/db/bridal-orders");
+    const row = await getBridalOrderDb(id);
+    if (row) return row;
+  }
   return demoBridalOrders.find((o) => o.id === id) ?? null;
 }
 
 export async function getBridalOrderByNumber(orderNumber: string): Promise<BridalOrder | null> {
+  if (isDbConfigured()) {
+    const { getBridalOrderByNumberDb } = await import("@/lib/db/bridal-orders");
+    const row = await getBridalOrderByNumberDb(orderNumber);
+    if (row) return row;
+  }
   return demoBridalOrders.find((o) => o.orderNumber === orderNumber) ?? null;
 }
 
 export async function getCustomer(id: string): Promise<Customer | null> {
+  if (isDbConfigured()) {
+    const { getCustomerDb } = await import("@/lib/db/bridal-orders");
+    const row = await getCustomerDb(id);
+    if (row) return row;
+  }
   return demoCustomers.find((c) => c.id === id) ?? null;
 }
 
 export async function getCustomers(): Promise<Customer[]> {
+  if (isDbConfigured()) {
+    const { listCustomersDb } = await import("@/lib/db/bridal-orders");
+    const rows = await listCustomersDb();
+    if (rows.length) return rows;
+  }
   return demoCustomers;
 }
 
 export async function getSupplier(id: string): Promise<Supplier | null> {
+  if (isDbConfigured()) {
+    const { getSupplierDb } = await import("@/lib/db/bridal-orders");
+    const row = await getSupplierDb(id);
+    if (row) return row;
+  }
   return demoSuppliers.find((s) => s.id === id) ?? null;
 }
 
 export async function getSuppliers(): Promise<Supplier[]> {
+  if (isDbConfigured()) {
+    const { listSuppliersDb } = await import("@/lib/db/bridal-orders");
+    const rows = await listSuppliersDb();
+    if (rows.length) return rows;
+  }
   return demoSuppliers;
 }
 
 export async function getTimeline(orderId: string): Promise<TimelineEvent[]> {
+  if (isDbConfigured()) {
+    const { getTimelineDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getTimelineDb(orderId);
+    if (rows.length) return rows;
+  }
   return demoTimeline.filter((e) => e.orderId === orderId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
 export async function getOrderFiles(orderId: string, includeSensitive = true): Promise<OrderFile[]> {
+  if (isDbConfigured()) {
+    const { getOrderFilesDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getOrderFilesDb(orderId);
+    if (rows.length) return includeSensitive ? rows : [];
+  }
   const files = demoOrderFiles.filter((f) => f.orderId === orderId);
   if (includeSensitive) return files;
   return [];
 }
 
 export async function getMessages(orderId: string): Promise<CustomerMessage[]> {
+  if (isDbConfigured()) {
+    const { getMessagesDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getMessagesDb(orderId);
+    if (rows.length) return rows;
+  }
   return demoMessages.filter((m) => m.orderId === orderId);
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
+  if (isDbConfigured()) {
+    const { getProductByIdDb, countProductsDb } = await import("@/lib/db/cms-products");
+    if ((await countProductsDb()) > 0) {
+      const product = await getProductByIdDb(id);
+      return product ? sanitizeProduct(product) : null;
+    }
+  }
   const product = demoProducts.find((p) => p.id === id);
   return product ? sanitizeProduct(product) : null;
 }
 
 export async function getRedesigns(orderId: string) {
+  if (isDbConfigured()) {
+    const { getRedesignsDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getRedesignsDb(orderId);
+    if (rows.length) return rows;
+  }
   return demoRedesigns.filter((r) => r.orderId === orderId);
 }
 
 export async function getCancellations(orderId?: string) {
+  if (isDbConfigured()) {
+    const { getCancellationsDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getCancellationsDb(orderId);
+    if (rows.length) return rows;
+  }
   return orderId ? demoCancellations.filter((c) => c.orderId === orderId) : demoCancellations;
 }
 
 export async function getRefunds(orderId?: string) {
+  if (isDbConfigured()) {
+    const { getRefundsDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getRefundsDb(orderId);
+    if (rows.length) return rows;
+  }
   return orderId ? demoRefunds.filter((r) => r.orderId === orderId) : demoRefunds;
 }
 
 export async function getCollectionRecord(orderId: string) {
+  if (isDbConfigured()) {
+    const { getCollectionRecordDb } = await import("@/lib/db/bridal-orders");
+    const row = await getCollectionRecordDb(orderId);
+    if (row) return row;
+  }
   return demoOrderCollections.find((c) => c.orderId === orderId) ?? null;
 }
 
 export async function getPayments(orderId: string) {
+  if (isDbConfigured()) {
+    const { getPaymentsDb } = await import("@/lib/db/bridal-orders");
+    const rows = await getPaymentsDb(orderId);
+    if (rows.length) return rows;
+  }
   return demoPayments.filter((p) => p.orderId === orderId);
 }
 
@@ -164,13 +325,32 @@ export async function getRetailOrders() {
   return demoRetailOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export async function getNotifications(unreadOnly = false) {
+export async function getNotifications(unreadOnly = false, userId?: string) {
+  if (isDbConfigured()) {
+    const { listNotificationsDb } = await import("@/lib/db/notifications");
+    const dbRows = await listNotificationsDb(userId);
+    if (dbRows.length) {
+      let list = dbRows;
+      if (unreadOnly) list = list.filter((n) => !n.read);
+      return list;
+    }
+  }
   let list = [...demoNotifications];
   if (unreadOnly) list = list.filter((n) => !n.read);
   return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export function getReportsData(period: "daily" | "weekly" | "monthly" | "yearly" = "monthly") {
+async function loadAllBridalOrders(): Promise<BridalOrder[]> {
+  if (isDbConfigured()) {
+    const { listBridalOrdersDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    if ((await countBridalOrdersDb()) > 0) {
+      return listBridalOrdersDb({ limit: 5000 });
+    }
+  }
+  return [...demoBridalOrders];
+}
+
+export async function getReportsData(period: "daily" | "weekly" | "monthly" | "yearly" = "monthly") {
   const now = new Date();
   const start = new Date(now);
   if (period === "daily") start.setDate(start.getDate() - 1);
@@ -178,24 +358,42 @@ export function getReportsData(period: "daily" | "weekly" | "monthly" | "yearly"
   else if (period === "monthly") start.setMonth(start.getMonth() - 1);
   else start.setFullYear(start.getFullYear() - 1);
 
-  const orders = demoBridalOrders.filter((o) => new Date(o.bookingDate) >= start);
+  const allOrders = await loadAllBridalOrders();
+  const orders = allOrders.filter((o) => new Date(o.bookingDate) >= start);
   const revenue = orders.reduce((s, o) => s + parseFloat(o.depositPaid), 0);
   const outstanding = orders
     .filter((o) => !["cancelled", "refunded", "collected"].includes(o.status))
     .reduce((s, o) => s + parseFloat(o.remainingBalance), 0);
+
+  const refunds = await getRefunds();
+  const cancellations = await getCancellations();
+  let redesignList = demoRedesigns;
+  if (isDbConfigured()) {
+    const { listRedesignsDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    if ((await countBridalOrdersDb()) > 0) {
+      redesignList = await listRedesignsDb();
+    }
+  }
+
   return {
     period,
     orderCount: orders.length,
     revenue,
     outstanding,
-    refunds: demoRefunds.filter((r) => new Date(r.createdAt) >= start).length,
-    cancellations: demoCancellations.filter((c) => new Date(c.createdAt) >= start).length,
-    redesigns: demoRedesigns.filter((r) => new Date(r.createdAt) >= start).length,
+    refunds: refunds.filter((r) => new Date(r.createdAt) >= start).length,
+    cancellations: cancellations.filter((c) => new Date(c.createdAt) >= start).length,
+    redesigns: redesignList.filter((r) => new Date(r.createdAt) >= start).length,
     late: orders.filter((o) => new Date(o.deliveryDate) < now && o.status !== "collected").length,
   };
 }
 
 export async function searchOrders(query: string): Promise<BridalOrder[]> {
+  if (isDbConfigured()) {
+    const { searchBridalOrdersDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    if ((await countBridalOrdersDb()) > 0) {
+      return searchBridalOrdersDb(query);
+    }
+  }
   const q = query.toLowerCase();
   const results: BridalOrder[] = [];
   for (const order of demoBridalOrders) {
@@ -212,8 +410,9 @@ export async function searchOrders(query: string): Promise<BridalOrder[]> {
   return results;
 }
 
-export function getDashboardStats() {
-  const active = demoBridalOrders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
+export async function getDashboardStats() {
+  const allOrders = await loadAllBridalOrders();
+  const active = allOrders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
   const now = new Date();
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
   return {
@@ -224,14 +423,15 @@ export function getDashboardStats() {
       return d.toDateString() === now.toDateString();
     }).length,
     late: active.filter((o) => new Date(o.deliveryDate) < now).length,
-    cancelled: demoBridalOrders.filter((o) => o.status === "cancelled").length,
-    refunded: demoBridalOrders.filter((o) => o.status === "refunded").length,
-    completed: demoBridalOrders.filter((o) => o.status === "collected").length,
+    cancelled: allOrders.filter((o) => o.status === "cancelled").length,
+    refunded: allOrders.filter((o) => o.status === "refunded").length,
+    completed: allOrders.filter((o) => o.status === "collected").length,
   };
 }
 
-export function getSupplierPerformance(supplierId: string) {
-  const orders = demoBridalOrders.filter((o) => o.supplierId === supplierId);
+export async function getSupplierPerformance(supplierId: string) {
+  const allOrders = await loadAllBridalOrders();
+  const orders = allOrders.filter((o) => o.supplierId === supplierId);
   const total = orders.length;
   const completed = orders.filter((o) => o.status === "collected").length;
   const redesigns = orders.filter((o) => o.status === "redesign_in_progress").length;

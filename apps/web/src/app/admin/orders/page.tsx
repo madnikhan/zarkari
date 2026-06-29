@@ -3,12 +3,15 @@ import { getBridalOrders, getCustomer, getSupplier } from "@/lib/data";
 import { OrdersTable } from "@/components/boms/OrdersTable";
 import { cn } from "@/lib/utils";
 
+const PAGE_SIZE = 20;
+
 interface Props {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string }>;
 }
 
 export default async function AdminOrdersPage({ searchParams }: Props) {
-  const { tab = "active" } = await searchParams;
+  const { tab = "active", page: pageStr = "1" } = await searchParams;
+  const page = Math.max(1, parseInt(pageStr, 10) || 1);
   const orders = await getBridalOrders();
   const now = new Date();
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
@@ -24,12 +27,14 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
   });
 
   const rows = await Promise.all(
-    filtered.map(async (order) => ({
+    filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(async (order) => ({
       order,
       customer: await getCustomer(order.customerId),
       supplierName: order.supplierId ? (await getSupplier(order.supplierId))?.name : undefined,
     }))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
   const tabs = [
     { key: "active", label: "Active" },
@@ -63,6 +68,30 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
       </div>
 
       <OrdersTable rows={rows} />
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          {page > 1 && (
+            <Link
+              href={`/admin/orders?tab=${tab}&page=${page - 1}`}
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
+            >
+              Previous
+            </Link>
+          )}
+          <span className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+          </span>
+          {page < totalPages && (
+            <Link
+              href={`/admin/orders?tab=${tab}&page=${page + 1}`}
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
+            >
+              Next
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

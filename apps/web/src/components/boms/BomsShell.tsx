@@ -17,6 +17,10 @@ import {
   LogOut,
   Menu,
   X,
+  Inbox,
+  Store,
+  Wallet,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
@@ -28,11 +32,15 @@ type NavItem = { label: string; href: string; icon: React.ComponentType<{ classN
 const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Orders", href: "/admin/orders", icon: ShoppingBag },
+  { label: "Shop Orders", href: "/admin/orders/retail", icon: Store },
+  { label: "Inbox", href: "/admin/inbox", icon: Inbox },
+  { label: "Content", href: "/admin/content", icon: FileText },
   { label: "New Order", href: "/admin/orders/new", icon: PlusCircle },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Suppliers", href: "/admin/suppliers", icon: Truck },
   { label: "Calendar", href: "/admin/calendar", icon: Calendar },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
+  { label: "Finance", href: "/admin/finance", icon: Wallet, ownerOnly: true },
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
   { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "Settings", href: "/admin/settings", icon: Settings },
@@ -89,7 +97,12 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {nav.map((item) => {
-            const active = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href) && item.href !== "/supplier");
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin/dashboard" &&
+                item.href !== "/admin/orders" &&
+                pathname.startsWith(item.href) &&
+                item.href !== "/supplier");
             const Icon = item.icon;
             return (
               <Link

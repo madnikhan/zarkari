@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { createProduct, updateProduct } from "@/lib/data/products";
 import { getProductById } from "@/lib/data";
+
+function revalidateProduct(handle: string, collectionHandles?: string[]) {
+  revalidatePath("/");
+  revalidatePath(`/products/${handle}`);
+  revalidatePath("/collections/catalogue");
+  for (const h of collectionHandles ?? []) {
+    revalidatePath(`/collections/${h}`);
+  }
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -10,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const product = createProduct({
+  const product = await createProduct({
     title: body.title,
     handle: body.handle ?? body.title.toLowerCase().replace(/\s+/g, "-"),
     description: body.description ?? "",
@@ -18,8 +28,13 @@ export async function POST(request: Request) {
     price: body.price ?? "0",
     collectionHandles: body.collectionHandles ?? [],
     featuredImageUrl: body.featuredImageUrl,
+    images: body.images,
+    inventoryQty: body.inventoryQty,
+    published: body.published,
+    tags: body.tags,
   });
 
+  revalidateProduct(product.handle, product.collectionHandles);
   return NextResponse.json({ product });
 }
 
@@ -30,8 +45,11 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const product = updateProduct(body.id, body);
+  const existing = body.id ? await getProductById(body.id) : null;
+  const product = await updateProduct(body.id, body);
   if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  revalidateProduct(product.handle, [...(existing?.collectionHandles ?? []), ...product.collectionHandles]);
   return NextResponse.json({ product });
 }
 

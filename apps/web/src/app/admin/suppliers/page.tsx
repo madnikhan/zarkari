@@ -4,7 +4,7 @@ import Link from "next/link";
 export default async function AdminSuppliersPage() {
   const suppliers = await getSuppliers();
   const perfData = await Promise.all(
-    suppliers.map(async (s) => ({ supplier: s, perf: getSupplierPerformance(s.id) }))
+    suppliers.map(async (s) => ({ supplier: s, perf: await getSupplierPerformance(s.id) }))
   );
 
   return (

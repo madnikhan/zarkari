@@ -3,8 +3,9 @@ import { demoProducts, demoRetailOrders } from "./seed";
 import { sanitizeImageUrl } from "@/lib/image-url";
 import { createRetailOrderDb, findRetailOrderByStripeSession } from "@/lib/db/retail-orders";
 import { isDbConfigured } from "@/lib/db";
+import { createProductDb, updateProductDb } from "@/lib/db/cms-products";
 
-export function createProduct(input: {
+export async function createProduct(input: {
   title: string;
   handle: string;
   description: string;
@@ -12,13 +13,39 @@ export function createProduct(input: {
   price: string;
   collectionHandles?: string[];
   featuredImageUrl?: string;
-}): Product {
+  images?: string[];
+  inventoryQty?: number;
+  published?: boolean;
+  tags?: string[];
+}): Promise<Product> {
+  if (isDbConfigured()) {
+    const dbProduct = await createProductDb({
+      title: input.title,
+      handle: input.handle,
+      description: input.description,
+      fabric: input.fabric,
+      price: input.price,
+      collectionHandles: input.collectionHandles,
+      featuredImageUrl: input.featuredImageUrl,
+      images: input.images,
+      inventoryQty: input.inventoryQty,
+      published: input.published,
+      tags: input.tags,
+    });
+    if (dbProduct) {
+      const existing = demoProducts.findIndex((p) => p.handle === dbProduct.handle);
+      if (existing >= 0) demoProducts[existing] = dbProduct;
+      else demoProducts.push(dbProduct);
+      return dbProduct;
+    }
+  }
+
   const id = `prod-${Date.now()}`;
   const variant: ProductVariant = {
     id: `var-${Date.now()}`,
     title: "Default",
     price: input.price,
-    inventoryQty: 10,
+    inventoryQty: input.inventoryQty ?? 10,
     options: [{ name: "Title", value: "Default" }],
   };
   const product: Product = {
@@ -27,9 +54,13 @@ export function createProduct(input: {
     title: input.title,
     description: input.description,
     fabric: input.fabric,
-    tags: [],
+    tags: input.tags ?? [],
     featuredImageUrl: sanitizeImageUrl(input.featuredImageUrl),
-    images: input.featuredImageUrl ? [sanitizeImageUrl(input.featuredImageUrl)!] : [],
+    images: input.images?.length
+      ? input.images.map((u) => sanitizeImageUrl(u) ?? u)
+      : input.featuredImageUrl
+        ? [sanitizeImageUrl(input.featuredImageUrl)!]
+        : [],
     variants: [variant],
     collectionHandles: input.collectionHandles ?? [],
   };
@@ -37,21 +68,39 @@ export function createProduct(input: {
   return product;
 }
 
-export function updateProduct(
+export async function updateProduct(
   id: string,
-  input: Partial<Pick<Product, "title" | "description" | "fabric" | "featuredImageUrl">> & { price?: string }
-): Product | null {
+  input: Partial<
+    Pick<Product, "title" | "handle" | "description" | "fabric" | "featuredImageUrl" | "collectionHandles" | "tags">
+  > & { price?: string; inventoryQty?: number; images?: string[]; published?: boolean }
+): Promise<Product | null> {
+  if (isDbConfigured()) {
+    const dbProduct = await updateProductDb(id, input);
+    if (dbProduct) {
+      const idx = demoProducts.findIndex((p) => p.id === id);
+      if (idx >= 0) demoProducts[idx] = dbProduct;
+      return dbProduct;
+    }
+  }
+
   const product = demoProducts.find((p) => p.id === id);
   if (!product) return null;
   if (input.title) product.title = input.title;
+  if (input.handle) product.handle = input.handle;
   if (input.description) product.description = input.description;
   if (input.fabric !== undefined) product.fabric = input.fabric;
+  if (input.collectionHandles) product.collectionHandles = input.collectionHandles;
+  if (input.tags) product.tags = input.tags;
   if (input.featuredImageUrl) {
     const url = sanitizeImageUrl(input.featuredImageUrl);
     product.featuredImageUrl = url;
-    product.images = url ? [url] : [];
+  }
+  if (input.images) {
+    product.images = input.images.map((u) => sanitizeImageUrl(u) ?? u);
+    if (input.images[0]) product.featuredImageUrl = sanitizeImageUrl(input.images[0]);
   }
   if (input.price && product.variants[0]) product.variants[0].price = input.price;
+  if (input.inventoryQty !== undefined && product.variants[0]) product.variants[0].inventoryQty = input.inventoryQty;
   return product;
 }
 
@@ -73,7 +122,9 @@ export function createRetailOrder(input: {
   stripeSessionId?: string;
 }): RetailOrder {
   if (input.stripeSessionId) {
-    const memExisting = demoRetailOrders.find((o) => (o as RetailOrder & { stripeSessionId?: string }).stripeSessionId === input.stripeSessionId);
+    const memExisting = demoRetailOrders.find(
+      (o) => (o as RetailOrder & { stripeSessionId?: string }).stripeSessionId === input.stripeSessionId
+    );
     if (memExisting) return memExisting;
   }
 
@@ -115,4 +166,14 @@ export async function getRetailOrderBySession(sessionId: string): Promise<Retail
 
 export async function getRetailOrderByNumber(orderNumber: string): Promise<RetailOrder | null> {
   return demoRetailOrders.find((o) => o.orderNumber === orderNumber) ?? null;
+}
+
+export async function updateRetailOrderStatus(orderId: string, status: string): Promise<boolean> {
+  const order = demoRetailOrders.find((o) => o.id === orderId);
+  if (order) order.status = status;
+  if (isDbConfigured()) {
+    const { updateRetailOrderStatusDb } = await import("@/lib/db/retail-orders");
+    return updateRetailOrderStatusDb(orderId, status);
+  }
+  return Boolean(order);
 }

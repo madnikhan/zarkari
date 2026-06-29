@@ -145,3 +145,14 @@ export async function listRetailOrdersDb(): Promise<RetailOrder[]> {
   }
   return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
+
+export async function updateRetailOrderStatusDb(id: string, status: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const [row] = await db
+    .update(schema.retailOrders)
+    .set({ status })
+    .where(eq(schema.retailOrders.id, id))
+    .returning();
+  return Boolean(row);
+}

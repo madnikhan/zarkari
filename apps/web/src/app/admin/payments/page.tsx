@@ -1,6 +1,7 @@
 import { getBridalOrders, getPayments } from "@/lib/data";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
+import { RecordPaymentForm } from "@/components/boms/RecordPaymentForm";
 
 export default async function AdminPaymentsPage() {
   const orders = await getBridalOrders();
@@ -40,6 +41,7 @@ export default async function AdminPaymentsPage() {
               <th className="text-left px-4 py-3 font-medium text-slate-500">Deposit</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Balance</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Payments</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -54,6 +56,13 @@ export default async function AdminPaymentsPage() {
                 <td className="px-4 py-3 text-emerald-600">{formatPrice(order.depositPaid)}</td>
                 <td className="px-4 py-3 text-amber-600">{formatPrice(order.remainingBalance)}</td>
                 <td className="px-4 py-3 text-slate-500">{payments.length} recorded</td>
+                <td className="px-4 py-3">
+                  <RecordPaymentForm
+                    orderId={order.id}
+                    orderNumber={order.orderNumber}
+                    remainingBalance={order.remainingBalance}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

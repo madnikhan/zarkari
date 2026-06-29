@@ -1,33 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { parseSessionCookie } from "@/lib/auth/signed-session";
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get("zarkari-session")?.value;
+export async function middleware(request: NextRequest) {
+  const sessionRaw = request.cookies.get("zarkari-session")?.value;
   const path = request.nextUrl.pathname;
+  const user = sessionRaw ? await parseSessionCookie(sessionRaw) : null;
 
   if (path.startsWith("/admin") && !path.startsWith("/admin/login")) {
-    if (!session) return NextResponse.redirect(new URL("/login?redirect=/admin/dashboard", request.url));
-    try {
-      const user = JSON.parse(session);
-      if (user.role !== "owner" && user.role !== "staff") {
-        return NextResponse.redirect(new URL("/login", request.url));
-      }
-      if (path.startsWith("/admin/finance") && user.role !== "owner") {
-        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-      }
-    } catch {
+    if (!user) return NextResponse.redirect(new URL("/login?redirect=/admin/dashboard", request.url));
+    const isInbox = path.startsWith("/admin/inbox");
+    if (!isInbox && user.role !== "owner" && user.role !== "staff") {
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (path.startsWith("/admin/finance") && user.role !== "owner") {
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
   }
 
   if (path.startsWith("/supplier")) {
-    if (!session) return NextResponse.redirect(new URL("/login?redirect=/supplier", request.url));
-    try {
-      const user = JSON.parse(session);
-      if (user.role !== "supplier") return NextResponse.redirect(new URL("/login", request.url));
-    } catch {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+    if (!user) return NextResponse.redirect(new URL("/login?redirect=/supplier", request.url));
+    if (user.role !== "supplier") return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();

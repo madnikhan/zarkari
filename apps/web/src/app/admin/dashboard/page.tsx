@@ -4,10 +4,11 @@ import { getBridalOrders, getCustomer, getDashboardStats, getSupplier } from "@/
 import { getSession } from "@/lib/auth/session";
 import { StatCard } from "@/components/boms/StatCard";
 import { OrdersTable } from "@/components/boms/OrdersTable";
+import { SocialInboxWidget } from "@/components/admin/inbox/SocialInboxWidget";
 
 export default async function AdminDashboardPage() {
   const session = await getSession();
-  const stats = getDashboardStats();
+  const stats = await getDashboardStats();
   const orders = await getBridalOrders();
   const totalOrders = orders.length;
   const now = new Date();
@@ -42,6 +43,8 @@ export default async function AdminDashboardPage() {
         <StatCard label="Completed" value={stats.completed} subtitle="Collected" href="/admin/orders" icon={CheckCircle} accent="success" />
         <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders" icon={RotateCcw} />
       </div>
+
+      <SocialInboxWidget />
 
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Recent Orders</h2>

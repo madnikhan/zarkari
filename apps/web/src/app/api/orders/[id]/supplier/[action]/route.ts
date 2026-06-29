@@ -29,17 +29,17 @@ export async function POST(request: Request, { params }: Props) {
 
   switch (action) {
     case "accept":
-      supplierAccept(id, session.name);
+      await supplierAccept(id, session.name);
       break;
     case "reject":
-      supplierReject(id, body.comment ?? "Rejected", session.name);
+      await supplierReject(id, body.comment ?? "Rejected", session.name);
       break;
     case "advance":
-      advanceProductionStage(id, body.stage as BridalStatus, session.name);
+      await advanceProductionStage(id, body.stage as BridalStatus, session.name);
       break;
     case "complete":
       if (!body.billNumber) return NextResponse.json({ error: "Bill number required" }, { status: 400 });
-      supplierComplete(
+      await supplierComplete(
         id,
         {
           deliveryDate: body.deliveryDate ?? new Date().toISOString(),

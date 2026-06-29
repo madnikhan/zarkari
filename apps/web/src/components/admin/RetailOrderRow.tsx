@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MEASUREMENT_FIELDS, formatInches } from "@/lib/sizing";
 import type { RetailOrder } from "@/lib/data/seed";
+import { RetailOrderStatusSelect } from "@/components/admin/RetailOrderStatusSelect";
 
 export function RetailOrderRow({ order }: { order: RetailOrder }) {
   const [open, setOpen] = useState(false);
@@ -17,9 +18,7 @@ export function RetailOrderRow({ order }: { order: RetailOrder }) {
         </td>
         <td className="px-4 py-3 font-medium">{order.total}</td>
         <td className="px-4 py-3">
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 capitalize">
-            {order.status}
-          </span>
+          <RetailOrderStatusSelect orderId={order.id} currentStatus={order.status} />
         </td>
         <td className="px-4 py-3 text-slate-500">{new Date(order.createdAt).toLocaleDateString("en-GB")}</td>
         <td className="px-4 py-3">

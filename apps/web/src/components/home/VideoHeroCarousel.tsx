@@ -11,9 +11,10 @@ const MIN_CLIP_MS = 10000;
 
 interface VideoHeroCarouselProps {
   tagline: string;
+  headline?: string;
 }
 
-export function VideoHeroCarousel({ tagline }: VideoHeroCarouselProps) {
+export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps) {
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frontSlot, setFrontSlot] = useState(0);
@@ -164,7 +165,11 @@ export function VideoHeroCarousel({ tagline }: VideoHeroCarouselProps) {
 
       <div className="relative z-10 flex min-h-[90vh] flex-col justify-end px-4 pb-16 pt-24 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl">
-          <ZarkariLogo size="lg" variant="light" className="mb-4" />
+          {headline ? (
+            <h1 className="font-display text-4xl md:text-6xl text-cream mb-4 tracking-wide">{headline}</h1>
+          ) : (
+            <ZarkariLogo size="lg" variant="light" className="mb-4" />
+          )}
           <p className="mb-8 max-w-md text-sm leading-relaxed text-cream/80 md:text-base">{tagline}</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link

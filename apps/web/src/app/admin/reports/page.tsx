@@ -9,7 +9,7 @@ interface Props {
 export default async function AdminReportsPage({ searchParams }: Props) {
   const { period = "monthly" } = await searchParams;
   const p = (["daily", "weekly", "monthly", "yearly"].includes(period) ? period : "monthly") as "daily" | "weekly" | "monthly" | "yearly";
-  const data = getReportsData(p);
+  const data = await getReportsData(p);
 
   return (
     <div className="p-6 lg:p-10">

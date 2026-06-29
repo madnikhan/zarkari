@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   }
 
   const period = (new URL(request.url).searchParams.get("period") ?? "monthly") as "daily" | "weekly" | "monthly" | "yearly";
-  const data = getReportsData(period);
+  const data = await getReportsData(period);
   const orders = await getBridalOrders();
 
   const rows = [

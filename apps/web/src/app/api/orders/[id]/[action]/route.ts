@@ -29,22 +29,27 @@ export async function POST(request: Request, { params }: Props) {
 
   switch (action as Action) {
     case "send-to-supplier":
-      sendToSupplier(id, session.name);
+      await sendToSupplier(id, session.name);
       break;
     case "cancel":
       if (session.role !== "owner") return NextResponse.json({ error: "Owner only" }, { status: 403 });
-      cancelOrder(id, body.reason ?? "Cancelled", session.name, "owner");
+      await cancelOrder(id, body.reason ?? "Cancelled", session.name, "owner");
       break;
     case "refund":
       if (!canRefund(session.role)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
-      refundOrder(id, body.amount ?? "0", body.reason ?? "Refund", session.name);
+      await refundOrder(id, body.amount ?? "0", body.reason ?? "Refund", session.name);
       break;
     case "redesign":
       if (session.role !== "owner") return NextResponse.json({ error: "Owner only" }, { status: 403 });
-      sendForRedesign(id, body.reason ?? "Redesign requested", session.name);
+      await sendForRedesign(
+        id,
+        body.reason ?? "Redesign requested",
+        session.name,
+        body.comment ?? body.reason
+      );
       break;
     case "collect":
-      markCollected(id, session.name, {
+      await markCollected(id, session.name, {
         balancePaid: body.balancePaid ?? true,
         amountPaid: body.amountPaid,
         alterationNotes: body.alterationNotes,

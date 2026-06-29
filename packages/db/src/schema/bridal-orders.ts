@@ -167,6 +167,8 @@ export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id"),
   orderId: uuid("order_id"),
+  threadId: uuid("thread_id"),
+  href: text("href"),
   title: text("title").notNull(),
   body: text("body"),
   read: boolean("read").default(false).notNull(),

@@ -346,6 +346,8 @@ export interface AppNotification {
   id: string;
   userId?: string;
   orderId?: string;
+  threadId?: string;
+  href?: string;
   title: string;
   body?: string;
   read: boolean;
