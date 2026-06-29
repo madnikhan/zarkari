@@ -28,6 +28,15 @@ import {
   type CustomerMessage,
 } from "./seed";
 import { sanitizeImageUrl } from "@/lib/image-url";
+import { isUuid } from "@/lib/db";
+
+function useDemoData(): boolean {
+  return !isDbConfigured();
+}
+
+function canQueryDbId(id: string): boolean {
+  return isDbConfigured() && isUuid(id);
+}
 
 function sanitizeProduct(product: Product): Product {
   return {
@@ -164,8 +173,7 @@ export async function getBridalOrders(filters?: {
 }): Promise<BridalOrder[]> {
   if (isDbConfigured()) {
     const { listBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    const dbOrders = await listBridalOrdersDb(filters);
-    if (dbOrders.length || filters?.limit) return dbOrders;
+    return listBridalOrdersDb(filters);
   }
   let orders = [...demoBridalOrders];
   if (filters?.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
@@ -177,11 +185,13 @@ export async function getBridalOrders(filters?: {
 }
 
 export async function getBridalOrderById(id: string): Promise<BridalOrder | null> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(id)) {
     const { getBridalOrderDb } = await import("@/lib/db/bridal-orders");
     const row = await getBridalOrderDb(id);
     if (row) return row;
+    return null;
   }
+  if (!useDemoData()) return null;
   return demoBridalOrders.find((o) => o.id === id) ?? null;
 }
 
@@ -195,67 +205,66 @@ export async function getBridalOrderByNumber(orderNumber: string): Promise<Brida
 }
 
 export async function getCustomer(id: string): Promise<Customer | null> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(id)) {
     const { getCustomerDb } = await import("@/lib/db/bridal-orders");
-    const row = await getCustomerDb(id);
-    if (row) return row;
+    return getCustomerDb(id);
   }
+  if (!useDemoData()) return null;
   return demoCustomers.find((c) => c.id === id) ?? null;
 }
 
 export async function getCustomers(): Promise<Customer[]> {
   if (isDbConfigured()) {
     const { listCustomersDb } = await import("@/lib/db/bridal-orders");
-    const rows = await listCustomersDb();
-    if (rows.length) return rows;
+    return listCustomersDb();
   }
   return demoCustomers;
 }
 
 export async function getSupplier(id: string): Promise<Supplier | null> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(id)) {
     const { getSupplierDb } = await import("@/lib/db/bridal-orders");
-    const row = await getSupplierDb(id);
-    if (row) return row;
+    return getSupplierDb(id);
   }
+  if (!useDemoData()) return null;
   return demoSuppliers.find((s) => s.id === id) ?? null;
 }
 
 export async function getSuppliers(): Promise<Supplier[]> {
   if (isDbConfigured()) {
     const { listSuppliersDb } = await import("@/lib/db/bridal-orders");
-    const rows = await listSuppliersDb();
-    if (rows.length) return rows;
+    return listSuppliersDb();
   }
   return demoSuppliers;
 }
 
 export async function getTimeline(orderId: string): Promise<TimelineEvent[]> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getTimelineDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getTimelineDb(orderId);
-    if (rows.length) return rows;
+    return getTimelineDb(orderId);
   }
+  if (!useDemoData()) return [];
   return demoTimeline.filter((e) => e.orderId === orderId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
 export async function getOrderFiles(orderId: string, includeSensitive = true): Promise<OrderFile[]> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getOrderFilesDb } = await import("@/lib/db/bridal-orders");
     const rows = await getOrderFilesDb(orderId);
-    if (rows.length) return includeSensitive ? rows : [];
+    return includeSensitive ? rows : [];
   }
+  if (!useDemoData()) return [];
   const files = demoOrderFiles.filter((f) => f.orderId === orderId);
   if (includeSensitive) return files;
   return [];
 }
 
 export async function getMessages(orderId: string): Promise<CustomerMessage[]> {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getMessagesDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getMessagesDb(orderId);
-    if (rows.length) return rows;
+    return getMessagesDb(orderId);
   }
+  if (!useDemoData()) return [];
   return demoMessages.filter((m) => m.orderId === orderId);
 }
 
@@ -272,19 +281,19 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function getRedesigns(orderId: string) {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getRedesignsDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getRedesignsDb(orderId);
-    if (rows.length) return rows;
+    return getRedesignsDb(orderId);
   }
+  if (!useDemoData()) return [];
   return demoRedesigns.filter((r) => r.orderId === orderId);
 }
 
 export async function getCancellations(orderId?: string) {
   if (isDbConfigured()) {
     const { getCancellationsDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getCancellationsDb(orderId);
-    if (rows.length) return rows;
+    if (!orderId || canQueryDbId(orderId)) return getCancellationsDb(orderId);
+    return [];
   }
   return orderId ? demoCancellations.filter((c) => c.orderId === orderId) : demoCancellations;
 }
@@ -292,27 +301,27 @@ export async function getCancellations(orderId?: string) {
 export async function getRefunds(orderId?: string) {
   if (isDbConfigured()) {
     const { getRefundsDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getRefundsDb(orderId);
-    if (rows.length) return rows;
+    if (!orderId || canQueryDbId(orderId)) return getRefundsDb(orderId);
+    return [];
   }
   return orderId ? demoRefunds.filter((r) => r.orderId === orderId) : demoRefunds;
 }
 
 export async function getCollectionRecord(orderId: string) {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getCollectionRecordDb } = await import("@/lib/db/bridal-orders");
-    const row = await getCollectionRecordDb(orderId);
-    if (row) return row;
+    return getCollectionRecordDb(orderId);
   }
+  if (!useDemoData()) return null;
   return demoOrderCollections.find((c) => c.orderId === orderId) ?? null;
 }
 
 export async function getPayments(orderId: string) {
-  if (isDbConfigured()) {
+  if (canQueryDbId(orderId)) {
     const { getPaymentsDb } = await import("@/lib/db/bridal-orders");
-    const rows = await getPaymentsDb(orderId);
-    if (rows.length) return rows;
+    return getPaymentsDb(orderId);
   }
+  if (!useDemoData()) return [];
   return demoPayments.filter((p) => p.orderId === orderId);
 }
 
@@ -342,10 +351,8 @@ export async function getNotifications(unreadOnly = false, userId?: string) {
 
 async function loadAllBridalOrders(): Promise<BridalOrder[]> {
   if (isDbConfigured()) {
-    const { listBridalOrdersDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    if ((await countBridalOrdersDb()) > 0) {
-      return listBridalOrdersDb({ limit: 5000 });
-    }
+    const { listBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    return listBridalOrdersDb({ limit: 5000 });
   }
   return [...demoBridalOrders];
 }
@@ -369,10 +376,8 @@ export async function getReportsData(period: "daily" | "weekly" | "monthly" | "y
   const cancellations = await getCancellations();
   let redesignList = demoRedesigns;
   if (isDbConfigured()) {
-    const { listRedesignsDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    if ((await countBridalOrdersDb()) > 0) {
-      redesignList = await listRedesignsDb();
-    }
+    const { listRedesignsDb } = await import("@/lib/db/bridal-orders");
+    redesignList = await listRedesignsDb();
   }
 
   return {
@@ -389,10 +394,8 @@ export async function getReportsData(period: "daily" | "weekly" | "monthly" | "y
 
 export async function searchOrders(query: string): Promise<BridalOrder[]> {
   if (isDbConfigured()) {
-    const { searchBridalOrdersDb, countBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    if ((await countBridalOrdersDb()) > 0) {
-      return searchBridalOrdersDb(query);
-    }
+    const { searchBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    return searchBridalOrdersDb(query);
   }
   const q = query.toLowerCase();
   const results: BridalOrder[] = [];

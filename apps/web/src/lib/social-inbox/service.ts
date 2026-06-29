@@ -88,7 +88,11 @@ export async function getSocialMessages(threadId: string): Promise<SocialMessage
 
 export async function getSocialInboxStats(): Promise<SocialInboxStats> {
   if (isDbConfigured()) {
-    return dbLayer.getSocialInboxStatsDb();
+    try {
+      return await dbLayer.getSocialInboxStatsDb();
+    } catch {
+      // Tables may not exist yet on a fresh production deploy.
+    }
   }
   return getDemoStats();
 }
