@@ -10,6 +10,7 @@
     "build": "npm run build --workspace=web",
     "db:generate": "npm run generate --workspace=@zarkari/db",
     "db:push": "npm run push --workspace=@zarkari/db",
-    "db:seed": "tsx scripts/seed-db.ts"
+    "db:seed": "tsx scripts/seed-db.ts",
+    "test:r2": "tsx scripts/test-r2.ts"
   }
 }

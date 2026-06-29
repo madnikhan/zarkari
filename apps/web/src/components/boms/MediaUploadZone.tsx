@@ -34,25 +34,15 @@ export function MediaUploadZone({
 
     try {
       for (const file of selected) {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            category,
-          }),
-        });
+        if (file.size > 4 * 1024 * 1024) {
+          throw new Error(`${file.name} is over 4 MB. Please compress it before uploading.`);
+        }
+        const form = new FormData();
+        form.append("file", file);
+        form.append("category", category);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Upload failed");
-        if (data.uploadUrl && !data.demo) {
-          const putRes = await fetch(data.uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": file.type || data.contentType || "application/octet-stream" },
-            body: file,
-          });
-          if (!putRes.ok) throw new Error("Failed to upload file to storage");
-        }
         uploaded.push({ name: file.name, url: data.url });
       }
       const next = [...files, ...uploaded];
@@ -81,7 +71,7 @@ export function MediaUploadZone({
           <Upload className="h-8 w-8 text-slate-300 mb-2" />
         )}
         <span className="text-sm text-slate-500">{uploading ? "Uploading…" : label}</span>
-        <span className="text-xs text-slate-400 mt-1">JPG, PNG, MP4 up to 50MB</span>
+        <span className="text-xs text-slate-400 mt-1">JPG, PNG, MP4 up to 4 MB</span>
         <input
           type="file"
           accept={accept}
