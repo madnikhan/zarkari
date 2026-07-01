@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { Copy, Check, Loader2 } from "lucide-react";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
+import { publicAssetUrl } from "@/lib/image-url";
 
 interface MediaAsset {
   id: string;
@@ -57,7 +58,7 @@ export function MediaLibrary() {
           {assets.map((asset) => (
             <div key={asset.id} className="boms-card overflow-hidden group">
               <div className="relative aspect-square bg-slate-100">
-                <Image src={asset.url} alt={asset.fileName} fill sizes="200px" className="object-cover" />
+                <Image src={publicAssetUrl(asset.url) ?? asset.url} alt={asset.fileName} fill sizes="200px" className="object-cover" />
               </div>
               <div className="p-2">
                 <p className="text-xs text-slate-600 truncate" title={asset.fileName}>
