@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   sendToSupplier,
   cancelOrder,
@@ -56,6 +57,13 @@ export async function POST(request: Request, { params }: Props) {
       });
       break;
   }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/calendar");
+  revalidatePath("/admin/cash");
 
   return NextResponse.json({ ok: true });
 }

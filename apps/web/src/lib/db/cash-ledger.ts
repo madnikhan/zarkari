@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, lt, notInArray, sql } from "drizzle-orm";
 import { getDb, schema } from "./index";
 
 export type CashDirection = "in" | "out";
@@ -124,16 +124,98 @@ export async function getOpeningBalanceForDay(date: string | Date): Promise<{
   return null;
 }
 
-async function computeClosingFromPreviousDay(date: string): Promise<{ cashInHand: number; onlineBank: number }> {
+async function sumDayTransactionTotals(businessDate: string) {
+  const db = getDb();
+  if (!db) return { cashIn: 0, onlineIn: 0, cashOut: 0, onlineOut: 0, totalCashIn: 0, totalCashOut: 0 };
+
+  const txRows = await db
+    .select({
+      amount: schema.cashTransactions.amount,
+      method: schema.cashTransactions.method,
+      direction: schema.cashTransactions.direction,
+    })
+    .from(schema.cashTransactions)
+    .where(eq(schema.cashTransactions.businessDate, businessDate));
+
+  const totalCashIn = txRows.filter((r) => r.direction === "in").reduce((s, r) => s + parseFloat(r.amount), 0);
+  const totalCashOut = txRows.filter((r) => r.direction === "out").reduce((s, r) => s + parseFloat(r.amount), 0);
+
+  return {
+    cashIn: sumByMethod(txRows, "in", "cash"),
+    onlineIn: sumByMethod(txRows, "in", "online"),
+    cashOut: sumByMethod(txRows, "out", "cash"),
+    onlineOut: sumByMethod(txRows, "out", "online"),
+    totalCashIn,
+    totalCashOut,
+  };
+}
+
+async function getOutstandingBridalTotals() {
+  const db = getDb();
+  if (!db) return { count: 0, balance: 0 };
+
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      balance: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric), 0)`,
+    })
+    .from(schema.bridalOrders)
+    .where(notInArray(schema.bridalOrders.status, ["collected", "cancelled", "refunded"]));
+
+  return { count: Number(row?.count ?? 0), balance: Number(row?.balance ?? 0) };
+}
+
+async function resolveOpeningForDay(businessDate: string): Promise<{ cashInHand: number; onlineBank: number }> {
+  const stored = await getOpeningBalanceForDay(businessDate);
+  if (stored) return stored;
+
   const db = getDb();
   if (!db) return { cashInHand: 0, onlineBank: 0 };
 
-  const target = new Date(`${date}T12:00:00Z`);
-  const prev = new Date(target);
-  prev.setUTCDate(prev.getUTCDate() - 1);
-  const prevDate = toDateString(prev);
-  const prevSummary = await getDailyCashSummary(prevDate);
-  return { cashInHand: prevSummary.closingCash, onlineBank: prevSummary.closingOnline };
+  const [anchor] = await db
+    .select()
+    .from(schema.cashOpeningBalances)
+    .where(lt(schema.cashOpeningBalances.businessDate, businessDate))
+    .orderBy(desc(schema.cashOpeningBalances.businessDate))
+    .limit(1);
+
+  let cursor = anchor?.businessDate ?? null;
+  let cash = anchor ? parseFloat(anchor.cashInHand) : 0;
+  let online = anchor ? parseFloat(anchor.onlineBank) : 0;
+
+  if (cursor) {
+    const dayTotals = await sumDayTransactionTotals(cursor);
+    cash += dayTotals.cashIn - dayTotals.cashOut;
+    online += dayTotals.onlineIn - dayTotals.onlineOut;
+  }
+
+  const start = cursor
+    ? (() => {
+        const d = new Date(`${cursor}T12:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + 1);
+        return toDateString(d);
+      })()
+    : "1970-01-01";
+
+  const target = new Date(`${businessDate}T12:00:00Z`);
+  let walk = new Date(`${start}T12:00:00Z`);
+  let iterations = 0;
+
+  while (walk < target && iterations < 120) {
+    const day = toDateString(walk);
+    const explicit = await getOpeningBalanceForDay(day);
+    if (explicit) {
+      cash = explicit.cashInHand;
+      online = explicit.onlineBank;
+    }
+    const totals = await sumDayTransactionTotals(day);
+    cash += totals.cashIn - totals.cashOut;
+    online += totals.onlineIn - totals.onlineOut;
+    walk.setUTCDate(walk.getUTCDate() + 1);
+    iterations += 1;
+  }
+
+  return { cashInHand: cash, onlineBank: online };
 }
 
 export async function setOpeningBalance(
@@ -188,38 +270,15 @@ export async function getDailyCashSummary(date: string | Date): Promise<DailyCas
     };
   }
 
-  const opening =
-    (await getOpeningBalanceForDay(businessDate)) ?? (await computeClosingFromPreviousDay(businessDate));
+  const opening = await resolveOpeningForDay(businessDate);
 
-  const txRows = await db
-    .select({
-      amount: schema.cashTransactions.amount,
-      method: schema.cashTransactions.method,
-      direction: schema.cashTransactions.direction,
-    })
-    .from(schema.cashTransactions)
-    .where(eq(schema.cashTransactions.businessDate, businessDate));
-
-  const totalCashIn = txRows.filter((r) => r.direction === "in").reduce((s, r) => s + parseFloat(r.amount), 0);
-  const totalCashOut = txRows.filter((r) => r.direction === "out").reduce((s, r) => s + parseFloat(r.amount), 0);
-
-  const cashIn = sumByMethod(txRows, "in", "cash");
-  const onlineIn = sumByMethod(txRows, "in", "online");
-  const cashOut = sumByMethod(txRows, "out", "cash");
-  const onlineOut = sumByMethod(txRows, "out", "online");
+  const { cashIn, onlineIn, cashOut, onlineOut, totalCashIn, totalCashOut } =
+    await sumDayTransactionTotals(businessDate);
 
   const closingCash = opening.cashInHand + cashIn - cashOut;
   const closingOnline = opening.onlineBank + onlineIn - onlineOut;
 
-  const orderRows = await db
-    .select({
-      status: schema.bridalOrders.status,
-      remainingBalance: schema.bridalOrders.remainingBalance,
-    })
-    .from(schema.bridalOrders);
-
-  const active = orderRows.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
-  const outstandingBalance = active.reduce((s, o) => s + parseFloat(o.remainingBalance), 0);
+  const outstanding = await getOutstandingBridalTotals();
 
   return {
     businessDate,
@@ -232,8 +291,8 @@ export async function getDailyCashSummary(date: string | Date): Promise<DailyCas
     closingCash,
     closingOnline,
     closingTotal: closingCash + closingOnline,
-    outstandingOrders: active.length,
-    outstandingBalance,
+    outstandingOrders: outstanding.count,
+    outstandingBalance: outstanding.balance,
   };
 }
 

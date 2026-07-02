@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, notInArray, or, sql } from "drizzle-orm";
 import type {
   BridalOrder,
   BridalStatus,
@@ -59,6 +59,380 @@ export async function listBridalOrdersDb(filters?: {
 
   const rows = await query;
   return rows.map(mapOrder);
+}
+
+const TERMINAL_STATUSES: BridalStatus[] = ["collected", "cancelled", "refunded"];
+
+export type BridalOrderWithRelations = BridalOrder & {
+  customerName?: string;
+  customerPhone?: string;
+  supplierName?: string;
+};
+
+export type OrdersTab = "active" | "overdue" | "due-week" | "completed";
+
+function ordersTabCondition(tab: OrdersTab = "active") {
+  const now = new Date();
+  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  if (tab === "completed") return eq(schema.bridalOrders.status, "collected");
+  if (tab === "overdue") {
+    return and(
+      lte(schema.bridalOrders.deliveryDate, now),
+      notInArray(schema.bridalOrders.status, TERMINAL_STATUSES)
+    );
+  }
+  if (tab === "due-week") {
+    return and(
+      gte(schema.bridalOrders.deliveryDate, now),
+      lte(schema.bridalOrders.deliveryDate, weekEnd),
+      notInArray(schema.bridalOrders.status, TERMINAL_STATUSES)
+    );
+  }
+  return notInArray(schema.bridalOrders.status, TERMINAL_STATUSES);
+}
+
+function mapOrderWithRelations(row: {
+  order: typeof schema.bridalOrders.$inferSelect;
+  customerName: string | null;
+  customerPhone: string | null;
+  supplierName: string | null;
+}): BridalOrderWithRelations {
+  return {
+    ...mapOrder(row.order),
+    customerName: row.customerName ?? undefined,
+    customerPhone: row.customerPhone ?? undefined,
+    supplierName: row.supplierName ?? undefined,
+  };
+}
+
+export async function listBridalOrdersWithRelationsDb(filters: {
+  supplierId?: string;
+  tab?: OrdersTab;
+  limit?: number;
+  offset?: number;
+  activeOnly?: boolean;
+}): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
+  const db = getDb();
+  if (!db) return { orders: [], total: 0 };
+
+  const conditions = [];
+  if (filters.supplierId) conditions.push(eq(schema.bridalOrders.supplierId, filters.supplierId));
+  if (filters.tab) conditions.push(ordersTabCondition(filters.tab));
+  else if (filters.activeOnly) conditions.push(notInArray(schema.bridalOrders.status, TERMINAL_STATUSES));
+
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.bridalOrders)
+    .where(whereClause);
+
+  let query = db
+    .select({
+      order: schema.bridalOrders,
+      customerName: schema.customers.name,
+      customerPhone: schema.customers.phone,
+      supplierName: schema.suppliers.name,
+    })
+    .from(schema.bridalOrders)
+    .innerJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
+    .leftJoin(schema.suppliers, eq(schema.bridalOrders.supplierId, schema.suppliers.id))
+    .where(whereClause)
+    .orderBy(desc(schema.bridalOrders.bookingDate));
+
+  if (filters.limit) query = query.limit(filters.limit) as typeof query;
+  if (filters.offset) query = query.offset(filters.offset) as typeof query;
+
+  const rows = await query;
+  return { orders: rows.map(mapOrderWithRelations), total: Number(countRow?.count ?? 0) };
+}
+
+export async function getBridalDashboardStatsDb() {
+  const db = getDb();
+  if (!db) {
+    return {
+      totalOrders: 0,
+      totalActive: 0,
+      dueThisWeek: 0,
+      dueToday: 0,
+      late: 0,
+      cancelled: 0,
+      refunded: 0,
+      completed: 0,
+    };
+  }
+
+  const now = new Date();
+  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const [row] = await db
+    .select({
+      totalOrders: sql<number>`count(*)`,
+      totalActive: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded'))`,
+      dueThisWeek: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} >= ${now} and ${schema.bridalOrders.deliveryDate} <= ${weekEnd})`,
+      dueToday: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} >= ${todayStart} and ${schema.bridalOrders.deliveryDate} <= ${todayEnd})`,
+      late: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} < ${now})`,
+      cancelled: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'cancelled')`,
+      refunded: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
+      completed: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'collected')`,
+    })
+    .from(schema.bridalOrders);
+
+  return {
+    totalOrders: Number(row?.totalOrders ?? 0),
+    totalActive: Number(row?.totalActive ?? 0),
+    dueThisWeek: Number(row?.dueThisWeek ?? 0),
+    dueToday: Number(row?.dueToday ?? 0),
+    late: Number(row?.late ?? 0),
+    cancelled: Number(row?.cancelled ?? 0),
+    refunded: Number(row?.refunded ?? 0),
+    completed: Number(row?.completed ?? 0),
+  };
+}
+
+export async function getFinanceSummaryDb() {
+  const db = getDb();
+  if (!db) {
+    return { totalDeposits: 0, totalOutstanding: 0, refundedCount: 0 };
+  }
+
+  const [row] = await db
+    .select({
+      totalDeposits: sql<number>`coalesce(sum(${schema.bridalOrders.depositPaid}::numeric), 0)`,
+      totalOutstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
+      refundedCount: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
+    })
+    .from(schema.bridalOrders);
+
+  return {
+    totalDeposits: Number(row?.totalDeposits ?? 0),
+    totalOutstanding: Number(row?.totalOutstanding ?? 0),
+    refundedCount: Number(row?.refundedCount ?? 0),
+  };
+}
+
+export async function getActiveFinanceSummaryDb() {
+  const db = getDb();
+  if (!db) {
+    return { totalDeposits: 0, totalOutstanding: 0 };
+  }
+
+  const [row] = await db
+    .select({
+      totalDeposits: sql<number>`coalesce(sum(${schema.bridalOrders.depositPaid}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded')), 0)`,
+      totalOutstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
+    })
+    .from(schema.bridalOrders);
+
+  return {
+    totalDeposits: Number(row?.totalDeposits ?? 0),
+    totalOutstanding: Number(row?.totalOutstanding ?? 0),
+  };
+}
+
+export type SupplierPerformanceRow = {
+  supplierId: string;
+  total: number;
+  completed: number;
+  redesigns: number;
+  cancellations: number;
+  refunds: number;
+  lateDeliveries: number;
+  successRate: number;
+};
+
+export async function getSupplierPerformanceAllDb(): Promise<SupplierPerformanceRow[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const rows = await db
+    .select({
+      supplierId: schema.bridalOrders.supplierId,
+      total: sql<number>`count(*)`,
+      completed: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'collected')`,
+      redesigns: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'redesign_in_progress')`,
+      cancellations: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'cancelled')`,
+      refunds: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
+      lateDeliveries: sql<number>`count(*) filter (where ${schema.bridalOrders.deliveryDate} < ${now} and ${schema.bridalOrders.status} <> 'collected')`,
+    })
+    .from(schema.bridalOrders)
+    .where(sql`${schema.bridalOrders.supplierId} is not null`)
+    .groupBy(schema.bridalOrders.supplierId);
+
+  return rows
+    .filter((r) => r.supplierId)
+    .map((r) => {
+      const total = Number(r.total ?? 0);
+      const completed = Number(r.completed ?? 0);
+      return {
+        supplierId: r.supplierId!,
+        total,
+        completed,
+        redesigns: Number(r.redesigns ?? 0),
+        cancellations: Number(r.cancellations ?? 0),
+        refunds: Number(r.refunds ?? 0),
+        lateDeliveries: Number(r.lateDeliveries ?? 0),
+        successRate: total ? Math.round((completed / total) * 100) : 0,
+      };
+    });
+}
+
+export async function listPaymentsByOrderIdsDb(orderIds: string[]) {
+  const db = getDb();
+  if (!db || !orderIds.length) return [];
+  const rows = await db
+    .select()
+    .from(schema.bridalPayments)
+    .where(inArray(schema.bridalPayments.orderId, orderIds));
+  return rows.map((row) => ({
+    id: row.id,
+    orderId: row.orderId,
+    type: row.type,
+    amount: row.amount,
+    method: row.method ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+export async function listCustomersByIdsDb(ids: string[]): Promise<Customer[]> {
+  const db = getDb();
+  if (!db || !ids.length) return [];
+  const rows = await db.select().from(schema.customers).where(inArray(schema.customers.id, ids));
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email ?? undefined,
+    address: row.address ?? undefined,
+  }));
+}
+
+export async function listCustomerOrderLinksDb(): Promise<
+  { customerId: string; orderId: string; orderNumber: string }[]
+> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      customerId: schema.bridalOrders.customerId,
+      orderId: schema.bridalOrders.id,
+      orderNumber: schema.bridalOrders.orderNumber,
+    })
+    .from(schema.bridalOrders)
+    .orderBy(desc(schema.bridalOrders.bookingDate));
+  return rows;
+}
+
+export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | "yearly") {
+  const db = getDb();
+  if (!db) {
+    return {
+      period,
+      orderCount: 0,
+      revenue: 0,
+      outstanding: 0,
+      refunds: 0,
+      cancellations: 0,
+      redesigns: 0,
+      late: 0,
+    };
+  }
+
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "daily") start.setDate(start.getDate() - 1);
+  else if (period === "weekly") start.setDate(start.getDate() - 7);
+  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
+  else start.setFullYear(start.getFullYear() - 1);
+
+  const [orderStats] = await db
+    .select({
+      orderCount: sql<number>`count(*)`,
+      revenue: sql<number>`coalesce(sum(${schema.bridalOrders.depositPaid}::numeric), 0)`,
+      outstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
+      late: sql<number>`count(*) filter (where ${schema.bridalOrders.deliveryDate} < ${now} and ${schema.bridalOrders.status} <> 'collected')`,
+    })
+    .from(schema.bridalOrders)
+    .where(gte(schema.bridalOrders.bookingDate, start));
+
+  const [refundCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.orderRefunds)
+    .where(gte(schema.orderRefunds.createdAt, start));
+
+  const [cancelCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.orderCancellations)
+    .where(gte(schema.orderCancellations.createdAt, start));
+
+  const [redesignCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.orderRedesigns)
+    .where(gte(schema.orderRedesigns.createdAt, start));
+
+  return {
+    period,
+    orderCount: Number(orderStats?.orderCount ?? 0),
+    revenue: Number(orderStats?.revenue ?? 0),
+    outstanding: Number(orderStats?.outstanding ?? 0),
+    refunds: Number(refundCount?.count ?? 0),
+    cancellations: Number(cancelCount?.count ?? 0),
+    redesigns: Number(redesignCount?.count ?? 0),
+    late: Number(orderStats?.late ?? 0),
+  };
+}
+
+export async function listBridalOrdersForExportDb(since: Date) {
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      order: schema.bridalOrders,
+      customerName: schema.customers.name,
+    })
+    .from(schema.bridalOrders)
+    .innerJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
+    .where(gte(schema.bridalOrders.bookingDate, since))
+    .orderBy(desc(schema.bridalOrders.bookingDate));
+
+  return rows.map((r) => ({
+    ...mapOrder(r.order),
+    customerName: r.customerName ?? "",
+  }));
+}
+
+export async function searchBridalOrdersWithCustomerDb(query: string) {
+  const db = getDb();
+  if (!db) return [];
+  const q = `%${query.trim()}%`;
+  const rows = await db
+    .select({
+      order: schema.bridalOrders,
+      customerName: schema.customers.name,
+    })
+    .from(schema.bridalOrders)
+    .leftJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
+    .where(
+      or(
+        ilike(schema.bridalOrders.orderNumber, q),
+        ilike(schema.customers.name, q),
+        ilike(schema.customers.phone, q),
+        ilike(sql`${schema.bridalOrders.status}::text`, q)
+      )
+    )
+    .orderBy(desc(schema.bridalOrders.bookingDate))
+    .limit(50);
+
+  return rows.map((r) => ({
+    ...mapOrder(r.order),
+    customerName: r.customerName ?? undefined,
+  }));
 }
 
 export async function getBridalOrderDb(id: string): Promise<BridalOrder | null> {

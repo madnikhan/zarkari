@@ -155,7 +155,7 @@ export async function getBridalOrders(filters?: {
 }): Promise<BridalOrder[]> {
   if (isDbConfigured()) {
     const { listBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    return listBridalOrdersDb(filters);
+    return listBridalOrdersDb({ ...filters, limit: filters?.limit ?? 5000 });
   }
   let orders = [...demoBridalOrders];
   if (filters?.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
@@ -305,6 +305,136 @@ export async function getPayments(orderId: string) {
   return demoPayments.filter((p) => p.orderId === orderId);
 }
 
+export async function getPaymentsForOrders(orderIds: string[]) {
+  if (isDbConfigured() && orderIds.length) {
+    const { listPaymentsByOrderIdsDb } = await import("@/lib/db/bridal-orders");
+    return listPaymentsByOrderIdsDb(orderIds);
+  }
+  if (!useDemoData()) return [];
+  return demoPayments.filter((p) => orderIds.includes(p.orderId));
+}
+
+export type BridalOrderWithRelations = BridalOrder & {
+  customerName?: string;
+  customerPhone?: string;
+  supplierName?: string;
+};
+
+export async function getBridalOrdersWithRelations(filters: {
+  supplierId?: string;
+  tab?: "active" | "overdue" | "due-week" | "completed";
+  limit?: number;
+  offset?: number;
+  activeOnly?: boolean;
+}): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
+  if (isDbConfigured()) {
+    const { listBridalOrdersWithRelationsDb } = await import("@/lib/db/bridal-orders");
+    return listBridalOrdersWithRelationsDb(filters);
+  }
+  const now = new Date();
+  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  let orders = [...demoBridalOrders];
+  if (filters.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
+  if (filters.tab === "completed") orders = orders.filter((o) => o.status === "collected");
+  else if (filters.tab === "overdue") {
+    orders = orders.filter(
+      (o) => new Date(o.deliveryDate) < now && !["collected", "cancelled", "refunded"].includes(o.status)
+    );
+  } else if (filters.tab === "due-week") {
+    orders = orders.filter((o) => {
+      const d = new Date(o.deliveryDate);
+      return d >= now && d <= weekEnd && !["collected", "cancelled", "refunded"].includes(o.status);
+    });
+  } else if (filters.activeOnly || filters.tab === "active") {
+    orders = orders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
+  }
+  orders.sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
+  const total = orders.length;
+  const offset = filters.offset ?? 0;
+  const limit = filters.limit ?? total;
+  orders = orders.slice(offset, offset + limit);
+  const withRelations = orders.map((order) => {
+    const customer = demoCustomers.find((c) => c.id === order.customerId);
+    const supplier = order.supplierId ? demoSuppliers.find((s) => s.id === order.supplierId) : undefined;
+    return {
+      ...order,
+      customerName: customer?.name,
+      customerPhone: customer?.phone,
+      supplierName: supplier?.name,
+    };
+  });
+  return { orders: withRelations, total };
+}
+
+export async function getFinanceSummary() {
+  if (isDbConfigured()) {
+    const { getFinanceSummaryDb } = await import("@/lib/db/bridal-orders");
+    return getFinanceSummaryDb();
+  }
+  const orders = demoBridalOrders;
+  return {
+    totalDeposits: orders.reduce((s, o) => s + parseFloat(o.depositPaid), 0),
+    totalOutstanding: orders
+      .filter((o) => !["cancelled", "refunded", "collected"].includes(o.status))
+      .reduce((s, o) => s + parseFloat(o.remainingBalance), 0),
+    refundedCount: orders.filter((o) => o.status === "refunded").length,
+  };
+}
+
+export async function getActiveFinanceSummary() {
+  if (isDbConfigured()) {
+    const { getActiveFinanceSummaryDb } = await import("@/lib/db/bridal-orders");
+    return getActiveFinanceSummaryDb();
+  }
+  const active = demoBridalOrders.filter((o) => !["cancelled", "refunded"].includes(o.status));
+  return {
+    totalDeposits: active.reduce((s, o) => s + parseFloat(o.depositPaid), 0),
+    totalOutstanding: active
+      .filter((o) => o.status !== "collected")
+      .reduce((s, o) => s + parseFloat(o.remainingBalance), 0),
+  };
+}
+
+export async function getAllSupplierPerformance() {
+  if (isDbConfigured()) {
+    const { getSupplierPerformanceAllDb } = await import("@/lib/db/bridal-orders");
+    return getSupplierPerformanceAllDb();
+  }
+  return demoSuppliers.map((s) => {
+    const orders = demoBridalOrders.filter((o) => o.supplierId === s.id);
+    const completed = orders.filter((o) => o.status === "collected").length;
+    const total = orders.length;
+    return {
+      supplierId: s.id,
+      total,
+      completed,
+      redesigns: orders.filter((o) => o.status === "redesign_in_progress").length,
+      cancellations: orders.filter((o) => o.status === "cancelled").length,
+      refunds: orders.filter((o) => o.status === "refunded").length,
+      lateDeliveries: orders.filter((o) => new Date(o.deliveryDate) < new Date() && o.status !== "collected").length,
+      successRate: total ? Math.round((completed / total) * 100) : 0,
+    };
+  });
+}
+
+export async function getCustomersWithOrders() {
+  if (isDbConfigured()) {
+    const { listCustomersDb, listCustomerOrderLinksDb } = await import("@/lib/db/bridal-orders");
+    const [customers, links] = await Promise.all([listCustomersDb(), listCustomerOrderLinksDb()]);
+    const byCustomer = new Map<string, { id: string; orderNumber: string }[]>();
+    for (const link of links) {
+      const list = byCustomer.get(link.customerId) ?? [];
+      list.push({ id: link.orderId, orderNumber: link.orderNumber });
+      byCustomer.set(link.customerId, list);
+    }
+    return customers.map((c) => ({ ...c, orders: byCustomer.get(c.id) ?? [] }));
+  }
+  return demoCustomers.map((c) => ({
+    ...c,
+    orders: demoBridalOrders.filter((o) => o.customerId === c.id).map((o) => ({ id: o.id, orderNumber: o.orderNumber })),
+  }));
+}
+
 export async function getRetailOrders() {
   if (isDbConfigured()) {
     const { listRetailOrdersDb } = await import("@/lib/db/retail-orders");
@@ -335,6 +465,11 @@ async function loadAllBridalOrders(): Promise<BridalOrder[]> {
 }
 
 export async function getReportsData(period: "daily" | "weekly" | "monthly" | "yearly" = "monthly") {
+  if (isDbConfigured()) {
+    const { getReportsDataDb } = await import("@/lib/db/bridal-orders");
+    return getReportsDataDb(period);
+  }
+
   const now = new Date();
   const start = new Date(now);
   if (period === "daily") start.setDate(start.getDate() - 1);
@@ -351,11 +486,6 @@ export async function getReportsData(period: "daily" | "weekly" | "monthly" | "y
 
   const refunds = await getRefunds();
   const cancellations = await getCancellations();
-  let redesignList = demoRedesigns;
-  if (isDbConfigured()) {
-    const { listRedesignsDb } = await import("@/lib/db/bridal-orders");
-    redesignList = await listRedesignsDb();
-  }
 
   return {
     period,
@@ -364,9 +494,33 @@ export async function getReportsData(period: "daily" | "weekly" | "monthly" | "y
     outstanding,
     refunds: refunds.filter((r) => new Date(r.createdAt) >= start).length,
     cancellations: cancellations.filter((c) => new Date(c.createdAt) >= start).length,
-    redesigns: redesignList.filter((r) => new Date(r.createdAt) >= start).length,
+    redesigns: demoRedesigns.filter((r) => new Date(r.createdAt) >= start).length,
     late: orders.filter((o) => new Date(o.deliveryDate) < now && o.status !== "collected").length,
   };
+}
+
+export async function getExportOrders(period: "daily" | "weekly" | "monthly" | "yearly") {
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "daily") start.setDate(start.getDate() - 1);
+  else if (period === "weekly") start.setDate(start.getDate() - 7);
+  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
+  else start.setFullYear(start.getFullYear() - 1);
+
+  if (isDbConfigured()) {
+    const { listBridalOrdersForExportDb } = await import("@/lib/db/bridal-orders");
+    return listBridalOrdersForExportDb(start);
+  }
+
+  return loadAllBridalOrders()
+    .then((orders) =>
+      orders
+        .filter((o) => new Date(o.bookingDate) >= start)
+        .map((o) => ({
+          ...o,
+          customerName: demoCustomers.find((c) => c.id === o.customerId)?.name ?? "",
+        }))
+    );
 }
 
 export async function searchOrders(query: string): Promise<BridalOrder[]> {
@@ -390,12 +544,30 @@ export async function searchOrders(query: string): Promise<BridalOrder[]> {
   return results;
 }
 
+export async function searchOrdersWithCustomer(query: string) {
+  if (isDbConfigured()) {
+    const { searchBridalOrdersWithCustomerDb } = await import("@/lib/db/bridal-orders");
+    return searchBridalOrdersWithCustomerDb(query);
+  }
+  const results = await searchOrders(query);
+  return results.map((order) => ({
+    ...order,
+    customerName: demoCustomers.find((c) => c.id === order.customerId)?.name,
+  }));
+}
+
 export async function getDashboardStats() {
+  if (isDbConfigured()) {
+    const { getBridalDashboardStatsDb } = await import("@/lib/db/bridal-orders");
+    return getBridalDashboardStatsDb();
+  }
+
   const allOrders = await loadAllBridalOrders();
   const active = allOrders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
   const now = new Date();
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
   return {
+    totalOrders: allOrders.length,
     totalActive: active.length,
     dueThisWeek: active.filter((o) => new Date(o.deliveryDate) <= weekEnd && new Date(o.deliveryDate) >= now).length,
     dueToday: active.filter((o) => {
@@ -410,6 +582,24 @@ export async function getDashboardStats() {
 }
 
 export async function getSupplierPerformance(supplierId: string) {
+  if (isDbConfigured()) {
+    const all = await getAllSupplierPerformance();
+    const perf = all.find((p) => p.supplierId === supplierId);
+    if (perf) {
+      return {
+        total: perf.total,
+        completed: perf.completed,
+        successful: perf.completed,
+        wrongOrders: perf.redesigns,
+        redesigns: perf.redesigns,
+        refunds: perf.refunds,
+        cancellations: perf.cancellations,
+        lateDeliveries: perf.lateDeliveries,
+        successRate: perf.successRate,
+      };
+    }
+  }
+
   const allOrders = await loadAllBridalOrders();
   const orders = allOrders.filter((o) => o.supplierId === supplierId);
   const total = orders.length;

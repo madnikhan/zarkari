@@ -19,7 +19,7 @@ export function isUuid(value: string): boolean {
 export function getDb() {
   if (!isDbConfigured()) return null;
   if (!db) {
-    client = postgres(process.env.DATABASE_URL!, { max: 1 });
+    client = postgres(process.env.DATABASE_URL!, { max: 3 });
     db = drizzle(client, { schema });
   }
   return db;

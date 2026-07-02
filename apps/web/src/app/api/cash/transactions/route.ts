@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import {
   createCashTransaction,
@@ -72,5 +73,7 @@ export async function POST(request: Request) {
   });
 
   if (!tx) return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 });
+  revalidatePath("/admin/cash");
+  revalidatePath("/admin/cash/analytics");
   return NextResponse.json({ transaction: tx });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { searchOrders, getCustomer } from "@/lib/data";
+import { revalidatePath } from "next/cache";
+import { searchOrdersWithCustomer } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
@@ -10,14 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const q = new URL(request.url).searchParams.get("q") ?? "";
-    const orders = await searchOrders(q);
-    const results = await Promise.all(
-      orders.map(async (o) => ({
-        ...o,
-        customerName: (await getCustomer(o.customerId))?.name,
-      }))
-    );
-
+    const results = await searchOrdersWithCustomer(q);
     return NextResponse.json({ results });
   } catch (err) {
     console.error("Order search failed:", err);

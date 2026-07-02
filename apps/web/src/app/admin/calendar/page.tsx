@@ -1,27 +1,21 @@
-import { getBridalOrders, getCustomer } from "@/lib/data";
+import { getBridalOrdersWithRelations } from "@/lib/data";
 import Link from "next/link";
 import { StatusBadge } from "@/components/boms/StatusBadge";
 
 export default async function AdminCalendarPage() {
-  const orders = await getBridalOrders();
-  const active = orders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
+  const { orders } = await getBridalOrdersWithRelations({ activeOnly: true, limit: 500 });
 
-  const enriched = await Promise.all(
-    active.map(async (order) => ({
-      order,
-      customer: await getCustomer(order.customerId),
-    }))
-  );
-
-  const byDate = enriched.reduce<Record<string, typeof enriched>>((acc, row) => {
-    const key = new Date(row.order.deliveryDate).toLocaleDateString("en-GB", {
+  const byDate = orders.reduce<
+    Record<string, { order: (typeof orders)[0]; customerName?: string }[]>
+  >((acc, order) => {
+    const key = new Date(order.deliveryDate).toLocaleDateString("en-GB", {
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     });
     if (!acc[key]) acc[key] = [];
-    acc[key].push(row);
+    acc[key].push({ order, customerName: order.customerName });
     return acc;
   }, {});
 
@@ -37,13 +31,13 @@ export default async function AdminCalendarPage() {
           <div key={date} className="boms-card p-6">
             <h2 className="text-sm font-semibold text-[#4C3BCF] mb-4">{date}</h2>
             <ul className="space-y-3">
-              {byDate[date].map(({ order, customer }) => (
+              {byDate[date].map(({ order, customerName }) => (
                 <li key={order.id} className="flex items-center justify-between gap-4 py-2 border-b border-slate-100 last:border-0">
                   <div>
                     <Link href={`/admin/orders/${order.id}`} className="font-mono text-sm text-[#4C3BCF] hover:underline">
                       {order.orderNumber}
                     </Link>
-                    <p className="text-sm text-slate-600">{customer?.name}</p>
+                    <p className="text-sm text-slate-600">{customerName}</p>
                   </div>
                   <StatusBadge status={order.status} />
                 </li>

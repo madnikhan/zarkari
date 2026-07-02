@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { recordPayment } from "@/lib/data/actions";
 
@@ -23,6 +24,10 @@ export async function POST(request: Request, { params }: Props) {
     amount: body.amount,
     method: body.method,
   });
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/finance");
+  revalidatePath(`/admin/orders/${id}`);
 
   return NextResponse.json({ ok: true });
 }

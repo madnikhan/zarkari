@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReportsData, getBridalOrders, getCustomer } from "@/lib/data";
+import { getReportsData, getExportOrders } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
@@ -10,23 +10,18 @@ export async function GET(request: Request) {
 
   const period = (new URL(request.url).searchParams.get("period") ?? "monthly") as "daily" | "weekly" | "monthly" | "yearly";
   const data = await getReportsData(period);
-  const allOrders = await getBridalOrders();
-  const now = new Date();
-  const start = new Date(now);
-  if (period === "daily") start.setDate(start.getDate() - 1);
-  else if (period === "weekly") start.setDate(start.getDate() - 7);
-  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
-  else start.setFullYear(start.getFullYear() - 1);
-  const orders = allOrders.filter((o) => new Date(o.bookingDate) >= start);
+  const orders = await getExportOrders(period);
 
   const rows = [
     ["Order Number", "Customer", "Status", "Total", "Deposit", "Delivery Date"],
-    ...(await Promise.all(
-      orders.map(async (o) => {
-        const c = await getCustomer(o.customerId);
-        return [o.orderNumber, c?.name ?? "", o.status, o.totalPrice, o.depositPaid, o.deliveryDate.slice(0, 10)];
-      })
-    )),
+    ...orders.map((o) => [
+      o.orderNumber,
+      o.customerName ?? "",
+      o.status,
+      o.totalPrice,
+      o.depositPaid,
+      o.deliveryDate.slice(0, 10),
+    ]),
   ];
 
   const csv = [

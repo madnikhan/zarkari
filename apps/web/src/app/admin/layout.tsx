@@ -10,8 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  const showSampleBanner = await hasSampleData();
+  const [session, showSampleBanner] = await Promise.all([getSession(), hasSampleData()]);
   return (
     <>
       <BomsShell userName={session?.name} userRole={session?.role}>

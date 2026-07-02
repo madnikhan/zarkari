@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart } from "lucide-react";
-import { getBridalOrders, getCustomer, getDashboardStats, getSupplier } from "@/lib/data";
+import { getBridalOrdersWithRelations, getDashboardStats } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { StatCard } from "@/components/boms/StatCard";
 import { OrdersTable } from "@/components/boms/OrdersTable";
@@ -8,20 +8,18 @@ import { SocialInboxWidget } from "@/components/admin/inbox/SocialInboxWidget";
 
 export default async function AdminDashboardPage() {
   const session = await getSession();
-  const stats = await getDashboardStats();
-  const orders = await getBridalOrders();
-  const totalOrders = orders.length;
-  const now = new Date();
-  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  const [stats, { orders: recentOrders }] = await Promise.all([
+    getDashboardStats(),
+    getBridalOrdersWithRelations({ limit: 8 }),
+  ]);
 
-  const recent = orders.slice(0, 8);
-  const rows = await Promise.all(
-    recent.map(async (order) => ({
-      order,
-      customer: await getCustomer(order.customerId),
-      supplierName: order.supplierId ? (await getSupplier(order.supplierId))?.name : undefined,
-    }))
-  );
+  const rows = recentOrders.map((order) => ({
+    order,
+    customer: order.customerName
+      ? { id: order.customerId, name: order.customerName, phone: order.customerPhone ?? "" }
+      : null,
+    supplierName: order.supplierName,
+  }));
 
   return (
     <div className="p-4 lg:p-8">
@@ -36,7 +34,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <StatCard label="Total Orders" value={totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
+        <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
         <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
         <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders" icon={Clock} accent="warning" />
         <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders" icon={AlertTriangle} accent="danger" />

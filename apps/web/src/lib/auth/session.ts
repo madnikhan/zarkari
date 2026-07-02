@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import type { UserRole } from "@/lib/data/seed";
 import { demoUsers } from "@/lib/data/seed";
@@ -16,11 +17,15 @@ export interface SessionUser {
 
 const SESSION_COOKIE = "zarkari-session";
 
-export async function getSession(): Promise<SessionUser | null> {
+const readSession = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
   return parseSessionCookie(raw);
+});
+
+export async function getSession(): Promise<SessionUser | null> {
+  return readSession();
 }
 
 export async function authenticate(email: string, password: string): Promise<SessionUser | null> {

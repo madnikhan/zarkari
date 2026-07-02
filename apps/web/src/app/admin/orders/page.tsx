@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getBridalOrders, getCustomer, getSupplier } from "@/lib/data";
+import { getBridalOrdersWithRelations } from "@/lib/data";
 import { OrdersTable } from "@/components/boms/OrdersTable";
 import { cn } from "@/lib/utils";
 
@@ -12,29 +12,27 @@ interface Props {
 export default async function AdminOrdersPage({ searchParams }: Props) {
   const { tab = "active", page: pageStr = "1" } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
-  const orders = await getBridalOrders();
-  const now = new Date();
-  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  const tabKey = (["active", "overdue", "due-week", "completed"].includes(tab) ? tab : "active") as
+    | "active"
+    | "overdue"
+    | "due-week"
+    | "completed";
 
-  const filtered = orders.filter((o) => {
-    if (tab === "completed") return o.status === "collected";
-    if (tab === "overdue") return new Date(o.deliveryDate) < now && !["collected", "cancelled", "refunded"].includes(o.status);
-    if (tab === "due-week") {
-      const d = new Date(o.deliveryDate);
-      return d >= now && d <= weekEnd && !["collected", "cancelled", "refunded"].includes(o.status);
-    }
-    return !["collected", "cancelled", "refunded"].includes(o.status);
+  const { orders, total } = await getBridalOrdersWithRelations({
+    tab: tabKey,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
   });
 
-  const rows = await Promise.all(
-    filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(async (order) => ({
-      order,
-      customer: await getCustomer(order.customerId),
-      supplierName: order.supplierId ? (await getSupplier(order.supplierId))?.name : undefined,
-    }))
-  );
+  const rows = orders.map((order) => ({
+    order,
+    customer: order.customerName
+      ? { id: order.customerId, name: order.customerName, phone: order.customerPhone ?? "" }
+      : null,
+    supplierName: order.supplierName,
+  }));
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const tabs = [
     { key: "active", label: "Active" },
@@ -59,7 +57,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
             href={`/admin/orders?tab=${t.key}`}
             className={cn(
               "px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors",
-              tab === t.key ? "boms-btn-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              tabKey === t.key ? "boms-btn-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
             )}
           >
             {t.label}
@@ -73,7 +71,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
         <div className="flex items-center justify-center gap-2 mt-6">
           {page > 1 && (
             <Link
-              href={`/admin/orders?tab=${tab}&page=${page - 1}`}
+              href={`/admin/orders?tab=${tabKey}&page=${page - 1}`}
               className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
             >
               Previous
@@ -84,7 +82,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
           </span>
           {page < totalPages && (
             <Link
-              href={`/admin/orders?tab=${tab}&page=${page + 1}`}
+              href={`/admin/orders?tab=${tabKey}&page=${page + 1}`}
               className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
             >
               Next
