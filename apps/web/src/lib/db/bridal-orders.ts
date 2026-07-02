@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, inArray, lt, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type {
   BridalOrder,
   BridalStatus,
@@ -169,28 +169,43 @@ export async function getBridalDashboardStatsDb() {
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  const [row] = await db
-    .select({
-      totalOrders: sql<number>`count(*)`,
-      totalActive: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded'))`,
-      dueThisWeek: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} >= ${now} and ${schema.bridalOrders.deliveryDate} <= ${weekEnd})`,
-      dueToday: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} >= ${todayStart} and ${schema.bridalOrders.deliveryDate} <= ${todayEnd})`,
-      late: sql<number>`count(*) filter (where ${schema.bridalOrders.status} not in ('collected', 'cancelled', 'refunded') and ${schema.bridalOrders.deliveryDate} < ${now})`,
-      cancelled: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'cancelled')`,
-      refunded: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
-      completed: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'collected')`,
-    })
-    .from(schema.bridalOrders);
+  const active = notInArray(schema.bridalOrders.status, TERMINAL_STATUSES);
+
+  const [
+    [totalRow],
+    [activeRow],
+    [dueWeekRow],
+    [dueTodayRow],
+    [lateRow],
+    [cancelledRow],
+    [refundedRow],
+    [completedRow],
+  ] = await Promise.all([
+    db.select({ c: count() }).from(schema.bridalOrders),
+    db.select({ c: count() }).from(schema.bridalOrders).where(active),
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(active, gte(schema.bridalOrders.deliveryDate, now), lte(schema.bridalOrders.deliveryDate, weekEnd))),
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(active, gte(schema.bridalOrders.deliveryDate, todayStart), lte(schema.bridalOrders.deliveryDate, todayEnd))),
+    db.select({ c: count() }).from(schema.bridalOrders).where(and(active, lt(schema.bridalOrders.deliveryDate, now))),
+    db.select({ c: count() }).from(schema.bridalOrders).where(eq(schema.bridalOrders.status, "cancelled")),
+    db.select({ c: count() }).from(schema.bridalOrders).where(eq(schema.bridalOrders.status, "refunded")),
+    db.select({ c: count() }).from(schema.bridalOrders).where(eq(schema.bridalOrders.status, "collected")),
+  ]);
 
   return {
-    totalOrders: Number(row?.totalOrders ?? 0),
-    totalActive: Number(row?.totalActive ?? 0),
-    dueThisWeek: Number(row?.dueThisWeek ?? 0),
-    dueToday: Number(row?.dueToday ?? 0),
-    late: Number(row?.late ?? 0),
-    cancelled: Number(row?.cancelled ?? 0),
-    refunded: Number(row?.refunded ?? 0),
-    completed: Number(row?.completed ?? 0),
+    totalOrders: Number(totalRow?.c ?? 0),
+    totalActive: Number(activeRow?.c ?? 0),
+    dueThisWeek: Number(dueWeekRow?.c ?? 0),
+    dueToday: Number(dueTodayRow?.c ?? 0),
+    late: Number(lateRow?.c ?? 0),
+    cancelled: Number(cancelledRow?.c ?? 0),
+    refunded: Number(refundedRow?.c ?? 0),
+    completed: Number(completedRow?.c ?? 0),
   };
 }
 
@@ -249,7 +264,7 @@ export async function getSupplierPerformanceAllDb(): Promise<SupplierPerformance
   const db = getDb();
   if (!db) return [];
 
-  const now = new Date();
+  const nowIso = new Date().toISOString();
   const rows = await db
     .select({
       supplierId: schema.bridalOrders.supplierId,
@@ -258,7 +273,7 @@ export async function getSupplierPerformanceAllDb(): Promise<SupplierPerformance
       redesigns: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'redesign_in_progress')`,
       cancellations: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'cancelled')`,
       refunds: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
-      lateDeliveries: sql<number>`count(*) filter (where ${schema.bridalOrders.deliveryDate} < ${now} and ${schema.bridalOrders.status} <> 'collected')`,
+      lateDeliveries: sql<number>`count(*) filter (where ${schema.bridalOrders.deliveryDate} < ${nowIso}::timestamptz and ${schema.bridalOrders.status} <> 'collected')`,
     })
     .from(schema.bridalOrders)
     .where(sql`${schema.bridalOrders.supplierId} is not null`)
