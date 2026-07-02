@@ -19,6 +19,9 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/admin/cash/analytics") && user.role !== "owner") {
       return NextResponse.redirect(new URL("/admin/cash", request.url));
     }
+    if (path.startsWith("/admin/users") && user.role !== "owner") {
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    }
   }
 
   if (path.startsWith("/supplier")) {

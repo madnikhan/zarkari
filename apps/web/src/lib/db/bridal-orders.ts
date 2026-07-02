@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, inArray, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type {
   BridalOrder,
   BridalStatus,
@@ -355,10 +355,20 @@ export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | 
       orderCount: sql<number>`count(*)`,
       revenue: sql<number>`coalesce(sum(${schema.bridalOrders.depositPaid}::numeric), 0)`,
       outstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
-      late: sql<number>`count(*) filter (where ${schema.bridalOrders.deliveryDate} < ${now} and ${schema.bridalOrders.status} <> 'collected')`,
     })
     .from(schema.bridalOrders)
     .where(gte(schema.bridalOrders.bookingDate, start));
+
+  const [lateRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.bridalOrders)
+    .where(
+      and(
+        gte(schema.bridalOrders.bookingDate, start),
+        lt(schema.bridalOrders.deliveryDate, now),
+        notInArray(schema.bridalOrders.status, ["collected"])
+      )
+    );
 
   const [refundCount] = await db
     .select({ count: sql<number>`count(*)` })
@@ -383,7 +393,7 @@ export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | 
     refunds: Number(refundCount?.count ?? 0),
     cancellations: Number(cancelCount?.count ?? 0),
     redesigns: Number(redesignCount?.count ?? 0),
-    late: Number(orderStats?.late ?? 0),
+    late: Number(lateRow?.count ?? 0),
   };
 }
 
