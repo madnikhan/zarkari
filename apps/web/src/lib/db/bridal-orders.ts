@@ -79,6 +79,25 @@ export async function getBridalOrderByNumberDb(orderNumber: string): Promise<Bri
   return row ? mapOrder(row) : null;
 }
 
+export async function nextBridalOrderNumberDb(): Promise<string> {
+  const db = getDb();
+  const year = new Date().getFullYear();
+  const prefix = `BR-${year}-`;
+  if (!db) return `${prefix}${String(Date.now()).slice(-4)}`;
+
+  const [latest] = await db
+    .select({ orderNumber: schema.bridalOrders.orderNumber })
+    .from(schema.bridalOrders)
+    .where(ilike(schema.bridalOrders.orderNumber, `${prefix}%`))
+    .orderBy(desc(schema.bridalOrders.orderNumber))
+    .limit(1);
+
+  if (!latest) return `${prefix}0001`;
+  const seq = parseInt(latest.orderNumber.slice(prefix.length), 10);
+  const next = Number.isFinite(seq) ? seq + 1 : 1;
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}
+
 export async function searchBridalOrdersDb(query: string): Promise<BridalOrder[]> {
   const db = getDb();
   if (!db) return [];
@@ -92,7 +111,7 @@ export async function searchBridalOrdersDb(query: string): Promise<BridalOrder[]
         ilike(schema.bridalOrders.orderNumber, q),
         ilike(schema.customers.name, q),
         ilike(schema.customers.phone, q),
-        ilike(schema.bridalOrders.status, q)
+        ilike(sql`${schema.bridalOrders.status}::text`, q)
       )
     )
     .orderBy(desc(schema.bridalOrders.bookingDate))

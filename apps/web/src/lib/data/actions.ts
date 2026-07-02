@@ -106,13 +106,14 @@ export async function createBridalOrder(input: {
   const deposit = (parseFloat(input.totalPrice) * 0.5).toFixed(2);
   const remaining = (parseFloat(input.totalPrice) - parseFloat(deposit)).toFixed(2);
   const delivery = new Date(Date.now() + 56 * 86400000).toISOString();
-  const orderNumber = nextOrderNumber();
 
   if (isDbConfigured()) {
     const {
       createCustomerDb,
       createBridalOrderDb,
+      nextBridalOrderNumberDb,
     } = await import("@/lib/db/bridal-orders");
+    const orderNumber = await nextBridalOrderNumberDb();
     const customer = await createCustomerDb(input.customer);
     if (customer) {
       const dbOrder = await createBridalOrderDb({
@@ -136,11 +137,26 @@ export async function createBridalOrder(input: {
           performedByName: input.createdByName,
           performedByRole: "staff",
         });
+        if (parseFloat(deposit) > 0) {
+          const { addPaymentDb } = await import("@/lib/db/bridal-orders");
+          await addPaymentDb(dbOrder.id, { type: "deposit", amount: deposit, method: "cash" });
+          const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
+          await autoPostCashTransaction({
+            direction: "in",
+            type: "order_deposit",
+            amount: deposit,
+            method: "cash",
+            reference: dbOrder.orderNumber,
+            description: "Deposit from customer",
+            orderId: dbOrder.id,
+          });
+        }
         return dbOrder;
       }
     }
   }
 
+  const orderNumber = nextOrderNumber();
   const customerId = `cust-${Date.now()}`;
   demoCustomers.push({
     id: customerId,

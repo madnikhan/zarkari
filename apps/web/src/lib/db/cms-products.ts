@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Product } from "@/lib/data/seed";
-import { getDb, schema } from "./index";
+import { getDb, isUuid, schema } from "./index";
 
 async function loadProductRelations(
   db: NonNullable<ReturnType<typeof getDb>>,
@@ -93,6 +93,7 @@ export async function listProductsDb(limit = 100, publishedOnly = false): Promis
 export async function getProductByIdDb(id: string): Promise<Product | null> {
   const db = getDb();
   if (!db) return null;
+  if (!isUuid(id)) return null;
   const [row] = await db.select().from(schema.products).where(eq(schema.products.id, id)).limit(1);
   if (!row) return null;
   const rel = await loadProductRelations(db, [row.id]);

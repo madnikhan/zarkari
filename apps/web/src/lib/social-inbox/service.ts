@@ -1,5 +1,6 @@
 import { demoNotifications } from "@/lib/data/seed";
 import { isDbConfigured } from "@/lib/db";
+import { createNotificationDb } from "@/lib/db/notifications";
 import * as dbLayer from "@/lib/db/social-inbox";
 import { demoSocialMessages, demoSocialThreads } from "./demo-store";
 import type {
@@ -12,15 +13,19 @@ import type {
 import { SOCIAL_PLATFORM_LABELS } from "./types";
 
 function notifyInquiry(title: string, body: string, threadId: string) {
+  const href = `/admin/inbox/${threadId}`;
   demoNotifications.unshift({
     id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     title,
     body,
     read: false,
     createdAt: new Date().toISOString(),
-    href: `/admin/inbox/${threadId}`,
+    href,
     threadId,
   });
+  if (isDbConfigured()) {
+    createNotificationDb({ title, body, href, threadId }).catch(console.error);
+  }
 }
 
 function listDemoThreads(filters?: {

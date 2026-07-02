@@ -10,7 +10,14 @@ export async function GET(request: Request) {
 
   const period = (new URL(request.url).searchParams.get("period") ?? "monthly") as "daily" | "weekly" | "monthly" | "yearly";
   const data = await getReportsData(period);
-  const orders = await getBridalOrders();
+  const allOrders = await getBridalOrders();
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "daily") start.setDate(start.getDate() - 1);
+  else if (period === "weekly") start.setDate(start.getDate() - 7);
+  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
+  else start.setFullYear(start.getFullYear() - 1);
+  const orders = allOrders.filter((o) => new Date(o.bookingDate) >= start);
 
   const rows = [
     ["Order Number", "Customer", "Status", "Total", "Deposit", "Delivery Date"],

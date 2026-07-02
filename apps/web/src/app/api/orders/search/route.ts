@@ -8,14 +8,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const q = new URL(request.url).searchParams.get("q") ?? "";
-  const orders = await searchOrders(q);
-  const results = await Promise.all(
-    orders.map(async (o) => ({
-      ...o,
-      customerName: (await getCustomer(o.customerId))?.name,
-    }))
-  );
+  try {
+    const q = new URL(request.url).searchParams.get("q") ?? "";
+    const orders = await searchOrders(q);
+    const results = await Promise.all(
+      orders.map(async (o) => ({
+        ...o,
+        customerName: (await getCustomer(o.customerId))?.name,
+      }))
+    );
 
-  return NextResponse.json({ results });
+    return NextResponse.json({ results });
+  } catch (err) {
+    console.error("Order search failed:", err);
+    return NextResponse.json({ error: "Search failed" }, { status: 500 });
+  }
 }

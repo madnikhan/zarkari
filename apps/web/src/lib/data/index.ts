@@ -60,31 +60,25 @@ export function isDbConfigured(): boolean {
 
 export async function getProducts(limit = 12): Promise<Product[]> {
   if (isDbConfigured()) {
-    const { listProductsDb, countProductsDb } = await import("@/lib/db/cms-products");
-    if ((await countProductsDb()) > 0) {
-      return (await listProductsDb(limit, true)).map(sanitizeProduct);
-    }
+    const { listProductsDb } = await import("@/lib/db/cms-products");
+    return (await listProductsDb(limit, true)).map(sanitizeProduct);
   }
   return demoProducts.slice(0, limit).map(sanitizeProduct);
 }
 
 export async function getAllProducts(limit = 200): Promise<Product[]> {
   if (isDbConfigured()) {
-    const { listProductsDb, countProductsDb } = await import("@/lib/db/cms-products");
-    if ((await countProductsDb()) > 0) {
-      return (await listProductsDb(limit, false)).map(sanitizeProduct);
-    }
+    const { listProductsDb } = await import("@/lib/db/cms-products");
+    return (await listProductsDb(limit, false)).map(sanitizeProduct);
   }
   return demoProducts.slice(0, limit).map(sanitizeProduct);
 }
 
 export async function getProductByHandle(handle: string): Promise<Product | null> {
   if (isDbConfigured()) {
-    const { getProductByHandleDb, countProductsDb } = await import("@/lib/db/cms-products");
-    if ((await countProductsDb()) > 0) {
-      const product = await getProductByHandleDb(handle);
-      return product ? sanitizeProduct(product) : null;
-    }
+    const { getProductByHandleDb } = await import("@/lib/db/cms-products");
+    const product = await getProductByHandleDb(handle);
+    return product ? sanitizeProduct(product) : null;
   }
   const product = demoProducts.find((p) => p.handle === handle);
   return product ? sanitizeProduct(product) : null;
@@ -92,27 +86,23 @@ export async function getProductByHandle(handle: string): Promise<Product | null
 
 export async function getCollections(): Promise<Collection[]> {
   if (isDbConfigured()) {
-    const { listCollectionsDb, countCollectionsDb } = await import("@/lib/db/cms-collections");
-    if ((await countCollectionsDb()) > 0) {
-      return (await listCollectionsDb()).map(sanitizeCollection);
-    }
+    const { listCollectionsDb } = await import("@/lib/db/cms-collections");
+    return (await listCollectionsDb()).map(sanitizeCollection);
   }
   return demoCollections.map(sanitizeCollection);
 }
 
 export async function getCollectionByHandle(handle: string): Promise<(Collection & { products: Product[] }) | null> {
   if (isDbConfigured()) {
-    const { getCollectionByHandleDb, countCollectionsDb } = await import("@/lib/db/cms-collections");
-    if ((await countCollectionsDb()) > 0) {
-      const col = await getCollectionByHandleDb(handle);
-      if (col) {
-        return {
-          ...sanitizeCollection(col),
-          products: col.products.map(sanitizeProduct),
-        };
-      }
-      return null;
+    const { getCollectionByHandleDb } = await import("@/lib/db/cms-collections");
+    const col = await getCollectionByHandleDb(handle);
+    if (col) {
+      return {
+        ...sanitizeCollection(col),
+        products: col.products.map(sanitizeProduct),
+      };
     }
+    return null;
   }
   const collection = demoCollections.find((c) => c.handle === handle);
   if (!collection) return null;
@@ -125,31 +115,25 @@ export async function getCollectionByHandle(handle: string): Promise<(Collection
 
 export async function getBlogPosts(limit = 10): Promise<BlogPost[]> {
   if (isDbConfigured()) {
-    const { listBlogPostsDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
-    if ((await countBlogPostsDb()) > 0) {
-      return (await listBlogPostsDb(limit, true)).map(sanitizeBlogPost);
-    }
+    const { listBlogPostsDb } = await import("@/lib/db/cms-blog");
+    return (await listBlogPostsDb(limit, true)).map(sanitizeBlogPost);
   }
   return demoBlogPosts.slice(0, limit).map(sanitizeBlogPost);
 }
 
 export async function getAllBlogPosts(limit = 100): Promise<BlogPost[]> {
   if (isDbConfigured()) {
-    const { listBlogPostsDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
-    if ((await countBlogPostsDb()) > 0) {
-      return (await listBlogPostsDb(limit, false)).map(sanitizeBlogPost);
-    }
+    const { listBlogPostsDb } = await import("@/lib/db/cms-blog");
+    return (await listBlogPostsDb(limit, false)).map(sanitizeBlogPost);
   }
   return demoBlogPosts.slice(0, limit).map(sanitizeBlogPost);
 }
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
   if (isDbConfigured()) {
-    const { getBlogPostBySlugDb, countBlogPostsDb } = await import("@/lib/db/cms-blog");
-    if ((await countBlogPostsDb()) > 0) {
-      const post = await getBlogPostBySlugDb(slug);
-      return post ? sanitizeBlogPost(post) : null;
-    }
+    const { getBlogPostBySlugDb } = await import("@/lib/db/cms-blog");
+    const post = await getBlogPostBySlugDb(slug);
+    return post ? sanitizeBlogPost(post) : null;
   }
   const post = demoBlogPosts.find((p) => p.slug === slug);
   return post ? sanitizeBlogPost(post) : null;
@@ -157,10 +141,8 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> 
 
 export async function getShopSettings() {
   if (isDbConfigured()) {
-    const { getShopSettingsDb, countShopSettingsDb } = await import("@/lib/db/shop-settings");
-    if ((await countShopSettingsDb()) > 0) {
-      return { ...demoShopSettings, ...(await getShopSettingsDb()) };
-    }
+    const { getShopSettingsDb } = await import("@/lib/db/shop-settings");
+    return { ...demoShopSettings, ...(await getShopSettingsDb()) };
   }
   return demoShopSettings;
 }
@@ -270,11 +252,9 @@ export async function getMessages(orderId: string): Promise<CustomerMessage[]> {
 
 export async function getProductById(id: string): Promise<Product | null> {
   if (isDbConfigured()) {
-    const { getProductByIdDb, countProductsDb } = await import("@/lib/db/cms-products");
-    if ((await countProductsDb()) > 0) {
-      const product = await getProductByIdDb(id);
-      return product ? sanitizeProduct(product) : null;
-    }
+    const { getProductByIdDb } = await import("@/lib/db/cms-products");
+    const product = await getProductByIdDb(id);
+    return product ? sanitizeProduct(product) : null;
   }
   const product = demoProducts.find((p) => p.id === id);
   return product ? sanitizeProduct(product) : null;
@@ -337,12 +317,9 @@ export async function getRetailOrders() {
 export async function getNotifications(unreadOnly = false, userId?: string) {
   if (isDbConfigured()) {
     const { listNotificationsDb } = await import("@/lib/db/notifications");
-    const dbRows = await listNotificationsDb(userId);
-    if (dbRows.length) {
-      let list = dbRows;
-      if (unreadOnly) list = list.filter((n) => !n.read);
-      return list;
-    }
+    let list = await listNotificationsDb(userId);
+    if (unreadOnly) list = list.filter((n) => !n.read);
+    return list;
   }
   let list = [...demoNotifications];
   if (unreadOnly) list = list.filter((n) => !n.read);
