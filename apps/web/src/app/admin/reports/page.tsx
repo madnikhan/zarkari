@@ -25,7 +25,13 @@ export default async function AdminReportsPage({ searchParams }: Props) {
               {t}
             </Link>
           ))}
-          <a href={`/api/reports/export?period=${p}`} className="px-3 py-1.5 text-xs uppercase tracking-wide rounded bg-gold text-charcoal">
+          <Link
+            href="/admin/cash/analytics"
+            className="px-3 py-1.5 text-xs uppercase tracking-wide rounded border border-sand hover:bg-sand/30"
+          >
+            Cash analytics
+          </Link>
+        <a href={`/api/reports/export?period=${p}`} className="px-3 py-1.5 text-xs uppercase tracking-wide rounded bg-gold text-charcoal">
             Export CSV
           </a>
         </div>

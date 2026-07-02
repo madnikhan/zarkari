@@ -112,3 +112,16 @@ body {
   border: 1px solid #e8e6f5;
   border-radius: 0.75rem;
 }
+
+@media print {
+  .boms-theme aside,
+  .boms-theme header,
+  nav.fixed,
+  .print\\:hidden {
+    display: none !important;
+  }
+  .boms-theme main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -144,6 +144,16 @@ export async function countBridalOrdersDb(): Promise<number> {
   return Number(rows[0]?.count ?? 0);
 }
 
+export async function countSampleOrdersDb(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.bridalOrders)
+    .where(ilike(schema.bridalOrders.orderNumber, "SAMPLE-%"));
+  return Number(rows[0]?.count ?? 0);
+}
+
 export async function getOrderFilesDb(orderId: string): Promise<OrderFile[]> {
   const db = getDb();
   if (!db) return [];

@@ -21,6 +21,8 @@ import {
   Store,
   Wallet,
   FileText,
+  Banknote,
+  LineChart,
 } from "lucide-react";
 import { useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
@@ -31,6 +33,8 @@ type NavItem = { label: string; href: string; icon: React.ComponentType<{ classN
 
 const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+  { label: "Daily Cash", href: "/admin/cash", icon: Banknote },
+  { label: "Cash Analytics", href: "/admin/cash/analytics", icon: LineChart, ownerOnly: true },
   { label: "Orders", href: "/admin/orders", icon: ShoppingBag },
   { label: "Shop Orders", href: "/admin/orders/retail", icon: Store },
   { label: "Inbox", href: "/admin/inbox", icon: Inbox },

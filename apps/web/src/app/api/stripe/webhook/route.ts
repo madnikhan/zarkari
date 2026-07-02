@@ -96,6 +96,19 @@ export async function POST(request: Request) {
         ? (await createRetailOrderDb(orderInput)) ?? createRetailOrder(orderInput)
         : createRetailOrder(orderInput);
 
+      if (isDbConfigured() && order) {
+        const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
+        await autoPostCashTransaction({
+          direction: "in",
+          type: "ready_made_sale",
+          amount: total,
+          method: "online",
+          reference: order.orderNumber,
+          description: order.items.map((i) => i.title).join(", ") || "Online shop sale",
+          retailOrderId: order.id,
+        });
+      }
+
       await sendOrderConfirmation(email, order.orderNumber, total);
 
       const res = NextResponse.json({ received: true, orderNumber: order.orderNumber });

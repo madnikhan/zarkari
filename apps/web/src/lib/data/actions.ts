@@ -285,6 +285,16 @@ export async function refundOrder(orderId: string, amount: string, reason: strin
   if (isDbConfigured()) {
     const { addRefundDb } = await import("@/lib/db/bridal-orders");
     await addRefundDb(orderId, { reason, amount, paymentMethod: "original" });
+    const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
+    await autoPostCashTransaction({
+      direction: "out",
+      type: "refund",
+      amount,
+      method: "online",
+      reference: order.orderNumber,
+      description: reason,
+      orderId,
+    });
   }
   await syncOrderPatch(orderId, { status: "refunded" });
   await syncTimeline(orderId, "refunded", {
@@ -320,6 +330,19 @@ export async function markCollected(
       amountPaid: details?.amountPaid ?? order.remainingBalance,
       alterationNotes: details?.alterationNotes,
     });
+    const paidAmount = details?.amountPaid ?? order.remainingBalance;
+    if (parseFloat(paidAmount) > 0) {
+      const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
+      await autoPostCashTransaction({
+        direction: "in",
+        type: "order_collection",
+        amount: paidAmount,
+        method: "cash",
+        reference: order.orderNumber,
+        description: "Balance received on collection",
+        orderId,
+      });
+    }
   }
   await syncOrderPatch(orderId, { status: "collected", supplierLocked: true });
   await syncTimeline(orderId, "collected", { performedByName: byName, performedByRole: "staff" });
@@ -426,5 +449,19 @@ export async function recordPayment(orderId: string, input: { type: string; amou
   if (isDbConfigured()) {
     const { addPaymentDb } = await import("@/lib/db/bridal-orders");
     await addPaymentDb(orderId, input);
+    const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
+    const cashType = input.type === "deposit" ? "order_deposit" : "order_collection";
+    await autoPostCashTransaction({
+      direction: "in",
+      type: cashType,
+      amount: input.amount,
+      method: input.method,
+      reference: order?.orderNumber,
+      description:
+        cashType === "order_deposit"
+          ? `Deposit from customer`
+          : `Balance received`,
+      orderId,
+    });
   }
 }
