@@ -84,14 +84,16 @@ export async function PATCH(request: Request) {
     name?: string;
     role?: UserRole;
     password?: string;
+    supplierId?: string;
   };
   if (!body.id) return NextResponse.json({ error: "User id required" }, { status: 400 });
 
   if (isDbConfigured()) {
-    const patch: { name?: string; role?: UserRole; passwordHash?: string } = {};
+    const patch: { name?: string; role?: UserRole; passwordHash?: string; supplierId?: string | null } = {};
     if (body.name) patch.name = body.name;
     if (body.role) patch.role = body.role;
     if (body.password) patch.passwordHash = await hashPassword(body.password);
+    if (body.supplierId !== undefined) patch.supplierId = body.supplierId || null;
     const user = await updateUserDb(body.id, patch);
     if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });

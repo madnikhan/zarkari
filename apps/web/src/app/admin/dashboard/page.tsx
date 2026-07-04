@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8" data-tour="stat-cards">
         <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
         <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
         <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders" icon={Clock} accent="warning" />
@@ -51,7 +51,9 @@ export default async function AdminDashboardPage() {
           Online shop orders
         </Link>
       </div>
+      <div data-tour="recent-orders">
       <OrdersTable rows={rows} />
+      </div>
     </div>
   );
 }

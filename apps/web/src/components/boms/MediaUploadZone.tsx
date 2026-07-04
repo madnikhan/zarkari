@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Upload, Video, X, Loader2, ImageIcon } from "lucide-react";
 
-interface UploadedFile {
+export interface UploadedFile {
   name: string;
   url: string;
 }
@@ -13,6 +13,7 @@ interface Props {
   accept?: string;
   category?: string;
   onUploaded?: (files: UploadedFile[]) => void;
+  showCameraButtons?: boolean;
 }
 
 export function MediaUploadZone({
@@ -20,13 +21,16 @@ export function MediaUploadZone({
   accept = "image/*,video/*",
   category = "supplier-completion",
   onUploaded,
+  showCameraButtons = false,
 }: Props) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []);
+  async function uploadFiles(selected: File[]) {
     if (!selected.length) return;
     setUploading(true);
     setError("");
@@ -52,8 +56,13 @@ export function MediaUploadZone({
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
+  }
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    await uploadFiles(selected);
+    e.target.value = "";
   }
 
   function removeFile(index: number) {
@@ -62,39 +71,100 @@ export function MediaUploadZone({
     onUploaded?.(next);
   }
 
+  const isImage = (name: string) => /\.(jpe?g|png|gif|webp)$/i.test(name);
+
   return (
     <div className="space-y-3">
-      <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-8 cursor-pointer hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors">
-        {uploading ? (
-          <Loader2 className="h-8 w-8 text-[#4C3BCF] mb-2 animate-spin" />
-        ) : (
-          <Upload className="h-8 w-8 text-slate-300 mb-2" />
-        )}
-        <span className="text-sm text-slate-500">{uploading ? "Uploading…" : label}</span>
-        <span className="text-xs text-slate-400 mt-1">JPG, PNG, MP4 up to 4 MB</span>
-        <input
-          type="file"
-          accept={accept}
-          multiple
-          className="hidden"
-          disabled={uploading}
-          onChange={handleChange}
-        />
-      </label>
+      {showCameraButtons ? (
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => photoInputRef.current?.click()}
+            className="flex flex-col items-center gap-1.5 border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="h-6 w-6 animate-spin text-[#4C3BCF]" /> : <Camera className="h-6 w-6 text-[#4C3BCF]" />}
+            <span className="text-xs font-medium text-slate-600">Take Photo</span>
+          </button>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => videoInputRef.current?.click()}
+            className="flex flex-col items-center gap-1.5 border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors disabled:opacity-50"
+          >
+            <Video className="h-6 w-6 text-[#4C3BCF]" />
+            <span className="text-xs font-medium text-slate-600">Record Video</span>
+          </button>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex flex-col items-center gap-1.5 border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors disabled:opacity-50"
+          >
+            <Upload className="h-6 w-6 text-[#4C3BCF]" />
+            <span className="text-xs font-medium text-slate-600">Upload File</span>
+          </button>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-8 cursor-pointer hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors">
+          {uploading ? (
+            <Loader2 className="h-8 w-8 text-[#4C3BCF] mb-2 animate-spin" />
+          ) : (
+            <Upload className="h-8 w-8 text-slate-300 mb-2" />
+          )}
+          <span className="text-sm text-slate-500">{uploading ? "Uploading…" : label}</span>
+          <span className="text-xs text-slate-400 mt-1">JPG, PNG, MP4 up to 4 MB</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={accept}
+            multiple
+            className="hidden"
+            disabled={uploading}
+            onChange={handleChange}
+          />
+        </label>
+      )}
+
+      <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading} onChange={handleChange} />
+      <input ref={videoInputRef} type="file" accept="video/*" capture="environment" className="hidden" disabled={uploading} onChange={handleChange} />
+      {showCameraButtons && (
+        <input ref={fileInputRef} type="file" accept={accept} multiple className="hidden" disabled={uploading} onChange={handleChange} />
+      )}
+
       {error && <p className="text-xs text-red-600">{error}</p>}
+
       {files.length > 0 && (
-        <ul className="space-y-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {files.map((file, i) => (
-            <li key={i} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-2">
-              <a href={file.url} target="_blank" rel="noreferrer" className="truncate text-[#4C3BCF] hover:underline">
-                {file.name}
-              </a>
-              <button type="button" onClick={() => removeFile(i)} aria-label="Remove file">
-                <X className="h-4 w-4 text-slate-400" />
+            <div key={i} className="relative group rounded-lg overflow-hidden bg-slate-100 aspect-square">
+              {isImage(file.name) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full p-2 text-center">
+                  <Video className="h-6 w-6 text-slate-400 mb-1" />
+                  <span className="text-[10px] text-slate-500 truncate w-full">{file.name}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeFile(i)}
+                className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Remove file"
+              >
+                <X className="h-3.5 w-3.5" />
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="aspect-square rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center hover:border-[#4C3BCF]/40"
+          >
+            <ImageIcon className="h-6 w-6 text-slate-300" />
+          </button>
+        </div>
       )}
     </div>
   );

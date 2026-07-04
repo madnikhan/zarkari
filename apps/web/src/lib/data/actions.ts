@@ -99,13 +99,23 @@ export async function createBridalOrder(input: {
   colour?: string;
   size?: string;
   totalPrice: string;
+  depositPaid?: string;
+  deliveryDate?: string;
   customisationNotes?: string;
+  mediaFiles?: { url: string; name: string; category: string }[];
   createdById?: string;
   createdByName?: string;
 }): Promise<BridalOrder> {
-  const deposit = (parseFloat(input.totalPrice) * 0.5).toFixed(2);
+  const deposit = input.depositPaid ?? (parseFloat(input.totalPrice) * 0.5).toFixed(2);
   const remaining = (parseFloat(input.totalPrice) - parseFloat(deposit)).toFixed(2);
-  const delivery = new Date(Date.now() + 56 * 86400000).toISOString();
+  const delivery = input.deliveryDate ?? new Date(Date.now() + 56 * 86400000).toISOString();
+
+  async function attachMedia(orderId: string) {
+    if (!input.mediaFiles?.length) return;
+    for (const file of input.mediaFiles) {
+      await addOrderFile(orderId, file.category, file.name, file.url);
+    }
+  }
 
   if (isDbConfigured()) {
     const {
@@ -151,6 +161,7 @@ export async function createBridalOrder(input: {
             orderId: dbOrder.id,
           });
         }
+        await attachMedia(dbOrder.id);
         return dbOrder;
       }
     }
@@ -188,6 +199,7 @@ export async function createBridalOrder(input: {
     performedByName: input.createdByName,
     performedByRole: "staff",
   });
+  await attachMedia(order.id);
   return order;
 }
 

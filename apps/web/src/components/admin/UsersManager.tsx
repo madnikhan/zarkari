@@ -23,7 +23,7 @@ export function UsersManager() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({ email: "", password: "", name: "", role: "staff", supplierId: "" });
-  const [editForm, setEditForm] = useState({ name: "", role: "staff", password: "" });
+  const [editForm, setEditForm] = useState({ name: "", role: "staff", password: "", supplierId: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -77,6 +77,7 @@ export function UsersManager() {
           id: editing.id,
           name: editForm.name,
           role: editForm.role,
+          supplierId: editForm.role === "supplier" ? editForm.supplierId || undefined : undefined,
           ...(editForm.password ? { password: editForm.password } : {}),
         }),
       });
@@ -142,6 +143,19 @@ export function UsersManager() {
             <option value="owner">Owner</option>
             <option value="supplier">Supplier</option>
           </select>
+          {editForm.role === "supplier" && (
+            <select
+              value={editForm.supplierId}
+              onChange={(e) => setEditForm({ ...editForm, supplierId: e.target.value })}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              required
+            >
+              <option value="">Select supplier</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
           <input type="password" placeholder="New password (optional)" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
           <div className="flex gap-2">
             <button type="submit" disabled={loading} className="boms-btn-primary px-4 py-2 rounded-lg text-sm">Save</button>
@@ -173,7 +187,12 @@ export function UsersManager() {
                     type="button"
                     onClick={() => {
                       setEditing(user);
-                      setEditForm({ name: user.name, role: user.role, password: "" });
+                      setEditForm({
+                        name: user.name,
+                        role: user.role,
+                        password: "",
+                        supplierId: user.supplierId ?? "",
+                      });
                     }}
                     className="text-xs text-[#4C3BCF] hover:underline"
                   >

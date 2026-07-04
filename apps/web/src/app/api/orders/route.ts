@@ -20,18 +20,26 @@ export async function POST(request: Request) {
   }
 
   try {
+    const total = parseFloat(String(body.totalPrice));
+    const deposit = body.depositPaid != null ? parseFloat(String(body.depositPaid)) : total * 0.5;
+    if (deposit < 0 || deposit > total) {
+      return NextResponse.json({ error: "Deposit must be between 0 and total price" }, { status: 400 });
+    }
+
     const order = await createBridalOrder({
       customer: {
         name: body.customerName.trim(),
         phone: String(body.customerPhone).replace(/\s/g, ""),
-        email: body.customerEmail?.trim(),
       },
       supplierId: body.supplierId || undefined,
       dressType: body.dressType,
-      colour: body.colour,
-      size: body.size,
       totalPrice: String(body.totalPrice),
+      depositPaid: deposit.toFixed(2),
+      deliveryDate: body.deliveryDate
+        ? new Date(body.deliveryDate).toISOString()
+        : undefined,
       customisationNotes: body.customisationNotes,
+      mediaFiles: body.mediaFiles,
       createdById: session.id,
       createdByName: session.name,
     });

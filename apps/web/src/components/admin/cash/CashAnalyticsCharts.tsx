@@ -20,6 +20,7 @@ import {
 import { formatPrice } from "@/lib/utils";
 import { CASH_TYPE_LABELS } from "@/lib/cash/labels";
 import type { CashAnalytics } from "@/lib/db/cash-ledger";
+import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
 
 const PIE_COLORS = ["#4C3BCF", "#10b981"];
 
@@ -61,13 +62,17 @@ export function CashAnalyticsCharts() {
   });
 
   return (
-    <div className="space-y-8">
+    <div id="cash-analytics-export" className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Cash Analytics</h1>
-          <p className="text-sm text-slate-500 mt-1">Trends and insights</p>
+          <p className="text-sm text-slate-500 mt-1">Trends and insights · Last {period} days</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportExportToolbar
+            targetId="cash-analytics-export"
+            filename={`zarkari-cash-analytics-${period}d-${new Date().toISOString().slice(0, 10)}.pdf`}
+          />
           {([7, 30, 90] as const).map((p) => (
             <button
               key={p}

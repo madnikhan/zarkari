@@ -806,16 +806,69 @@ export async function listCustomersDb(): Promise<Customer[]> {
   }));
 }
 
-export async function listSuppliersDb(): Promise<Supplier[]> {
+export async function listSuppliersDb(includeInactive = false): Promise<Supplier[]> {
   const db = getDb();
   if (!db) return [];
-  const rows = await db.select().from(schema.suppliers).where(eq(schema.suppliers.active, true));
+  const rows = includeInactive
+    ? await db.select().from(schema.suppliers)
+    : await db.select().from(schema.suppliers).where(eq(schema.suppliers.active, true));
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
+    active: row.active,
   }));
+}
+
+export async function createSupplierDb(input: {
+  name: string;
+  email?: string;
+  phone?: string;
+  active?: boolean;
+}): Promise<Supplier | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .insert(schema.suppliers)
+    .values({
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      active: input.active ?? true,
+    })
+    .returning();
+  return row
+    ? { id: row.id, name: row.name, email: row.email ?? undefined, phone: row.phone ?? undefined }
+    : null;
+}
+
+export async function updateSupplierDb(
+  id: string,
+  patch: { name?: string; email?: string; phone?: string; active?: boolean }
+): Promise<Supplier | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db.update(schema.suppliers).set(patch).where(eq(schema.suppliers.id, id)).returning();
+  return row
+    ? { id: row.id, name: row.name, email: row.email ?? undefined, phone: row.phone ?? undefined }
+    : null;
+}
+
+export async function deleteSupplierDb(id: string): Promise<{ ok: boolean; soft?: boolean }> {
+  const db = getDb();
+  if (!db) return { ok: false };
+  const [orderRow] = await db
+    .select({ c: count() })
+    .from(schema.bridalOrders)
+    .where(eq(schema.bridalOrders.supplierId, id));
+  const hasOrders = Number(orderRow?.c ?? 0) > 0;
+  if (hasOrders) {
+    await db.update(schema.suppliers).set({ active: false }).where(eq(schema.suppliers.id, id));
+    return { ok: true, soft: true };
+  }
+  await db.delete(schema.suppliers).where(eq(schema.suppliers.id, id));
+  return { ok: true, soft: false };
 }
 
 export async function getSupplierDb(id: string): Promise<Supplier | null> {

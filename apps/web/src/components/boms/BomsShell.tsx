@@ -23,6 +23,8 @@ import {
   FileText,
   Banknote,
   LineChart,
+  GraduationCap,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
@@ -46,6 +48,7 @@ const adminNav: NavItem[] = [
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
   { label: "Finance", href: "/admin/finance", icon: Wallet, ownerOnly: true },
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { label: "Training", href: "/admin/training", icon: GraduationCap },
   { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "Settings", href: "/admin/settings", icon: Settings },
   { label: "Users", href: "/admin/users", icon: UserCog, ownerOnly: true },
@@ -113,6 +116,7 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
                 key={item.href + item.label}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
+                data-tour={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                   active ? "bg-[#4C3BCF] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -161,6 +165,16 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
           </div>
 
           <span className="hidden sm:block text-xs text-slate-500">{today}</span>
+          {role === "admin" && (
+            <Link
+              href="/admin/training"
+              className="p-2 text-slate-500 hover:text-[#4C3BCF] rounded-lg hover:bg-slate-50"
+              aria-label="Help and training"
+              title="Help & Training"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Link>
+          )}
           <NotificationBell />
           {userName && (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">

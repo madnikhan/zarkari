@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { BridalOrder, Customer } from "@/lib/data/seed";
-import { getStatusLabel } from "@/lib/orders/status-machine";
 import { formatPrice } from "@/lib/utils";
 import { CountdownBadge } from "./CountdownBadge";
+import { StatusBadge } from "@/components/boms/StatusBadge";
 
 interface OrderCardProps {
   order: BridalOrder;
@@ -31,7 +31,7 @@ export function OrderCard({ order, customer, supplierName, href, showSupplier = 
         {order.size && <span>· Size {order.size}</span>}
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-xs px-2 py-1 bg-sand/40 rounded text-charcoal">{getStatusLabel(order.status)}</span>
+        <StatusBadge status={order.status} />
         <span className="text-sm font-medium">{formatPrice(order.totalPrice)}</span>
       </div>
       {showSupplier && supplierName && (

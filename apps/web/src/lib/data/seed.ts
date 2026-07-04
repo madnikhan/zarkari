@@ -22,6 +22,7 @@ export interface Supplier {
   name: string;
   email?: string;
   phone?: string;
+  active?: boolean;
 }
 
 export interface Customer {

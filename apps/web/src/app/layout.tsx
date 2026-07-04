@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter, Montserrat } from "next/font/google";
-import Script from "next/script";
 import {
   DEFAULT_DESCRIPTION,
   DEFAULT_TITLE,
@@ -71,9 +70,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-GB" className={`${inter.variable} ${cormorant.variable} ${fontLogo.variable} h-full`}>
       <body suppressHydrationWarning className="min-h-full flex flex-col antialiased bg-cream text-charcoal">
         {children}
-        <Script id="sw-cleanup" strategy="afterInteractive">
-          {`if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})});if('caches' in window){caches.keys().then(function(k){k.forEach(function(n){caches.delete(n)})})}}`}
-        </Script>
       </body>
     </html>
   );
