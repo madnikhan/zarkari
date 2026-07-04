@@ -1,11 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Upload, Video, X, Loader2, ImageIcon } from "lucide-react";
+import { Camera, Upload, Video, X, Loader2, ImageIcon, Mic } from "lucide-react";
+
+export type MediaFileType = "image" | "video" | "audio";
 
 export interface UploadedFile {
   name: string;
   url: string;
+  mediaType?: MediaFileType;
 }
 
 interface Props {
@@ -32,6 +35,12 @@ export function MediaUploadZone({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  function mediaTypeForFile(file: File): MediaFileType {
+    if (file.type.startsWith("video/")) return "video";
+    if (file.type.startsWith("audio/")) return "audio";
+    return "image";
+  }
+
   async function uploadFiles(selected: File[]) {
     if (!selected.length) return;
     setUploading(true);
@@ -49,7 +58,7 @@ export function MediaUploadZone({
         const res = await fetch("/api/upload", { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Upload failed");
-        const item = { name: file.name, url: data.url };
+        const item = { name: file.name, url: data.url, mediaType: mediaTypeForFile(file) };
         uploaded.push(item);
         onSingleUploaded?.(item);
       }
@@ -75,7 +84,10 @@ export function MediaUploadZone({
     onUploaded?.(next);
   }
 
-  const isImage = (name: string) => /\.(jpe?g|png|gif|webp)$/i.test(name);
+  const isImage = (file: UploadedFile) =>
+    file.mediaType === "image" || (!file.mediaType && /\.(jpe?g|png|gif|webp)$/i.test(file.name));
+  const isAudio = (file: UploadedFile) =>
+    file.mediaType === "audio" || /\.(webm|m4a|mp3|ogg|wav)$/i.test(file.name);
 
   return (
     <div className="space-y-3">
@@ -142,9 +154,14 @@ export function MediaUploadZone({
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {files.map((file, i) => (
             <div key={i} className="relative group rounded-lg overflow-hidden bg-slate-100 aspect-square">
-              {isImage(file.name) ? (
+              {isImage(file) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+              ) : isAudio(file) ? (
+                <div className="flex flex-col items-center justify-center h-full p-2 gap-1">
+                  <Mic className="h-6 w-6 text-[#4C3BCF]" />
+                  <audio controls src={file.url} className="w-full h-8" preload="metadata" />
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-2 text-center">
                   <Video className="h-6 w-6 text-slate-400 mb-1" />

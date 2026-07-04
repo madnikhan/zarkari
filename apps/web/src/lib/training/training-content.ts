@@ -47,7 +47,7 @@ export const TRAINING_SECTIONS: TrainingSection[] = [
     steps: [
       { element: "[data-tour='whatsapp-field']", title: "WhatsApp number", description: "Enter the customer's WhatsApp number. You can message them directly from the order page." },
       { element: "[data-tour='deposit-field']", title: "Deposit & remaining", description: "Enter how much was paid today. The remaining balance is calculated automatically." },
-      { element: "[data-tour='media-upload']", title: "Photos & videos", description: "Take a photo, record a video, or upload files from the gallery." },
+      { element: "[data-tour='media-upload']", title: "Photos & videos", description: "Take a photo, record a video, record a voice note, or upload from gallery." },
     ],
   },
   {

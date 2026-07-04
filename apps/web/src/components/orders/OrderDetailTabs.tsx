@@ -40,14 +40,26 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
       {tab === "Timeline" && <OrderTimeline events={data.timeline} />}
 
       {tab === "Files" && (
-        <ul className="space-y-2 text-sm">
-          {data.files.map((f) => (
-            <li key={f.id}>
-              <a href={f.url} target="_blank" rel="noreferrer" className="text-gold hover:underline">
-                {f.fileName} ({f.category})
-              </a>
-            </li>
-          ))}
+        <ul className="space-y-3 text-sm">
+          {data.files.length === 0 && <li className="text-slate-400">No files yet.</li>}
+          {data.files.map((f) => {
+            const isVoice =
+              f.category === "voice" || /\.(webm|m4a|mp3|ogg|wav)$/i.test(f.fileName);
+            return (
+              <li key={f.id} className="space-y-1">
+                <p className="text-xs text-slate-500 capitalize">
+                  {f.fileName} ({f.category})
+                </p>
+                {isVoice ? (
+                  <audio controls src={f.url} className="w-full" preload="metadata" />
+                ) : (
+                  <a href={f.url} target="_blank" rel="noreferrer" className="text-gold hover:underline">
+                    Open file
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import type { Supplier } from "@/lib/data/seed";
 import { MediaUploadZone, type UploadedFile } from "@/components/boms/MediaUploadZone";
+import { VoiceNoteRecorder, type AudioUploadedFile } from "@/components/boms/VoiceNoteRecorder";
 import { whatsAppUrl } from "@/lib/whatsapp";
 
 function defaultDeliveryDate(): string {
@@ -46,6 +47,50 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
       ? whatsAppUrl(form.customerPhone, `Hi ${form.customerName || "there"}, your ZARKARI order will be confirmed shortly.`)
       : null;
 
+  const voiceFiles = mediaFiles.filter((f): f is AudioUploadedFile => f.mediaType === "audio");
+
+  function handleVisualUploaded(files: UploadedFile[]) {
+    setMediaFiles((prev) => {
+      const voices = prev.filter((f) => f.mediaType === "audio");
+      return [...files, ...voices];
+    });
+  }
+
+  function handleVoiceRecorded(file: AudioUploadedFile) {
+    setMediaFiles((prev) => [...prev, file]);
+  }
+
+  function handleVoiceRemove(index: number) {
+    setMediaFiles((prev) => {
+      const voices = prev.filter((f) => f.mediaType === "audio");
+      const rest = prev.filter((f) => f.mediaType !== "audio");
+      voices.splice(index, 1);
+      return [...rest, ...voices];
+    });
+  }
+
+  function inferMediaType(f: UploadedFile): UploadedFile["mediaType"] {
+    if (f.mediaType) return f.mediaType;
+    if (/^voice-note-/i.test(f.name) || /\.(m4a|mp3|ogg|wav)$/i.test(f.name)) return "audio";
+    if (/\.(mp4|mov)$/i.test(f.name)) return "video";
+    return "image";
+  }
+
+  function mapMediaCategories(files: UploadedFile[]) {
+    let imageCount = 0;
+    return files.map((f) => {
+      const mediaType = inferMediaType(f);
+      if (mediaType === "audio") {
+        return { url: f.url, name: f.name, category: "voice" };
+      }
+      if (mediaType === "video") {
+        return { url: f.url, name: f.name, category: "design" };
+      }
+      const category = imageCount++ === 0 ? "design" : "measurements";
+      return { url: f.url, name: f.name, category };
+    });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -58,11 +103,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
           ...form,
           depositPaid: form.depositPaid,
           remainingBalance: remaining,
-          mediaFiles: mediaFiles.map((f, i) => ({
-            url: f.url,
-            name: f.name,
-            category: i === 0 ? "design" : "measurements",
-          })),
+          mediaFiles: mapMediaCategories(mediaFiles),
         }),
       });
       const data = await res.json();
@@ -175,7 +216,19 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
           <MediaUploadZone
             category="order-design"
             showCameraButtons
-            onUploaded={setMediaFiles}
+            onUploaded={handleVisualUploaded}
+          />
+        </div>
+      </div>
+
+      <div data-tour="voice-upload">
+        <span className="text-slate-500 text-xs uppercase tracking-wide">Voice Notes</span>
+        <div className="mt-2">
+          <VoiceNoteRecorder
+            recordings={voiceFiles}
+            onRecorded={handleVoiceRecorded}
+            onRemove={handleVoiceRemove}
+            disabled={loading}
           />
         </div>
       </div>
