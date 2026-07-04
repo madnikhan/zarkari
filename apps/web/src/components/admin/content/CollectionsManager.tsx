@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Collection } from "@/lib/data/seed";
+import { ImageField } from "@/components/admin/content/ImageField";
 
 export function CollectionsManager({ initial, isOwner = true }: { initial: Collection[]; isOwner?: boolean }) {
   const router = useRouter();
@@ -67,49 +68,69 @@ export function CollectionsManager({ initial, isOwner = true }: { initial: Colle
     <div className="space-y-6">
       {error && <p className="text-sm text-red-600">{error}</p>}
       {isOwner && (
-        <form onSubmit={create} className="boms-card p-6 grid sm:grid-cols-2 gap-4">
-          <h2 className="sm:col-span-2 text-lg font-semibold text-slate-900">New collection</h2>
-          {(["handle", "title", "description", "imageUrl"] as const).map((key) => (
+        <form onSubmit={create} className="boms-card p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900">New collection</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
             <input
-              key={key}
-              placeholder={key}
-              value={form[key]}
-              onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+              placeholder="handle"
+              value={form.handle}
+              onChange={(e) => setForm({ ...form, handle: e.target.value })}
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              required={key === "handle" || key === "title"}
+              required
             />
-          ))}
-          <button type="submit" disabled={loading} className="boms-btn-primary px-4 py-2 rounded-lg text-sm sm:col-span-2 w-fit">
+            <input
+              placeholder="title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          />
+          <ImageField
+            label="Hero image"
+            value={form.imageUrl}
+            onChange={(imageUrl) => setForm({ ...form, imageUrl })}
+          />
+          <button type="submit" disabled={loading} className="boms-btn-primary px-4 py-2 rounded-lg text-sm">
             Add collection
           </button>
         </form>
       )}
       <div className="space-y-4">
         {collections.map((col) => (
-          <div key={col.id} className="boms-card p-4 grid sm:grid-cols-2 gap-3">
-            <input
-              value={col.handle}
-              onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, handle: e.target.value } : c)))}
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
-            />
-            <input
-              value={col.title}
-              onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, title: e.target.value } : c)))}
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            />
+          <div key={col.id} className="boms-card p-4 space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <input
+                value={col.handle}
+                onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, handle: e.target.value } : c)))}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+              <input
+                value={col.title}
+                onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, title: e.target.value } : c)))}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
             <input
               value={col.description ?? ""}
               onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, description: e.target.value } : c)))}
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm sm:col-span-2"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
               placeholder="Description"
             />
-            <input
+            <ImageField
+              label="Hero image"
               value={col.imageUrl ?? ""}
-              onChange={(e) => setCollections(collections.map((c) => (c.id === col.id ? { ...c, imageUrl: e.target.value } : c)))}
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm sm:col-span-2 font-mono text-xs"
-              placeholder="Hero image URL"
+              onChange={(imageUrl) =>
+                setCollections(collections.map((c) => (c.id === col.id ? { ...c, imageUrl } : c)))
+              }
             />
-            <div className="flex gap-2 sm:col-span-2">
+            <div className="flex gap-2">
               {isOwner && (
                 <>
                   <button type="button" onClick={() => save(col)} disabled={loading} className="boms-btn-primary px-4 py-2 rounded-lg text-sm">

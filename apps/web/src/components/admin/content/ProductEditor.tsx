@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Product } from "@/lib/data/seed";
 import type { Collection } from "@/lib/data/seed";
+import { ProductImageGallery } from "@/components/admin/content/ProductImageGallery";
 
 interface Props {
   product: Product;
@@ -15,6 +16,16 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const initialImages =
+    product.images.length > 0
+      ? product.images
+      : product.featuredImageUrl
+        ? [product.featuredImageUrl]
+        : [];
+  const [images, setImages] = useState<string[]>(initialImages);
+  const [featuredUrl, setFeaturedUrl] = useState(
+    product.featuredImageUrl ?? initialImages[0] ?? ""
+  );
   const [form, setForm] = useState({
     title: product.title,
     handle: product.handle,
@@ -22,8 +33,6 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
     fabric: product.fabric ?? "",
     price: product.variants[0]?.price ?? "0",
     inventoryQty: String(product.variants[0]?.inventoryQty ?? 0),
-    featuredImageUrl: product.featuredImageUrl ?? "",
-    images: product.images.join("\n"),
     collectionHandles: product.collectionHandles,
     published: true,
   });
@@ -42,10 +51,7 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
     setLoading(true);
     setError("");
     try {
-      const images = form.images
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const featured = featuredUrl || images[0] || "";
       const res = await fetch("/api/products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -57,8 +63,8 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
           fabric: form.fabric || undefined,
           price: form.price,
           inventoryQty: parseInt(form.inventoryQty, 10) || 0,
-          featuredImageUrl: form.featuredImageUrl || images[0],
-          images: images.length ? images : form.featuredImageUrl ? [form.featuredImageUrl] : [],
+          featuredImageUrl: featured,
+          images: images.length ? images : featured ? [featured] : [],
           collectionHandles: form.collectionHandles,
           published: form.published,
         }),
@@ -78,7 +84,7 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
 
   return (
     <form onSubmit={submit} className="boms-card p-6 space-y-4 max-w-2xl">
-      {(["title", "handle", "fabric", "price", "inventoryQty", "featuredImageUrl"] as const).map((key) => (
+      {(["title", "handle", "fabric", "price", "inventoryQty"] as const).map((key) => (
         <div key={key}>
           <label className="text-xs text-slate-500 uppercase">{key}</label>
           <input
@@ -98,16 +104,14 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
           className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
         />
       </div>
-      <div>
-        <label className="text-xs text-slate-500 uppercase">Image URLs (one per line)</label>
-        <textarea
-          value={form.images}
-          onChange={(e) => setForm({ ...form, images: e.target.value })}
-          rows={3}
-          className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono text-xs"
-          placeholder="Paste URLs from Media Library"
-        />
-      </div>
+      <ProductImageGallery
+        images={images}
+        featuredUrl={featuredUrl}
+        onChange={(nextImages, nextFeatured) => {
+          setImages(nextImages);
+          setFeaturedUrl(nextFeatured);
+        }}
+      />
       <div>
         <label className="text-xs text-slate-500 uppercase block mb-2">Collections</label>
         <div className="flex flex-wrap gap-2">

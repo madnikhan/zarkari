@@ -8,7 +8,9 @@ export default function ContentMediaPage() {
         ← Content
       </Link>
       <h1 className="text-2xl font-semibold text-slate-900 mt-1 mb-2">Media Library</h1>
-      <p className="text-sm text-slate-500 mb-6">Upload images to R2 and copy URLs into product or collection editors.</p>
+      <p className="text-sm text-slate-500 mb-6">
+        Upload images once, then pick them directly in product, collection, and blog forms.
+      </p>
       <MediaLibrary />
     </div>
   );

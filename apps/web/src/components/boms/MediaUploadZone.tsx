@@ -13,6 +13,7 @@ interface Props {
   accept?: string;
   category?: string;
   onUploaded?: (files: UploadedFile[]) => void;
+  onSingleUploaded?: (file: UploadedFile) => void;
   showCameraButtons?: boolean;
 }
 
@@ -21,6 +22,7 @@ export function MediaUploadZone({
   accept = "image/*,video/*",
   category = "supplier-completion",
   onUploaded,
+  onSingleUploaded,
   showCameraButtons = false,
 }: Props) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -47,7 +49,9 @@ export function MediaUploadZone({
         const res = await fetch("/api/upload", { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Upload failed");
-        uploaded.push({ name: file.name, url: data.url });
+        const item = { name: file.name, url: data.url };
+        uploaded.push(item);
+        onSingleUploaded?.(item);
       }
       const next = [...files, ...uploaded];
       setFiles(next);

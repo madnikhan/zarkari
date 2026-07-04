@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { BlogPost } from "@/lib/data/seed";
+import { ImageField } from "@/components/admin/content/ImageField";
 
 export function BlogPostEditor({ post }: { post: BlogPost }) {
   const router = useRouter();
@@ -49,7 +50,7 @@ export function BlogPostEditor({ post }: { post: BlogPost }) {
           Published via Soro — edits here override the stored article.
         </p>
       )}
-      {(["title", "slug", "excerpt", "imageUrl", "author"] as const).map((key) => (
+      {(["title", "slug", "excerpt", "author"] as const).map((key) => (
         <div key={key}>
           <label className="text-xs text-slate-500 uppercase">{key}</label>
           <input
@@ -59,6 +60,11 @@ export function BlogPostEditor({ post }: { post: BlogPost }) {
           />
         </div>
       ))}
+      <ImageField
+        label="Cover image"
+        value={form.imageUrl}
+        onChange={(imageUrl) => setForm({ ...form, imageUrl })}
+      />
       <div>
         <label className="text-xs text-slate-500 uppercase">Content HTML</label>
         <textarea
@@ -114,7 +120,7 @@ export function NewBlogPostForm({ isOwner = true }: { isOwner?: boolean }) {
   return (
     <form onSubmit={submit} className="boms-card p-6 space-y-4">
       <h2 className="font-semibold text-slate-900">New blog post</h2>
-      {(["title", "slug", "excerpt", "imageUrl"] as const).map((key) => (
+      {(["title", "slug", "excerpt"] as const).map((key) => (
         <input
           key={key}
           placeholder={key}
@@ -124,6 +130,11 @@ export function NewBlogPostForm({ isOwner = true }: { isOwner?: boolean }) {
           required={key === "title"}
         />
       ))}
+      <ImageField
+        label="Cover image"
+        value={form.imageUrl}
+        onChange={(imageUrl) => setForm({ ...form, imageUrl })}
+      />
       <textarea
         value={form.contentHtml}
         onChange={(e) => setForm({ ...form, contentHtml: e.target.value })}

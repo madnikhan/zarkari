@@ -5,7 +5,7 @@ const modules = [
   { href: "/admin/content/products", label: "Products", description: "Catalogue items, prices, images", icon: Package },
   { href: "/admin/content/collections", label: "Collections", description: "Group products for storefront", icon: Layout },
   { href: "/admin/content/homepage", label: "Homepage", description: "Hero text and announcements", icon: Sparkles },
-  { href: "/admin/content/media", label: "Media Library", description: "Upload and copy image URLs", icon: Image },
+  { href: "/admin/content/media", label: "Media Library", description: "Upload once, pick in any content form", icon: Image },
   { href: "/admin/content/blog", label: "Blog", description: "Articles and Soro posts", icon: PenLine },
 ];
 
