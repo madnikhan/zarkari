@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Mic, Square, X } from "lucide-react";
+import { Mic, Square, X } from "lucide-react";
 import type { UploadedFile } from "@/components/boms/MediaUploadZone";
+import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
+import { uploadBlobWithProgress, type UploadProgressState } from "@/lib/upload/client";
 
 const MAX_RECORDING_MS = 3 * 60 * 1000;
 
@@ -38,6 +40,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
   const [uploading, setUploading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<UploadProgressState | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -69,19 +72,6 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
     }
   }
 
-  async function uploadBlob(blob: Blob, fileName: string) {
-    if (blob.size > 4 * 1024 * 1024) {
-      throw new Error("Recording is over 4 MB. Please record a shorter note.");
-    }
-    const form = new FormData();
-    form.append("file", blob, fileName);
-    form.append("category", "order-voice");
-    const res = await fetch("/api/upload", { method: "POST", body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Upload failed");
-    return { name: fileName, url: data.url, mediaType: "audio" as const };
-  }
-
   async function stopRecording() {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === "inactive") return;
@@ -89,6 +79,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
     setRecording(false);
     setUploading(true);
     setError("");
+    setProgress(null);
 
     await new Promise<void>((resolve) => {
       recorder.addEventListener("stop", () => resolve(), { once: true });
@@ -100,10 +91,15 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
       const blob = new Blob(chunksRef.current, { type: mime });
       const ext = extensionForMime(mime);
       const fileName = `voice-note-${Date.now()}.${ext}`;
-      const file = await uploadBlob(blob, fileName);
-      onRecorded(file);
+      const result = await uploadBlobWithProgress(blob, fileName, mime, "order-voice", (state) =>
+        setProgress(state)
+      );
+      onRecorded({ name: result.fileName, url: result.url, mediaType: "audio" });
+      setTimeout(() => setProgress(null), 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save voice note");
+      const message = err instanceof Error ? err.message : "Failed to save voice note";
+      setError(message);
+      setProgress({ label: "Upload failed", progress: 0, status: "error", error: message });
     } finally {
       chunksRef.current = [];
       setUploading(false);
@@ -115,6 +111,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
   async function startRecording() {
     if (disabled || recording || uploading) return;
     setError("");
+    setProgress(null);
 
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError("Voice recording is not supported in this browser.");
@@ -170,14 +167,8 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
             onClick={() => void startRecording()}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors disabled:opacity-50"
           >
-            {uploading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-[#4C3BCF]" />
-            ) : (
-              <Mic className="h-5 w-5 text-[#4C3BCF]" />
-            )}
-            <span className="text-sm font-medium text-slate-600">
-              {uploading ? "Saving voice note…" : "Record voice note"}
-            </span>
+            <Mic className="h-5 w-5 text-[#4C3BCF]" />
+            <span className="text-sm font-medium text-slate-600">Record voice note</span>
           </button>
         ) : (
           <button
@@ -196,7 +187,8 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
         <p className="text-xs text-slate-400">Up to 3 minutes per note</p>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      <UploadProgressBar state={progress} />
+      {error && progress?.status !== "error" && <p className="text-xs text-red-600">{error}</p>}
 
       {recordings.length > 0 && (
         <ul className="space-y-2">

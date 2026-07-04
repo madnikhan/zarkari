@@ -18,6 +18,7 @@ interface MyBridalOrderProps {
 export function MyBridalOrder({ order, files, messages, onSendMessage }: MyBridalOrderProps) {
   const designFiles = files.filter((f) => f.category === "design");
   const measurementFiles = files.filter((f) => f.category === "measurements");
+  const staffMessages = messages.filter((m) => m.senderType === "staff");
 
   return (
     <div>
@@ -53,6 +54,34 @@ export function MyBridalOrder({ order, files, messages, onSendMessage }: MyBrida
       <section className="mb-8">
         <h2 className="text-xs uppercase tracking-wide text-slate-500 mb-4">Progress</h2>
         <CustomerOrderProgressTracker status={order.status} />
+      </section>
+
+      <section className="mb-8 boms-card p-5">
+        <h2 className="text-sm font-semibold text-slate-900 mb-3">Updates from ZARKARI</h2>
+        {staffMessages.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No updates yet — we&apos;ll post messages here as your order progresses.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {staffMessages.map((m) => (
+              <li key={m.id} className="rounded-lg bg-[#F4F3FF] border border-[#4C3BCF]/10 px-3 py-2.5">
+                <p className="text-xs font-medium text-[#4C3BCF] mb-1">
+                  {m.senderName ? `ZARKARI · ${m.senderName}` : "ZARKARI"}
+                </p>
+                <p className="text-sm text-slate-800">{m.message}</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {new Date(m.createdAt).toLocaleString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <CustomerActionButtons
@@ -151,11 +180,17 @@ function CustomerActionButtons({
             {view === "message" && (
               <>
                 <ul className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                  {messages.length === 0 && (
+                    <p className="text-sm text-charcoal/50">No messages yet. Send us a note below.</p>
+                  )}
                   {messages.map((m) => (
                     <li
                       key={m.id}
                       className={`text-sm p-2 rounded ${m.senderType === "customer" ? "bg-sand/30" : "bg-charcoal/5"}`}
                     >
+                      <p className="text-[10px] uppercase tracking-wide text-charcoal/50 mb-0.5">
+                        {m.senderType === "customer" ? "You" : m.senderName ? `ZARKARI · ${m.senderName}` : "ZARKARI"}
+                      </p>
                       {m.message}
                     </li>
                   ))}

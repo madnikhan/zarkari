@@ -421,18 +421,19 @@ export function addCustomerMessage(orderId: string, message: string, senderName?
 }
 
 export async function addStaffMessage(orderId: string, message: string, senderName?: string) {
-  demoMessages.push({
-    id: `msg-${Date.now()}`,
-    orderId,
-    senderType: "staff",
-    senderName,
-    message,
-    createdAt: new Date().toISOString(),
-  });
-  if (isDbConfigured()) {
-    const { addMessageDb } = await import("@/lib/db/bridal-orders");
-    await addMessageDb(orderId, { senderType: "staff", senderName, message });
+  if (!isDbConfigured()) {
+    demoMessages.push({
+      id: `msg-${Date.now()}`,
+      orderId,
+      senderType: "staff",
+      senderName,
+      message,
+      createdAt: new Date().toISOString(),
+    });
+    return;
   }
+  const { addMessageDb } = await import("@/lib/db/bridal-orders");
+  await addMessageDb(orderId, { senderType: "staff", senderName, message });
 }
 
 export async function addOrderFile(orderId: string, category: string, fileName: string, url: string) {

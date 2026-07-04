@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Upload, Video, X, Loader2, ImageIcon, Mic } from "lucide-react";
+import { Camera, Upload, Video, X, ImageIcon, Mic } from "lucide-react";
+import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
+import { uploadFileWithProgress, type UploadProgressState } from "@/lib/upload/client";
+import { assertVideoDurationAllowed } from "@/lib/upload/video";
 
 export type MediaFileType = "image" | "video" | "audio";
 
@@ -31,6 +34,7 @@ export function MediaUploadZone({
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<UploadProgressState | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,28 +49,27 @@ export function MediaUploadZone({
     if (!selected.length) return;
     setUploading(true);
     setError("");
+    setProgress(null);
     const uploaded: UploadedFile[] = [];
 
     try {
       for (const file of selected) {
-        if (file.size > 4 * 1024 * 1024) {
-          throw new Error(`${file.name} is over 4 MB. Please compress it before uploading.`);
+        if (file.type.startsWith("video/")) {
+          await assertVideoDurationAllowed(file);
         }
-        const form = new FormData();
-        form.append("file", file);
-        form.append("category", category);
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Upload failed");
-        const item = { name: file.name, url: data.url, mediaType: mediaTypeForFile(file) };
+        const result = await uploadFileWithProgress(file, category, (state) => setProgress(state));
+        const item = { name: result.fileName, url: result.url, mediaType: mediaTypeForFile(file) };
         uploaded.push(item);
         onSingleUploaded?.(item);
+        setTimeout(() => setProgress(null), 1000);
       }
       const next = [...files, ...uploaded];
       setFiles(next);
       onUploaded?.(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      setProgress({ label: "Upload failed", progress: 0, status: "error", error: message });
     } finally {
       setUploading(false);
     }
@@ -99,7 +102,7 @@ export function MediaUploadZone({
             onClick={() => photoInputRef.current?.click()}
             className="flex flex-col items-center gap-1.5 border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors disabled:opacity-50"
           >
-            {uploading ? <Loader2 className="h-6 w-6 animate-spin text-[#4C3BCF]" /> : <Camera className="h-6 w-6 text-[#4C3BCF]" />}
+            <Camera className="h-6 w-6 text-[#4C3BCF]" />
             <span className="text-xs font-medium text-slate-600">Take Photo</span>
           </button>
           <button
@@ -123,13 +126,9 @@ export function MediaUploadZone({
         </div>
       ) : (
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-8 cursor-pointer hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors">
-          {uploading ? (
-            <Loader2 className="h-8 w-8 text-[#4C3BCF] mb-2 animate-spin" />
-          ) : (
-            <Upload className="h-8 w-8 text-slate-300 mb-2" />
-          )}
+          <Upload className="h-8 w-8 text-slate-300 mb-2" />
           <span className="text-sm text-slate-500">{uploading ? "Uploading…" : label}</span>
-          <span className="text-xs text-slate-400 mt-1">JPG, PNG, MP4 up to 4 MB</span>
+          <span className="text-xs text-slate-400 mt-1">Photos up to 4 MB · Videos up to 10 minutes</span>
           <input
             ref={fileInputRef}
             type="file"
@@ -148,7 +147,12 @@ export function MediaUploadZone({
         <input ref={fileInputRef} type="file" accept={accept} multiple className="hidden" disabled={uploading} onChange={handleChange} />
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {showCameraButtons && (
+        <p className="text-xs text-slate-400">Photos up to 4 MB · Videos up to 10 minutes</p>
+      )}
+
+      <UploadProgressBar state={progress} />
+      {error && progress?.status !== "error" && <p className="text-xs text-red-600">{error}</p>}
 
       {files.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">

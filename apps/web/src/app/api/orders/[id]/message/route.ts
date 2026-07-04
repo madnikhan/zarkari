@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { addStaffMessage } from "@/lib/data/actions";
 
@@ -17,5 +18,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   await addStaffMessage(orderId, message, session.name);
+  revalidatePath(`/admin/orders/${orderId}`);
   return NextResponse.json({ ok: true });
 }

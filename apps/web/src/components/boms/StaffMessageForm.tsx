@@ -8,17 +8,19 @@ interface Props {
   senderName?: string;
 }
 
-export function StaffMessageForm({ orderId, senderName }: Props) {
+export function StaffMessageForm({ orderId }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!message.trim()) return;
     setLoading(true);
     setError("");
+    setSuccess(false);
     try {
       const res = await fetch(`/api/orders/${orderId}/message`, {
         method: "POST",
@@ -30,6 +32,7 @@ export function StaffMessageForm({ orderId, senderName }: Props) {
         throw new Error(data.error ?? "Failed to send");
       }
       setMessage("");
+      setSuccess(true);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send");
@@ -43,12 +46,20 @@ export function StaffMessageForm({ orderId, senderName }: Props) {
       <label className="text-xs font-medium text-slate-500 uppercase">Staff message to customer</label>
       <textarea
         value={message}
-        onChange={(e) => setMessage(e.target.value)}
+        onChange={(e) => {
+          setMessage(e.target.value);
+          setSuccess(false);
+        }}
         rows={2}
         placeholder="Note for customer (visible on my-order portal)"
         className="w-full mt-2 border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none"
       />
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      {success && (
+        <p className="text-xs text-emerald-600 mt-1">
+          Message sent — visible to customer on their order portal.
+        </p>
+      )}
       <button
         type="submit"
         disabled={loading || !message.trim()}
