@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, X, Smartphone } from "lucide-react";
+import { Download, Loader2, X, Smartphone } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -12,16 +12,13 @@ export function PwaInstallBanner() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (localStorage.getItem("boms-pwa-dismissed")) {
       setDismissed(true);
       return;
-    }
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw-boms.js", { scope: "/admin" }).catch(console.error);
     }
 
     const handler = (e: Event) => {
@@ -43,11 +40,16 @@ export function PwaInstallBanner() {
   }
 
   async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    if (outcome === "accepted") dismiss();
-    setDeferred(null);
+    if (!deferred || installing) return;
+    setInstalling(true);
+    try {
+      await deferred.prompt();
+      const { outcome } = await deferred.userChoice;
+      if (outcome === "accepted") dismiss();
+      setDeferred(null);
+    } finally {
+      setInstalling(false);
+    }
   }
 
   if (dismissed) return null;
@@ -60,12 +62,22 @@ export function PwaInstallBanner() {
         <button
           type="button"
           onClick={install}
-          className="inline-flex items-center gap-1 px-3 py-1.5 bg-white text-[#4C3BCF] rounded-lg text-xs font-semibold"
+          disabled={installing}
+          className="inline-flex items-center gap-1 px-3 py-1.5 bg-white text-[#4C3BCF] rounded-lg text-xs font-semibold disabled:opacity-70"
         >
-          <Download className="h-3.5 w-3.5" />
-          Install
+          {installing ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Installing…
+            </>
+          ) : (
+            <>
+              <Download className="h-3.5 w-3.5" />
+              Install
+            </>
+          )}
         </button>
-        <button type="button" onClick={dismiss} aria-label="Dismiss">
+        <button type="button" onClick={dismiss} aria-label="Dismiss" disabled={installing}>
           <X className="h-4 w-4 opacity-70" />
         </button>
       </div>

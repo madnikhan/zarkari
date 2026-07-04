@@ -41,3 +41,109 @@ export function shiftDate(date: string, days: number): string {
 export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export type CashPeriodPreset = "today" | "week" | "month" | "7d" | "30d" | "90d" | "custom";
+
+export interface PeriodBounds {
+  start: string;
+  end: string;
+  label: string;
+  preset: CashPeriodPreset;
+}
+
+function startOfWeekMonday(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function endOfWeekSunday(dateStr: string): string {
+  const start = startOfWeekMonday(dateStr);
+  return shiftDate(start, 6);
+}
+
+function startOfMonth(dateStr: string): string {
+  return `${dateStr.slice(0, 7)}-01`;
+}
+
+function endOfMonth(dateStr: string): string {
+  const d = new Date(`${dateStr.slice(0, 7)}-01T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  d.setUTCDate(0);
+  return d.toISOString().slice(0, 10);
+}
+
+export function formatPeriodLabel(start: string, end: string): string {
+  if (start === end) return formatBusinessDate(start);
+  const fmt = (d: string) =>
+    new Date(`${d}T12:00:00`).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: start.slice(0, 4) !== end.slice(0, 4) ? "numeric" : undefined,
+    });
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+export function enumerateDates(start: string, end: string): string[] {
+  const dates: string[] = [];
+  let cursor = start;
+  let guard = 0;
+  while (cursor <= end && guard < 400) {
+    dates.push(cursor);
+    cursor = shiftDate(cursor, 1);
+    guard += 1;
+  }
+  return dates;
+}
+
+export function resolvePeriodBounds(
+  preset: CashPeriodPreset,
+  from?: string,
+  to?: string,
+  anchorDate: string = todayDateString()
+): PeriodBounds {
+  const today = anchorDate;
+
+  switch (preset) {
+    case "today":
+      return { start: today, end: today, label: formatBusinessDate(today), preset };
+    case "week": {
+      const start = startOfWeekMonday(today);
+      const end = endOfWeekSunday(today);
+      return { start, end, label: `This week · ${formatPeriodLabel(start, end)}`, preset };
+    }
+    case "month": {
+      const start = startOfMonth(today);
+      const end = endOfMonth(today);
+      return { start, end, label: `This month · ${formatPeriodLabel(start, end)}`, preset };
+    }
+    case "7d": {
+      const start = shiftDate(today, -6);
+      return { start, end: today, label: `Last 7 days`, preset };
+    }
+    case "30d": {
+      const start = shiftDate(today, -29);
+      return { start, end: today, label: `Last 30 days`, preset };
+    }
+    case "90d": {
+      const start = shiftDate(today, -89);
+      return { start, end: today, label: `Last 90 days`, preset };
+    }
+    case "custom": {
+      const start = from?.slice(0, 10) ?? today;
+      const end = to?.slice(0, 10) ?? today;
+      const [s, e] = start <= end ? [start, end] : [end, start];
+      return { start: s, end: e, label: formatPeriodLabel(s, e), preset };
+    }
+    default:
+      return resolvePeriodBounds("today", from, to, anchorDate);
+  }
+}
+
+export function parseCashPeriodPreset(value: string | null | undefined): CashPeriodPreset {
+  const allowed: CashPeriodPreset[] = ["today", "week", "month", "7d", "30d", "90d", "custom"];
+  if (value && allowed.includes(value as CashPeriodPreset)) return value as CashPeriodPreset;
+  return "today";
+}

@@ -1,12 +1,20 @@
 import { Wallet, ArrowDownLeft, ArrowUpRight, Scale } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import type { DailyCashSummary } from "@/lib/db/cash-ledger";
+import type { DailyCashSummary, RangeCashSummary } from "@/lib/db/cash-ledger";
 
 interface Props {
-  summary: DailyCashSummary;
+  summary: DailyCashSummary | RangeCashSummary;
+  viewMode?: "day" | "period";
 }
 
-export function CashSummaryCards({ summary }: Props) {
+function isRangeSummary(summary: DailyCashSummary | RangeCashSummary): summary is RangeCashSummary {
+  return "netPeriod" in summary;
+}
+
+export function CashSummaryCards({ summary, viewMode = "day" }: Props) {
+  const netLabel = viewMode === "period" || isRangeSummary(summary) ? "Net Balance (Period)" : "Net Balance (Today)";
+  const netValue = isRangeSummary(summary) ? summary.netPeriod : summary.netToday;
+
   const cards = [
     {
       label: "Opening Balance",
@@ -28,8 +36,8 @@ export function CashSummaryCards({ summary }: Props) {
       accent: "text-red-600",
     },
     {
-      label: "Net Balance (Today)",
-      value: formatPrice(String(summary.netToday)),
+      label: netLabel,
+      value: formatPrice(String(netValue)),
       icon: Scale,
       accent: "text-[#4C3BCF]",
     },

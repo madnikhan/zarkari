@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -18,24 +19,62 @@ import {
   YAxis,
 } from "recharts";
 import { formatPrice } from "@/lib/utils";
-import { CASH_TYPE_LABELS } from "@/lib/cash/labels";
+import { CASH_TYPE_LABELS, parseCashPeriodPreset, resolvePeriodBounds, type CashPeriodPreset } from "@/lib/cash/labels";
 import type { CashAnalytics } from "@/lib/db/cash-ledger";
 import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
 
 const PIE_COLORS = ["#4C3BCF", "#10b981"];
 
+const PRESET_BUTTONS: { id: CashPeriodPreset; label: string }[] = [
+  { id: "7d", label: "7 days" },
+  { id: "30d", label: "30 days" },
+  { id: "90d", label: "90 days" },
+  { id: "week", label: "This week" },
+  { id: "month", label: "This month" },
+];
+
 export function CashAnalyticsCharts() {
-  const [period, setPeriod] = useState<7 | 30 | 90>(7);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [analytics, setAnalytics] = useState<CashAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fromParam = searchParams.get("from") ?? "";
+  const toParam = searchParams.get("to") ?? "";
+  const presetParam = searchParams.get("preset");
+  const activePreset: CashPeriodPreset =
+    fromParam && toParam ? "custom" : parseCashPeriodPreset(presetParam ?? "7d");
+
+  const [customFrom, setCustomFrom] = useState(fromParam);
+  const [customTo, setCustomTo] = useState(toParam);
+
+  const loadAnalytics = useCallback(async () => {
     setLoading(true);
-    fetch(`/api/cash/analytics?period=${period}`)
-      .then((r) => r.json())
-      .then((d) => setAnalytics(d.analytics ?? null))
-      .finally(() => setLoading(false));
-  }, [period]);
+    try {
+      const query =
+        fromParam && toParam
+          ? `from=${fromParam}&to=${toParam}`
+          : `preset=${activePreset === "custom" ? "7d" : activePreset}`;
+      const res = await fetch(`/api/cash/analytics?${query}`);
+      const data = await res.json();
+      setAnalytics(data.analytics ?? null);
+    } finally {
+      setLoading(false);
+    }
+  }, [fromParam, toParam, activePreset]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  function selectPreset(preset: CashPeriodPreset) {
+    router.push(`/admin/cash/analytics?preset=${preset}`);
+  }
+
+  function applyCustom() {
+    if (!customFrom || !customTo) return;
+    router.push(`/admin/cash/analytics?from=${customFrom}&to=${customTo}`);
+  }
 
   if (loading) {
     return <p className="text-sm text-slate-500 py-12 text-center">Loading analytics…</p>;
@@ -61,34 +100,72 @@ export function CashAnalyticsCharts() {
     return { date: d.date.slice(5), net: d.net, cumulative };
   });
 
+  const bounds = resolvePeriodBounds(
+    activePreset,
+    fromParam || undefined,
+    toParam || undefined
+  );
+  const subtitle = analytics.presetLabel || bounds.label;
+  const exportSlug = activePreset === "custom" ? `${fromParam}_${toParam}` : activePreset;
+
   return (
     <div id="cash-analytics-export" className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Cash Analytics</h1>
-          <p className="text-sm text-slate-500 mt-1">Trends and insights · Last {period} days</p>
+          <p className="text-sm text-slate-500 mt-1">Trends and insights · {subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportToolbar
             targetId="cash-analytics-export"
-            filename={`zarkari-cash-analytics-${period}d-${new Date().toISOString().slice(0, 10)}.pdf`}
+            filename={`zarkari-cash-analytics-${exportSlug}-${new Date().toISOString().slice(0, 10)}.pdf`}
           />
-          {([7, 30, 90] as const).map((p) => (
+          {PRESET_BUTTONS.map((p) => (
             <button
-              key={p}
+              key={p.id}
               type="button"
-              onClick={() => setPeriod(p)}
+              onClick={() => selectPreset(p.id)}
               className={`px-3 py-1.5 text-xs rounded-lg border ${
-                period === p ? "bg-[#4C3BCF] text-white border-[#4C3BCF]" : "border-slate-200"
+                activePreset === p.id ? "bg-[#4C3BCF] text-white border-[#4C3BCF]" : "border-slate-200"
               }`}
             >
-              {p} days
+              {p.label}
             </button>
           ))}
           <Link href="/admin/cash" className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-slate-50">
             Daily Cash
           </Link>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50/80">
+        <label className="text-xs text-slate-500">
+          Custom from
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="mt-1 block border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+          />
+        </label>
+        <label className="text-xs text-slate-500">
+          Custom to
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="mt-1 block border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={applyCustom}
+          className={`px-3 py-2 text-xs rounded-lg border ${
+            activePreset === "custom" ? "bg-[#4C3BCF] text-white border-[#4C3BCF]" : "border-slate-200 bg-white"
+          }`}
+        >
+          Apply range
+        </button>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

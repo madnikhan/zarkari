@@ -1,27 +1,30 @@
 import { ClipboardList, PiggyBank, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import type { DailyCashSummary } from "@/lib/db/cash-ledger";
+import type { DailyCashSummary, RangeCashSummary } from "@/lib/db/cash-ledger";
 
 interface Props {
-  summary: DailyCashSummary;
+  summary: DailyCashSummary | RangeCashSummary;
+  viewMode?: "day" | "period";
 }
 
-export function CashClosingCards({ summary }: Props) {
+export function CashClosingCards({ summary, viewMode = "day" }: Props) {
+  const periodSuffix = viewMode === "period" ? " (end of period)" : "";
+
   const cards = [
     {
-      label: "Closing Cash In Hand",
+      label: `Closing Cash In Hand${periodSuffix}`,
       value: formatPrice(String(summary.closingCash)),
       icon: PiggyBank,
       accent: "text-emerald-600",
     },
     {
-      label: "Closing Online / Bank",
+      label: `Closing Online / Bank${periodSuffix}`,
       value: formatPrice(String(summary.closingOnline)),
       icon: Wallet,
       accent: "text-blue-600",
     },
     {
-      label: "Total Business Funds",
+      label: `Total Business Funds${periodSuffix}`,
       value: formatPrice(String(summary.closingTotal)),
       icon: ShoppingBag,
       accent: "text-[#4C3BCF]",

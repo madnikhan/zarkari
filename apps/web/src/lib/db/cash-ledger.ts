@@ -48,6 +48,13 @@ export interface DailyCashSummary {
   outstandingBalance: number;
 }
 
+export interface RangeCashSummary extends Omit<DailyCashSummary, "businessDate" | "netToday"> {
+  startDate: string;
+  endDate: string;
+  netPeriod: number;
+  dailyBreakdown: { date: string; cashIn: number; cashOut: number; net: number }[];
+}
+
 function mapTransaction(row: typeof schema.cashTransactions.$inferSelect): CashTransaction {
   return {
     id: row.id,
@@ -104,6 +111,113 @@ export async function listTransactionsForDay(
     .orderBy(desc(schema.cashTransactions.occurredAt));
 
   return rows.map(mapTransaction);
+}
+
+export async function listTransactionsForRange(
+  startDate: string | Date,
+  endDate: string | Date,
+  direction?: CashDirection
+): Promise<CashTransaction[]> {
+  const db = getDb();
+  if (!db) return [];
+  const start = parseDateInput(startDate);
+  const end = parseDateInput(endDate);
+  const conditions = [
+    gte(schema.cashTransactions.businessDate, start),
+    lte(schema.cashTransactions.businessDate, end),
+  ];
+  if (direction) conditions.push(eq(schema.cashTransactions.direction, direction));
+
+  const rows = await db
+    .select()
+    .from(schema.cashTransactions)
+    .where(and(...conditions))
+    .orderBy(desc(schema.cashTransactions.businessDate), desc(schema.cashTransactions.occurredAt));
+
+  return rows.map(mapTransaction);
+}
+
+export async function getRangeCashSummary(
+  startDate: string | Date,
+  endDate: string | Date
+): Promise<RangeCashSummary> {
+  const start = parseDateInput(startDate);
+  const end = parseDateInput(endDate);
+  const db = getDb();
+
+  if (!db) {
+    return {
+      startDate: start,
+      endDate: end,
+      openingCash: 0,
+      openingOnline: 0,
+      openingTotal: 0,
+      totalCashIn: 0,
+      totalCashOut: 0,
+      netPeriod: 0,
+      closingCash: 0,
+      closingOnline: 0,
+      closingTotal: 0,
+      outstandingOrders: 0,
+      outstandingBalance: 0,
+      dailyBreakdown: [],
+    };
+  }
+
+  const rows = await db
+    .select({
+      businessDate: schema.cashTransactions.businessDate,
+      amount: schema.cashTransactions.amount,
+      direction: schema.cashTransactions.direction,
+    })
+    .from(schema.cashTransactions)
+    .where(
+      and(
+        gte(schema.cashTransactions.businessDate, start),
+        lte(schema.cashTransactions.businessDate, end)
+      )
+    );
+
+  const dailyMap = new Map<string, { cashIn: number; cashOut: number }>();
+  let totalCashIn = 0;
+  let totalCashOut = 0;
+
+  for (const row of rows) {
+    const amt = parseFloat(row.amount);
+    const entry = dailyMap.get(row.businessDate) ?? { cashIn: 0, cashOut: 0 };
+    if (row.direction === "in") {
+      entry.cashIn += amt;
+      totalCashIn += amt;
+    } else {
+      entry.cashOut += amt;
+      totalCashOut += amt;
+    }
+    dailyMap.set(row.businessDate, entry);
+  }
+
+  const dailyBreakdown = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, cashIn: v.cashIn, cashOut: v.cashOut, net: v.cashIn - v.cashOut }));
+
+  const openingSummary = await getDailyCashSummary(start);
+  const closingSummary = await getDailyCashSummary(end);
+
+  return {
+    startDate: start,
+    endDate: end,
+    openingCash: openingSummary.openingCash,
+    openingOnline: openingSummary.openingOnline,
+    openingTotal: openingSummary.openingTotal,
+    totalCashIn,
+    totalCashOut,
+    netPeriod: totalCashIn - totalCashOut,
+    closingCash: closingSummary.closingCash,
+    closingOnline: closingSummary.closingOnline,
+    closingTotal: closingSummary.closingTotal,
+    outstandingOrders: closingSummary.outstandingOrders,
+    outstandingBalance: closingSummary.outstandingBalance,
+    dailyBreakdown,
+  };
 }
 
 export async function getOpeningBalanceForDay(date: string | Date): Promise<{
@@ -405,6 +519,9 @@ export async function autoPostCashTransaction(input: {
 }
 
 export interface CashAnalytics {
+  startDate: string;
+  endDate: string;
+  presetLabel: string;
   periodDays: number;
   daily: { date: string; cashIn: number; cashOut: number; net: number }[];
   methodSplit: { cash: number; online: number };
@@ -418,16 +535,28 @@ export interface CashAnalytics {
   };
 }
 
-export async function getCashAnalytics(periodDays: 7 | 30 | 90 = 7): Promise<CashAnalytics> {
+function countDaysInclusive(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate}T12:00:00Z`);
+  const end = new Date(`${endDate}T12:00:00Z`);
+  return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+export async function getCashAnalytics(input: {
+  startDate: string;
+  endDate: string;
+  presetLabel?: string;
+}): Promise<CashAnalytics> {
   const db = getDb();
-  const end = new Date();
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - (periodDays - 1));
-  const startDate = toDateString(start);
-  const endDate = toDateString(end);
+  const startDate = parseDateInput(input.startDate);
+  const endDate = parseDateInput(input.endDate);
+  const periodDays = countDaysInclusive(startDate, endDate);
+  const presetLabel = input.presetLabel ?? `${startDate} – ${endDate}`;
 
   if (!db) {
     return {
+      startDate,
+      endDate,
+      presetLabel,
       periodDays,
       daily: [],
       methodSplit: { cash: 0, online: 0 },
@@ -481,9 +610,18 @@ export async function getCashAnalytics(periodDays: 7 | 30 | 90 = 7): Promise<Cas
     }
   }
 
-  const daily = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, cashIn: v.cashIn, cashOut: v.cashOut, net: v.cashIn - v.cashOut }));
+  const allDates: string[] = [];
+  let cursor = new Date(`${startDate}T12:00:00Z`);
+  const target = new Date(`${endDate}T12:00:00Z`);
+  while (cursor <= target) {
+    allDates.push(toDateString(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const daily = allDates.map((date) => {
+    const v = dailyMap.get(date) ?? { cashIn: 0, cashOut: 0 };
+    return { date, cashIn: v.cashIn, cashOut: v.cashOut, net: v.cashIn - v.cashOut };
+  });
 
   const totalIn = daily.reduce((s, d) => s + d.cashIn, 0);
   const totalOut = daily.reduce((s, d) => s + d.cashOut, 0);
@@ -504,13 +642,16 @@ export async function getCashAnalytics(periodDays: 7 | 30 | 90 = 7): Promise<Cas
   const summary = await getDailyCashSummary(endDate);
 
   return {
+    startDate,
+    endDate,
+    presetLabel,
     periodDays,
     daily,
     methodSplit: { cash: cashMethod, online: onlineMethod },
     expensesByType: Array.from(expenseMap.entries()).map(([type, total]) => ({ type, total })),
     insights: {
-      avgDailyIn: daily.length ? totalIn / daily.length : 0,
-      avgDailyOut: daily.length ? totalOut / daily.length : 0,
+      avgDailyIn: periodDays ? totalIn / periodDays : 0,
+      avgDailyOut: periodDays ? totalOut / periodDays : 0,
       busiestDay: busiest?.date ?? null,
       topExpenseType,
       outstandingBalance: summary.outstandingBalance,

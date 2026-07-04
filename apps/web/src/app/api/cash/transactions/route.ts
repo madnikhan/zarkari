@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import {
   createCashTransaction,
   listTransactionsForDay,
+  listTransactionsForRange,
   type CashDirection,
   type CashTransactionType,
 } from "@/lib/db/cash-ledger";
@@ -16,8 +17,16 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get("date") ?? todayDateString();
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
   const direction = searchParams.get("direction") as CashDirection | null;
+
+  if (from && to) {
+    const transactions = await listTransactionsForRange(from, to, direction ?? undefined);
+    return NextResponse.json({ transactions });
+  }
+
+  const date = searchParams.get("date") ?? todayDateString();
   const transactions = await listTransactionsForDay(date, direction ?? undefined);
   return NextResponse.json({ transactions });
 }
