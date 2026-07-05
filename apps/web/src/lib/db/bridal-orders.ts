@@ -460,6 +460,44 @@ export async function searchBridalOrdersWithCustomerDb(query: string) {
   }));
 }
 
+export interface PayableBridalOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  remainingBalance: string;
+  depositPaid: string;
+  totalPrice: string;
+}
+
+export async function listPayableBridalOrdersDb(): Promise<PayableBridalOrder[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      order: schema.bridalOrders,
+      customerName: schema.customers.name,
+    })
+    .from(schema.bridalOrders)
+    .leftJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
+    .where(
+      and(
+        notInArray(schema.bridalOrders.status, ["collected", "cancelled", "refunded"]),
+        sql`${schema.bridalOrders.remainingBalance}::numeric > 0`
+      )
+    )
+    .orderBy(desc(schema.bridalOrders.bookingDate))
+    .limit(200);
+
+  return rows.map((r) => ({
+    id: r.order.id,
+    orderNumber: r.order.orderNumber,
+    customerName: r.customerName ?? "",
+    remainingBalance: r.order.remainingBalance,
+    depositPaid: r.order.depositPaid ?? "0",
+    totalPrice: r.order.totalPrice,
+  }));
+}
+
 export async function getBridalOrderDb(id: string): Promise<BridalOrder | null> {
   const db = getDb();
   if (!db) return null;

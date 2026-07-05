@@ -1,10 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import type { CashDirection, CashTransactionType } from "@/lib/db/cash-ledger";
 import { CASH_TYPE_LABELS, CASH_IN_TYPES, CASH_OUT_TYPES } from "@/lib/cash/labels";
+import { formatPrice } from "@/lib/utils";
+
+interface PayableOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  remainingBalance: string;
+  depositPaid: string;
+  totalPrice: string;
+}
 
 interface Props {
   open: boolean;
@@ -14,40 +24,117 @@ interface Props {
   defaultType?: CashTransactionType;
 }
 
+const ORDER_LINKED_TYPES: CashTransactionType[] = ["order_deposit", "order_collection", "refund"];
+
+function needsOrderPicker(type: CashTransactionType): boolean {
+  return ORDER_LINKED_TYPES.includes(type);
+}
+
 export function AddTransactionModal({ open, onClose, date, direction, defaultType }: Props) {
   const router = useRouter();
   const [type, setType] = useState<CashTransactionType>(defaultType ?? (direction === "in" ? "other_in" : "other_out"));
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "online">("cash");
+  const [orderId, setOrderId] = useState("");
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
+  const [payableOrders, setPayableOrders] = useState<PayableOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setType(defaultType ?? (direction === "in" ? "other_in" : "other_out"));
+    setAmount("");
+    setMethod("cash");
+    setOrderId("");
+    setReference("");
+    setDescription("");
+    setError("");
+  }, [open, defaultType, direction]);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingOrders(true);
+    fetch("/api/cash/payable-orders")
+      .then((r) => r.json())
+      .then((d) => setPayableOrders(d.orders ?? []))
+      .catch(() => setPayableOrders([]))
+      .finally(() => setLoadingOrders(false));
+  }, [open]);
 
   if (!open) return null;
 
   const types = direction === "in" ? CASH_IN_TYPES : CASH_OUT_TYPES;
+  const showOrderPicker = needsOrderPicker(type);
+  const selectedOrder = payableOrders.find((o) => o.id === orderId);
+
+  function handleTypeChange(next: CashTransactionType) {
+    setType(next);
+    if (!needsOrderPicker(next)) {
+      setOrderId("");
+    }
+  }
+
+  function handleOrderSelect(id: string) {
+    setOrderId(id);
+    const order = payableOrders.find((o) => o.id === id);
+    if (order) {
+      setReference(order.orderNumber);
+      setDescription(order.customerName);
+    } else {
+      setReference("");
+      setDescription("");
+    }
+  }
+
+  function fillRemainingBalance() {
+    if (selectedOrder) setAmount(selectedOrder.remainingBalance);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/cash/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          direction,
-          type,
-          amount,
-          method,
-          reference: reference || undefined,
-          description: description || undefined,
-          businessDate: date,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      if (showOrderPicker && !orderId) {
+        throw new Error("Please select an order / invoice number");
+      }
+
+      if ((type === "order_deposit" || type === "order_collection") && orderId) {
+        const paymentType = type === "order_deposit" ? "deposit" : "balance";
+        const res = await fetch(`/api/orders/${orderId}/payment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: paymentType,
+            amount,
+            method: method === "cash" ? "cash" : "card",
+            businessDate: date,
+            description: description || selectedOrder?.customerName,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to save payment");
+      } else {
+        const res = await fetch("/api/cash/transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            direction,
+            type,
+            amount,
+            method,
+            reference: reference || undefined,
+            description: description || undefined,
+            businessDate: date,
+            orderId: orderId || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      }
       onClose();
       router.refresh();
     } catch (err) {
@@ -59,8 +146,8 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 print:hidden">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white">
           <h2 className="font-semibold text-slate-900">Add Transaction</h2>
           <button type="button" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5 text-slate-400" />
@@ -71,7 +158,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             <label className="text-xs text-slate-500 uppercase">Type</label>
             <select
               value={type}
-              onChange={(e) => setType(e.target.value as CashTransactionType)}
+              onChange={(e) => handleTypeChange(e.target.value as CashTransactionType)}
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             >
               {types.map((t) => (
@@ -81,6 +168,34 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
               ))}
             </select>
           </div>
+
+          {showOrderPicker && (
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Order / Invoice</label>
+              <select
+                value={orderId}
+                onChange={(e) => handleOrderSelect(e.target.value)}
+                required
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">
+                  {loadingOrders ? "Loading orders…" : "Select customer order…"}
+                </option>
+                {payableOrders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.orderNumber} — {o.customerName} ({formatPrice(o.remainingBalance)} due)
+                  </option>
+                ))}
+              </select>
+              {selectedOrder && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Total {formatPrice(selectedOrder.totalPrice)} · Paid {formatPrice(selectedOrder.depositPaid)} ·
+                  Remaining {formatPrice(selectedOrder.remainingBalance)}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-500 uppercase">Amount (£)</label>
@@ -93,6 +208,15 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
                 onChange={(e) => setAmount(e.target.value)}
                 className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
               />
+              {type === "order_collection" && selectedOrder && (
+                <button
+                  type="button"
+                  onClick={fillRemainingBalance}
+                  className="mt-1 text-xs text-[#4C3BCF] hover:underline"
+                >
+                  Fill remaining balance
+                </button>
+              )}
             </div>
             <div>
               <label className="text-xs text-slate-500 uppercase">Method</label>
@@ -106,23 +230,29 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
               </select>
             </div>
           </div>
-          <div>
-            <label className="text-xs text-slate-500 uppercase">Reference</label>
-            <input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder="ORD-1150"
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
+
+          {!showOrderPicker && (
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Reference</label>
+              <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Optional reference"
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+
           <div>
             <label className="text-xs text-slate-500 uppercase">Description</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder={showOrderPicker ? "Customer name (auto-filled from order)" : "Optional note"}
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"

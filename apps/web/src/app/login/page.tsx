@@ -58,7 +58,6 @@ function LoginForm() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
-        <p className="text-xs text-charcoal/40 text-center mt-6">Demo: owner@zarkari.co.uk / demo123</p>
       </div>
     </div>
   );

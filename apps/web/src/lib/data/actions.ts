@@ -455,7 +455,10 @@ export function markAllNotificationsRead() {
   }
 }
 
-export async function recordPayment(orderId: string, input: { type: string; amount: string; method?: string }) {
+export async function recordPayment(
+  orderId: string,
+  input: { type: string; amount: string; method?: string; businessDate?: string; description?: string }
+) {
   const order = await resolveOrder(orderId);
   demoPayments.push({
     id: `pay-${Date.now()}`,
@@ -487,10 +490,10 @@ export async function recordPayment(orderId: string, input: { type: string; amou
       method: input.method,
       reference: order?.orderNumber,
       description:
-        cashType === "order_deposit"
-          ? `Deposit from customer`
-          : `Balance received`,
+        input.description ??
+        (cashType === "order_deposit" ? `Deposit from customer` : `Balance received`),
       orderId,
+      businessDate: input.businessDate,
     });
   }
 }

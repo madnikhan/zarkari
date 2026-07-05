@@ -70,6 +70,36 @@ async function pageOk(path: string, cookie: string): Promise<boolean> {
   return res.status === 200 || res.status === 307;
 }
 
+async function pageHtml(path: string, cookie?: string): Promise<string> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: cookie ? { Cookie: cookie } : {},
+    redirect: "follow",
+  });
+  return res.text();
+}
+
+async function customerSession(orderNumber: string, phone: string): Promise<string | null> {
+  const step1 = await fetch(`${BASE}/api/customer/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNumber, phone }),
+  });
+  if (!step1.ok) return null;
+  const demoOtp = (await step1.json()) as { demoOtp?: string };
+  if (!demoOtp.demoOtp) return null;
+
+  const step2 = await fetch(`${BASE}/api/customer/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNumber, phone, otp: demoOtp.demoOtp }),
+  });
+  if (!step2.ok) return null;
+  const raw = step2.headers.getSetCookie?.() ?? [step2.headers.get("set-cookie") ?? ""];
+  const cookies = raw.flatMap((c) => (c ? [c.split(";")[0]] : []));
+  const session = cookies.find((c) => c.startsWith("zarkari-customer-order="));
+  return session ?? null;
+}
+
 async function main() {
   console.log(`Auditing ${BASE}...\n`);
 
@@ -98,6 +128,17 @@ async function main() {
   const cashSummary = await req("/api/cash/summary?date=" + new Date().toISOString().slice(0, 10), ownerCookie);
   if (cashSummary.status === 200) pass("Daily Cash", "GET /api/cash/summary");
   else fail("Daily Cash", "GET /api/cash/summary", `status ${cashSummary.status}`);
+  const payableOrders = await req("/api/cash/payable-orders", ownerCookie);
+  if (payableOrders.status === 200 && Array.isArray((payableOrders.body as { orders?: unknown[] })?.orders)) {
+    pass("Daily Cash", "GET /api/cash/payable-orders");
+  } else fail("Daily Cash", "GET /api/cash/payable-orders", `status ${payableOrders.status}`);
+  if (await pageOk("/admin/cash?preset=week", ownerCookie)) pass("Daily Cash", "Week preset page loads");
+  else fail("Daily Cash", "Week preset page loads");
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const rangeSummary = await req(`/api/cash/summary?from=${weekAgo}&to=${today}`, ownerCookie);
+  if (rangeSummary.status === 200) pass("Daily Cash", "GET /api/cash/summary custom range");
+  else fail("Daily Cash", "GET /api/cash/summary custom range", `status ${rangeSummary.status}`);
   const txCreate = await req("/api/cash/transactions", ownerCookie, {
     method: "POST",
     body: JSON.stringify({
@@ -123,6 +164,12 @@ async function main() {
   const analytics = await req("/api/cash/analytics?period=7", ownerCookie);
   if (analytics.status === 200) pass("Cash Analytics", "GET /api/cash/analytics");
   else fail("Cash Analytics", "GET /api/cash/analytics", `status ${analytics.status}`);
+  const analyticsMonth = await req("/api/cash/analytics?preset=month", ownerCookie);
+  if (analyticsMonth.status === 200) pass("Cash Analytics", "GET /api/cash/analytics?preset=month");
+  else fail("Cash Analytics", "GET /api/cash/analytics?preset=month", `status ${analyticsMonth.status}`);
+  const analyticsRange = await req(`/api/cash/analytics?from=${weekAgo}&to=${today}`, ownerCookie);
+  if (analyticsRange.status === 200) pass("Cash Analytics", "GET /api/cash/analytics custom range");
+  else fail("Cash Analytics", "GET /api/cash/analytics custom range", `status ${analyticsRange.status}`);
   if (staffCookie) {
     const staffAn = await fetch(`${BASE}/admin/cash/analytics`, {
       headers: { Cookie: staffCookie },
@@ -185,26 +232,35 @@ async function main() {
   const supplierList = Array.isArray((suppliers.body as { suppliers?: unknown[] })?.suppliers)
     ? (suppliers.body as { suppliers: { id: string }[] }).suppliers
     : [];
+  const auditPhone = `07${String(Date.now()).slice(-9)}`;
   const createOrder = await req("/api/orders", ownerCookie, {
     method: "POST",
     body: JSON.stringify({
       customerName: "Audit Customer",
-      customerPhone: `07${String(Date.now()).slice(-9)}`,
+      customerPhone: auditPhone,
       customerEmail: "audit@test.com",
       supplierId: supplierList[0]?.id,
       dressType: "Lehenga",
       totalPrice: "2000.00",
     }),
   });
+  let auditOrderId: string | undefined;
+  let auditOrderNumber: string | undefined;
   if (createOrder.status === 200 || createOrder.status === 201) {
     pass("New Order", "POST create order");
-    const orderId = (createOrder.body as { id?: string })?.id;
-    if (orderId) {
-      const detail = await pageOk(`/admin/orders/${orderId}`, ownerCookie);
+    auditOrderId = (createOrder.body as { id?: string })?.id;
+    auditOrderNumber = (createOrder.body as { orderNumber?: string })?.orderNumber;
+    if (auditOrderId) {
+      const detail = await pageOk(`/admin/orders/${auditOrderId}`, ownerCookie);
       if (detail) pass("New Order", "Detail page after create");
       else fail("New Order", "Detail page after create");
     }
   } else fail("New Order", "POST create order", `status ${createOrder.status}`);
+
+  const newOrderHtml = await pageHtml("/admin/orders/new", ownerCookie);
+  if (newOrderHtml.includes("Voice Notes") || newOrderHtml.includes("New Bridal Order")) {
+    pass("New Order", "Form page includes voice note section or title");
+  } else partial("New Order", "Form page includes voice note section or title", "Voice UI may be client-only");
 
   // 9-11 Customers, Suppliers, Calendar
   for (const [section, path] of [
@@ -272,6 +328,83 @@ async function main() {
   const usersApi = await req("/api/users", ownerCookie);
   if (usersApi.status === 200) pass("Users", "GET /api/users");
   else fail("Users", "GET /api/users", `status ${usersApi.status}`);
+
+  // 18 Training
+  if (await pageOk("/admin/training", ownerCookie)) pass("Training", "Page loads");
+  else fail("Training", "Page loads");
+
+  // 19 Upload
+  const presignUnauth = await fetch(`${BASE}/api/upload/presign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileName: "test.mp4", contentType: "video/mp4", fileSize: 1024 }),
+  });
+  if (presignUnauth.status === 401) pass("Upload", "Presign requires auth");
+  else fail("Upload", "Presign requires auth", `status ${presignUnauth.status}`);
+  const presignBad = await req("/api/upload/presign", ownerCookie, {
+    method: "POST",
+    body: JSON.stringify({ fileName: "test.txt", contentType: "text/plain", fileSize: 100 }),
+  });
+  if (presignBad.status === 400) pass("Upload", "Presign rejects non-media");
+  else partial("Upload", "Presign rejects non-media", `status ${presignBad.status}`);
+  const presignOk = await req("/api/upload/presign", ownerCookie, {
+    method: "POST",
+    body: JSON.stringify({ fileName: "audit.mp4", contentType: "video/mp4", fileSize: 2048, category: "audit" }),
+  });
+  if (presignOk.status === 200) pass("Upload", "POST /api/upload/presign (video)");
+  else partial("Upload", "POST /api/upload/presign (video)", `status ${presignOk.status}`);
+
+  // 20 Staff messages + customer portal sync
+  if (auditOrderId && auditOrderNumber) {
+    const staffMsg = await req(`/api/orders/${auditOrderId}/message`, ownerCookie, {
+      method: "POST",
+      body: JSON.stringify({ message: "Audit staff update — your order is progressing well." }),
+    });
+    if (staffMsg.status === 200) pass("Staff Messages", "POST /api/orders/{id}/message");
+    else fail("Staff Messages", "POST /api/orders/{id}/message", `status ${staffMsg.status}`);
+
+    const customerCookie = await customerSession(auditOrderNumber, auditPhone);
+    if (customerCookie) {
+      const customerOrder = await fetch(`${BASE}/api/customer/order?orderNumber=${encodeURIComponent(auditOrderNumber)}`, {
+        headers: { Cookie: customerCookie },
+      });
+      if (customerOrder.status === 200) {
+        const data = (await customerOrder.json()) as { messages?: { body?: string; message?: string }[] };
+        const found = (data.messages ?? []).some((m) =>
+          (m.body ?? m.message ?? "").includes("Audit staff update")
+        );
+        if (found) pass("Staff Messages", "Customer order API shows staff message");
+        else partial("Staff Messages", "Customer order API shows staff message", "Message not found in response");
+      } else partial("Staff Messages", "Customer order API shows staff message", `status ${customerOrder.status}`);
+    } else partial("Staff Messages", "Customer verify for message sync", "OTP flow unavailable");
+  } else partial("Staff Messages", "POST /api/orders/{id}/message", "No order created in audit");
+
+  // 21 PWA
+  const manifest = await fetch(`${BASE}/manifest-boms.json`);
+  if (manifest.status === 200) {
+    const json = (await manifest.json()) as { name?: string };
+    if (json.name) pass("PWA", "manifest-boms.json reachable");
+    else partial("PWA", "manifest-boms.json reachable", "Missing name field");
+  } else fail("PWA", "manifest-boms.json reachable", `status ${manifest.status}`);
+
+  // 22 Login
+  const loginPage = await pageHtml("/login");
+  if (loginPage.includes("Sign In") || loginPage.includes("Staff")) pass("Login", "Page loads");
+  else fail("Login", "Page loads");
+  if (!loginPage.includes("demo123") && !loginPage.match(/Demo:\s*owner@/i)) {
+    pass("Login", "No demo credentials in HTML");
+  } else fail("Login", "No demo credentials in HTML", "Demo hint still present");
+
+  // 23 Customer portal
+  const myOrderPage = await fetch(`${BASE}/my-order`);
+  if (myOrderPage.status === 200) pass("Customer Portal", "my-order page loads");
+  else fail("Customer Portal", "my-order page loads", `status ${myOrderPage.status}`);
+
+  // 24 Supplier portal
+  if (supplierCookie) {
+    if (await pageOk("/supplier", supplierCookie)) pass("Supplier Portal", "Dashboard loads");
+    else partial("Supplier Portal", "Dashboard loads");
+  }
 
   // Auth cross-cutting
   const unauth = await fetch(`${BASE}/admin/dashboard`, { redirect: "manual" });

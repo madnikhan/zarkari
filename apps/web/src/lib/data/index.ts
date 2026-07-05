@@ -556,6 +556,28 @@ export async function searchOrdersWithCustomer(query: string) {
   }));
 }
 
+export async function getPayableOrders() {
+  if (isDbConfigured()) {
+    const { listPayableBridalOrdersDb } = await import("@/lib/db/bridal-orders");
+    return listPayableBridalOrdersDb();
+  }
+  return demoBridalOrders
+    .filter(
+      (o) =>
+        !["collected", "cancelled", "refunded"].includes(o.status) &&
+        parseFloat(o.remainingBalance) > 0
+    )
+    .map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      customerName: demoCustomers.find((c) => c.id === o.customerId)?.name ?? "",
+      remainingBalance: o.remainingBalance,
+      depositPaid: o.depositPaid,
+      totalPrice: o.totalPrice,
+    }))
+    .sort((a, b) => b.orderNumber.localeCompare(a.orderNumber));
+}
+
 export async function getDashboardStats() {
   if (isDbConfigured()) {
     const { getBridalDashboardStatsDb } = await import("@/lib/db/bridal-orders");

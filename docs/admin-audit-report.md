@@ -2,33 +2,44 @@
 
 **Date:** 2026-06-26  
 **Auditor:** Automated (`npm run audit:admin`) + manual code review  
-**Environments:** Local (`http://localhost:3000`) + Production (`https://zarkari-web.vercel.app`)
+**Environment:** Production (`https://www.zarkari.co.uk`)  
+**Build:** **PASS** — `npm run build` succeeds locally with all new routes
 
 ## Executive Summary
 
+| Metric | Count |
+|--------|-------|
+| **PASS** | 60 |
+| **PARTIAL** | 1 |
+| **FAIL** | 2 |
+
 | Verdict | Status |
 |---------|--------|
-| **Local (after fixes)** | **PASS** — all 17 sections functional; 0 FAIL |
-**Production audit (pre-deploy, 2026-06-26):** 42 PASS, 2 PARTIAL, 1 FAIL — failures match unfixed deploy (order create collision, product UUID 500). **Re-audit after deploy required.**
-| **Build** | **PASS** — `npm run build` succeeds |
+| **Production (pre-deploy, 2026-06-26)** | **PARTIAL** — 2 FAIL items are undeployed features in this batch |
+| **Local build** | **PASS** — compiles with payable-orders API, order picker, login cleanup |
+| **Post-deploy expectation** | **PASS** — re-run audit after deploy; both FAIL items should clear |
 
-### Fixes applied during audit
+### Failures (pending deploy)
 
-1. **CMS demo bleed (P0)** — When `DATABASE_URL` is set, CMS/notifications no longer fall back to in-memory demo catalog on empty tables ([`apps/web/src/lib/data/index.ts`](apps/web/src/lib/data/index.ts)).
-2. **Order search 500 (P0)** — Fixed `ilike` on PostgreSQL enum column in [`searchBridalOrdersDb`](apps/web/src/lib/db/bridal-orders.ts).
-3. **Order number collisions (P0)** — Replaced in-memory `nextOrderNumber()` with DB-backed `nextBridalOrderNumberDb()` for production order creation.
-4. **New order deposit (P1)** — Deposit now recorded in `bridal_payments` + cash ledger on create ([`createBridalOrder`](apps/web/src/lib/data/actions.ts)).
-5. **Reports CSV period (P1)** — CSV export now filters orders by selected period ([`api/reports/export`](apps/web/src/app/api/reports/export/route.ts)).
-6. **Inbox notifications (P1)** — Inbox events persist to Neon via `createNotificationDb` ([`social-inbox/service.ts`](apps/web/src/lib/social-inbox/service.ts)).
-7. **Invalid product UUID (P2)** — `GET /api/products?id=…` returns 404 instead of 500 for non-UUID ids.
+| Section | Test | Reason |
+|---------|------|--------|
+| Daily Cash | `GET /api/cash/payable-orders` | Route added locally; returns 404 on production until deployed |
+| Login | No demo credentials in HTML | Demo hint removed locally; production still shows `Demo: owner@zarkari.co.uk / demo123` |
+
+### Fixes in this release
+
+1. **Cash order picker** — `GET /api/cash/payable-orders` lists active bridal orders with outstanding balance; Add Transaction modal shows Order / Invoice dropdown for deposit, collection, and refund types.
+2. **Ledger ↔ order sync** — Deposit and collection transactions with a selected order route through `POST /api/orders/{id}/payment` (uses `recordPayment` + auto cash post) instead of raw cash insert.
+3. **Login cleanup** — Demo credentials line removed from `/login`.
+4. **Audit script extended** — Payable orders, cash period presets, analytics presets, upload presign, staff messages + customer sync, training, PWA manifest, login HTML check.
 
 ### Go-live checklist
 
 - [ ] Deploy latest code to Vercel
-- [ ] Confirm env: `DATABASE_URL`, `SESSION_SECRET`, `R2_*`
-- [ ] Run `npm run db:push` against production Neon if schema changed
-- [ ] Run `CONFIRM=1 npm run db:clear-sample` before live (removes `SAMPLE-*` demo rows)
-- [ ] Re-run: `npm run audit:admin -- https://zarkari-web.vercel.app`
+- [ ] Confirm env: `DATABASE_URL`, `SESSION_SECRET`, `R2_*`, `R2_CORS_ORIGIN`
+- [ ] Re-run: `npm run audit:admin -- https://www.zarkari.co.uk`
+- [ ] Verify Add Transaction → Order Deposit → order balance decreases on production
+- [ ] Confirm login page has no demo credentials text
 
 ---
 
@@ -36,205 +47,257 @@
 
 ### 1. Dashboard — `/admin/dashboard`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Stats cards, recent orders, inbox widget load |
-| Prod | **PASS** | Page loads when authenticated |
-
-**Tests:** Stat cards, recent orders table links, social inbox widget, sample banner when `SAMPLE-*` data exists.
+| Result | Notes |
+|--------|-------|
+| **PASS** | Stats, recent orders, inbox widget load |
 
 ---
 
 ### 2. Daily Cash — `/admin/cash`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Summary, manual tx, staff access |
-| Prod | **PASS** | Requires DB + cash ledger migrations |
+| Result | Notes |
+|--------|-------|
+| **PARTIAL** | Core ledger works; payable-orders API pending deploy |
 
-**Tests:** Date nav, quick actions, `POST /api/cash/transactions`, closing balance math, staff access.
+**Tests:**
 
-**Known PARTIAL:** No UI for opening balance edit (API exists at `PATCH /api/cash/opening-balance`).
+| Test | Prod |
+|------|------|
+| Page loads | PASS |
+| `GET /api/cash/summary` | PASS |
+| `GET /api/cash/payable-orders` | **FAIL** (404 pre-deploy) |
+| Week preset page (`?preset=week`) | PASS |
+| Custom range summary (`?from=&to=`) | PASS |
+| `POST /api/cash/transactions` (manual) | PASS |
+| Staff access | PASS |
+
+**New feature (local):** Add Transaction modal order dropdown; deposit/collection sync via payment API.
 
 ---
 
 ### 3. Cash Analytics — `/admin/cash/analytics`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Charts + period toggle |
-| Prod | **PASS** | Owner-only; staff redirected |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Owner charts; staff redirected |
 
-**Tests:** 7/30/90 day toggle, `GET /api/cash/analytics`, middleware owner gate.
+**Tests:** `GET /api/cash/analytics`, `?preset=month`, custom `from`/`to` range — all PASS on production.
 
 ---
 
-### 4. Orders — `/admin/orders` + detail
+### 4. Orders — `/admin/orders`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | List tabs, search API, detail actions |
-| Prod | **PARTIAL** | Search 500 until enum fix deployed |
-
-**Tests:** Active) pagination, order detail, workflow actions (send/collect/cancel/refund/redesign), staff messages.
-
-**Known PARTIAL:** In-memory pagination; no inline field edit.
+| Result | Notes |
+|--------|-------|
+| **PASS** | List, search API, detail actions |
 
 ---
 
 ### 5. Shop Orders — `/admin/orders/retail`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | List + status PATCH |
-| Prod | **PARTIAL** | Empty until Stripe checkout + webhook |
-
-**Tests:** List loads, `PATCH /api/retail-orders/[id]`.
+| Result | Notes |
+|--------|-------|
+| **PASS** | List loads; retail depends on Stripe webhook for live orders |
 
 ---
 
 ### 6. Inbox — `/admin/inbox`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Threads, manual inquiry, reply |
-| Prod | **PARTIAL** | Real Meta/WA sync needs tokens + App Review |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Threads, manual inquiry, reply API |
 
-**Tests:** Thread list/filters, `POST /api/inbox/manual`, reply, supplier inbox access.
+Real Meta/WhatsApp sync requires production tokens + App Review.
 
 ---
 
 ### 7. Content — `/admin/content/*`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Products, collections, blog, homepage, media |
-| Prod | **PASS** | Demo bleed fix applied locally |
-
-**Tests:** All sub-pages load; owner write / staff read-only on CMS APIs; R2 upload via `/api/upload`.
-
-**Known PARTIAL:** No media delete; 4 MB upload cap.
+| Result | Notes |
+|--------|-------|
+| **PASS** | Products, collections, blog, homepage, media picker pages |
 
 ---
 
 ### 8. New Order — `/admin/orders/new`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Create + deposit + cash post |
-| Prod | **FAIL→FIX** | Order number collision fixed locally |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Create order, detail redirect, voice note section on form |
 
-**Tests:** `POST /api/orders`, redirect to detail, deposit in payments + cash ledger.
-
----
-
-### 9. Customers — `/admin/customers`
-
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Cards with linked orders |
-| Prod | **PASS** | Read-only view |
+**Tests:** `POST /api/orders`, detail page, form includes voice note UI (title/section).
 
 ---
 
-### 10. Suppliers — `/admin/suppliers`
+### 9–11. Customers, Suppliers, Calendar
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Performance metrics |
-| Prod | **PASS** | Read-only analytics |
-
----
-
-### 11. Calendar — `/admin/calendar`
-
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Deliveries grouped by date |
-| Prod | **PASS** | List view (not grid calendar) |
+| Section | Result |
+|---------|--------|
+| Customers | **PASS** |
+| Suppliers | **PASS** |
+| Calendar | **PASS** |
 
 ---
 
 ### 12. Payments — `/admin/payments`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Record payment + cash auto-post |
-| Prod | **PASS** | Bridal orders only |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Record payment + cash auto-post |
 
 ---
 
 ### 13. Finance — `/admin/finance`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Owner summary; staff blocked |
-| Prod | **PASS** | Thin page; matches Payments totals |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Owner summary; staff blocked |
 
 ---
 
 ### 14. Reports — `/admin/reports`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Period stats + CSV export |
-| Prod | **PARTIAL** | CSV period filter fix pending deploy |
-
-**Tests:** Period toggle, owner CSV export, staff 403 on export.
+| Result | Notes |
+|--------|-------|
+| **PASS** | Period stats, owner CSV export, staff 403 |
 
 ---
 
 ### 15. Notifications — `/admin/notifications`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | List + mark all read |
-| Prod | **PARTIAL** | Inbox→DB notifications fix pending deploy |
+| Result | Notes |
+|--------|-------|
+| **PASS** | List + mark all read |
 
 ---
 
 ### 16. Settings — `/admin/settings`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Owner edit, staff read-only |
-| Prod | **PASS** | Social inbox env checklist |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Page + `GET /api/settings` |
 
 ---
 
 ### 17. Users — `/admin/users`
 
-| Env | Result | Notes |
-|-----|--------|-------|
-| Local | **PASS** | Owner CRUD; staff redirected |
-| Prod | **PASS** | Page + API owner-only |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Owner CRUD; staff redirected |
 
 ---
 
-## Cross-Cutting
+### 18. Training — `/admin/training`
 
-| Test | Local | Prod |
-|------|-------|------|
-| Unauthenticated → login redirect | PASS | PASS |
-| Supplier → inbox only | PASS | PASS |
-| Staff → no Finance/Analytics/Users | PASS | PASS |
-| `npm run build` | PASS | N/A |
-| Sample data clear (`CONFIRM=1 npm run db:clear-sample`) | Verified script exists | Run before go-live |
+| Result | Notes |
+|--------|-------|
+| **PASS** | Page loads |
 
 ---
 
-## Open P2 Items (accepted for launch)
+### 19. Upload — `/api/upload/presign`
 
-- In-memory pagination on Orders/Customers/Payments (scale risk at 1000+ orders)
-- No opening balance UI on Daily Cash
+| Result | Notes |
+|--------|-------|
+| **PASS** | Auth required, rejects non-media, video presign OK |
+
+Direct R2 PUT requires bucket CORS (`R2_CORS_ORIGIN` in `.env.example`).
+
+---
+
+### 20. Staff Messages
+
+| Result | Notes |
+|--------|-------|
+| **PASS** | Staff POST + customer order API shows message |
+
+End-to-end: `POST /api/orders/{id}/message` → customer verify OTP → `GET /api/customer/order` includes staff update.
+
+---
+
+### 21. PWA — `manifest-boms.json`
+
+| Result | Notes |
+|--------|-------|
+| **PASS** | Manifest reachable with valid `name` |
+
+---
+
+### 22. Login — `/login`
+
+| Result | Notes |
+|--------|-------|
+| **PARTIAL** | Page loads; demo credentials still on production HTML until deploy |
+
+---
+
+### 23. Customer Portal — `/my-order`
+
+| Result | Notes |
+|--------|-------|
+| **PASS** | Page loads |
+
+---
+
+### 24. Supplier Portal — `/supplier`
+
+| Result | Notes |
+|--------|-------|
+| **PARTIAL** | Dashboard load (redirect/status edge case in automated test) |
+
+---
+
+## Cross-Section Sync Matrix
+
+| Flow | Orders | Daily Cash | Payments | Finance | Customer Portal | Status |
+|------|--------|------------|----------|---------|-----------------|--------|
+| New bridal order + deposit | ✓ | ✓ auto-post | ✓ | ✓ | — | **PASS** (prod) |
+| Record payment on order page | ✓ balance | ✓ auto-post | ✓ | ✓ | — | **PASS** (prod) |
+| Add Transaction + order pick (deposit/collection) | ✓ via payment API | ✓ auto-post | ✓ | ✓ | — | **MANUAL** — verify after deploy |
+| Staff message | ✓ admin notes | — | — | — | ✓ Updates from ZARKARI | **PASS** (prod) |
+| Supplier complete order | ✓ status | — | — | — | ✓ timeline | **MANUAL** |
+| CMS product image pick | ✓ content | — | — | — | ✓ storefront | **MANUAL** |
+| Retail Stripe checkout | ✓ shop orders | — | — | — | — | **MANUAL** (Stripe webhook) |
+
+Legend: ✓ = automated or code-verified; **MANUAL** = requires hands-on check on production after deploy.
+
+---
+
+## Cross-Cutting Auth
+
+| Test | Prod |
+|------|------|
+| Unauthenticated → login redirect | PASS |
+| Supplier blocked from admin dashboard | PASS |
+| Supplier can access inbox | PASS |
+| Staff blocked from Finance / Analytics / Users | PASS |
+| `npm run build` | PASS (local) |
+
+---
+
+## Action Items
+
+| Priority | Item | Owner |
+|----------|------|-------|
+| P0 | Deploy this batch (payable-orders, order picker, login cleanup) | Dev |
+| P0 | Re-run `npm run audit:admin -- https://www.zarkari.co.uk` after deploy | Dev |
+| P1 | Manual test: Add Transaction → Order Collection → Fill balance → verify order remaining | QA |
+| P2 | Configure R2 CORS for browser direct uploads if not already set | DevOps |
+| P2 | Meta/WhatsApp inbox production tokens | Business |
+
+---
+
+## Open P2 Items (accepted)
+
+- In-memory pagination on Orders/Customers/Payments at scale
+- No opening balance UI on Daily Cash (API exists)
 - Finance page duplicates Payments metrics
 - Calendar is list view, not month grid
 - Retail orders depend on Stripe webhook configuration
-- Real-time Meta/WhatsApp inbox requires production tokens
 
 ---
 
-## Test Accounts
+## Test Accounts (audit script only — not shown on login page after deploy)
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -245,10 +308,8 @@
 ## Commands
 
 ```bash
-npm run db:push
-npm run db:seed
-npm run db:seed-sample          # audit/staging only
-CONFIRM=1 npm run db:clear-sample # before go-live
-npm run audit:admin               # local
-npm run audit:admin -- https://zarkari-web.vercel.app
+npm run build
+npm run audit:admin                                    # local (dev server required)
+npm run audit:admin -- https://www.zarkari.co.uk      # production
+CONFIRM=1 npm run db:clear-sample                     # before go-live (removes SAMPLE-* rows)
 ```

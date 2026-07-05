@@ -498,6 +498,7 @@ export async function autoPostCashTransaction(input: {
   method?: string;
   reference?: string;
   description?: string;
+  businessDate?: string | Date;
   orderId?: string;
   retailOrderId?: string;
   supplierId?: string;
