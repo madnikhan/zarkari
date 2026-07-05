@@ -1,5 +1,6 @@
 import { MAX_DIRECT_UPLOAD_BYTES, MAX_SERVER_UPLOAD_BYTES } from "./constants";
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
+import { parseJsonResponse, parseXhrJson } from "./parse-json";
 
 export type UploadProgressStatus = "uploading" | "processing" | "done" | "error";
 
@@ -19,7 +20,8 @@ export interface UploadResult {
   keepLocal?: boolean;
 }
 
-const MULTIPART_CHUNK_BYTES = Math.floor(3.5 * 1024 * 1024);
+/** Stay under Vercel's ~4.5 MB request body limit including multipart form overhead. */
+const MULTIPART_CHUNK_BYTES = 3 * 1024 * 1024;
 
 function shouldUseDirectUpload(file: File): boolean {
   if (isVideoFile(file)) return false;
@@ -82,13 +84,13 @@ function postFormWithStagedProgress(
     };
     xhr.onload = () => {
       try {
-        const data = JSON.parse(xhr.responseText) as {
+        const data = parseXhrJson<{
           url?: string;
           fileName?: string;
           mimeType?: string;
           keepLocal?: boolean;
           error?: string;
-        };
+        }>(xhr.responseText, xhr.status);
         if (xhr.status >= 200 && xhr.status < 300) {
           if (data.keepLocal && isAudioFile(file)) {
             if (!localPreviewUrl) {
@@ -116,8 +118,8 @@ function postFormWithStagedProgress(
           }
         }
         reject(new Error(data.error ?? `Upload failed (${xhr.status})`));
-      } catch {
-        reject(new Error(`Upload failed (${xhr.status})`));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(`Upload failed (${xhr.status})`));
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
@@ -139,7 +141,7 @@ async function uploadPartChunk(
   form.append("file", chunk, `part-${partNumber}`);
 
   const res = await fetch("/api/upload/multipart/part", { method: "POST", body: form });
-  const data = (await res.json()) as { etag?: string; error?: string };
+  const data = await parseJsonResponse<{ etag?: string; error?: string }>(res);
   if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
   if (!data.etag) throw new Error("Upload part failed — no etag returned");
   return { partNumber, etag: data.etag };
@@ -164,14 +166,14 @@ async function uploadVideoViaMultipart(
       fileSize: file.size,
     }),
   });
-  const initData = (await initRes.json()) as {
+  const initData = await parseJsonResponse<{
     demo?: boolean;
     uploadId?: string;
     key?: string;
     publicUrl?: string;
     fileName?: string;
     error?: string;
-  };
+  }>(initRes);
 
   if (!initRes.ok) throw new Error(initData.error ?? `Could not start upload (${initRes.status})`);
 
@@ -217,7 +219,7 @@ async function uploadVideoViaMultipart(
       parts,
     }),
   });
-  const completeData = (await completeRes.json()) as { url?: string; fileName?: string; error?: string };
+  const completeData = await parseJsonResponse<{ url?: string; fileName?: string; error?: string }>(completeRes);
   if (!completeRes.ok) throw new Error(completeData.error ?? `Upload failed (${completeRes.status})`);
   if (!completeData.url) throw new Error("Upload failed — no URL returned");
 
@@ -273,7 +275,7 @@ export async function uploadFileWithProgress(
       fileSize: resolved.size,
     }),
   });
-  const presignData = await presignRes.json();
+  const presignData = await parseJsonResponse<{ error?: string; demo?: boolean; keepLocal?: boolean; uploadUrl?: string; key?: string; fileName?: string; publicUrl?: string }>(presignRes);
   if (!presignRes.ok) throw new Error(presignData.error ?? "Could not start upload");
 
   if (presignData.demo || presignData.keepLocal) {
@@ -281,6 +283,10 @@ export async function uploadFileWithProgress(
     form.append("file", resolved);
     form.append("category", category);
     return postFormWithStagedProgress("/api/upload", form, label, resolved, onProgress, localPreviewUrl);
+  }
+
+  if (!presignData.uploadUrl || !presignData.publicUrl) {
+    throw new Error(presignData.error ?? "Could not start upload");
   }
 
   await putWithProgress(presignData.uploadUrl, resolved, mimeType, (pct) => {
@@ -300,8 +306,9 @@ export async function uploadFileWithProgress(
       publicUrl: presignData.publicUrl,
     }),
   });
-  const completeData = await completeRes.json();
+  const completeData = await parseJsonResponse<{ url?: string; fileName?: string; error?: string }>(completeRes);
   if (!completeRes.ok) throw new Error(completeData.error ?? "Upload failed");
+  if (!completeData.url) throw new Error("Upload failed — no URL returned");
 
   rejectAudioPlaceholder(completeData.url, resolved);
   onProgress?.({ label: "Upload complete", progress: 100, status: "done" });

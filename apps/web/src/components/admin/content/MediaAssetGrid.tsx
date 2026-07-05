@@ -41,8 +41,15 @@ export function MediaAssetGrid({
     setLoading(true);
     try {
       const res = await fetch("/api/media");
-      const data = await res.json();
+      const text = await res.text();
+      if (!text.trim()) {
+        setAssets([]);
+        return;
+      }
+      const data = JSON.parse(text) as { assets?: MediaAsset[] };
       setAssets(data.assets ?? []);
+    } catch {
+      setAssets([]);
     } finally {
       setLoading(false);
     }
