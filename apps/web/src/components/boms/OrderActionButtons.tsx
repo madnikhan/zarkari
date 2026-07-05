@@ -78,9 +78,19 @@ export function OrderActionButtons({
               </BomsActionButton>
             </>
           )}
+          {(status === "shipping" || status === "delivered_to_shop") && (
+            <BomsActionButton
+              color="green"
+              disabled={!!loading}
+              onClick={() => action("receive-at-shop")}
+              className="col-span-2"
+            >
+              {loading === "receive-at-shop" ? "Updating…" : "Order Received"}
+            </BomsActionButton>
+          )}
           {status === "ready_for_collection" && (
             <BomsActionButton color="blue" disabled={!!loading} onClick={() => setActiveModal("collect")} className="col-span-2">
-              Order Collected
+              Order Completed
             </BomsActionButton>
           )}
         </div>
@@ -179,7 +189,7 @@ export function OrderActionButtons({
 
       {activeModal === "collect" && (
         <div className="boms-card p-5 space-y-3">
-          <h3 className="font-semibold text-slate-900">Order Collected</h3>
+          <h3 className="font-semibold text-slate-900">Order Completed</h3>
           <input
             type="number"
             step="0.01"
@@ -205,7 +215,7 @@ export function OrderActionButtons({
                 action("collect", { balancePaid: true, amountPaid: collectAmount, alterationNotes })
               }
             >
-              Confirm Collection
+              Confirm Completion
             </BomsActionButton>
           </div>
         </div>

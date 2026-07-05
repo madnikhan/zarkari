@@ -21,7 +21,7 @@ export const CUSTOMER_PROGRESS_STEPS = [
   { key: "finishing", label: "Finishing" },
   { key: "shipping_group", label: "Shipping" },
   { key: "ready_for_collection", label: "Ready for Collection" },
-  { key: "collected", label: "Collected" },
+  { key: "collected", label: "Order Completed" },
 ] as const;
 
 const STATUS_ORDER: BridalStatus[] = [
@@ -96,11 +96,12 @@ export function getStatusLabel(status: BridalStatus): string {
     delivered_to_shop: "Delivered to Shop",
     redesign_in_progress: "Redesign in Progress",
     ready_for_collection: "Ready for Collection",
-    collected: "Collected",
+    received_at_shop: "Order Received at Shop",
+    collected: "Order Completed",
     cancelled: "Cancelled",
     refunded: "Refunded",
   };
-  return labels[status] ?? status;
+  return labels[status] ?? status.replace(/_/g, " ");
 }
 
 export function getCustomerStatusLabel(status: BridalStatus): string {
@@ -117,7 +118,7 @@ export function getCustomerStatusLabel(status: BridalStatus): string {
     shipping: "Shipping",
     delivered_to_shop: "Shipping",
     ready_for_collection: "Ready for Collection",
-    collected: "Collected",
+    collected: "Order Completed",
     cancelled: "Cancelled",
     refunded: "Refunded",
   };

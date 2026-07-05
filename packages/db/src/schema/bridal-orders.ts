@@ -63,6 +63,7 @@ export const timelineEventTypeEnum = pgEnum("timeline_event_type", [
   "refunded",
   "completed",
   "ready_for_collection",
+  "received_at_shop",
   "collected",
   "stage_update",
 ]);

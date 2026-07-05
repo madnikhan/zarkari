@@ -242,11 +242,19 @@ export async function advanceProductionStage(orderId: string, stage: BridalStatu
     performedByName: supplierName,
     performedByRole: "supplier",
   });
-  if (stage === "delivered_to_shop") {
-    order.status = "ready_for_collection";
-    await syncOrderPatch(orderId, { status: "ready_for_collection" });
-    notify("Order ready for review", order.orderNumber, orderId);
+  return order;
+}
+
+export async function markReceivedAtShop(orderId: string, byName?: string) {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+  if (order.status !== "shipping" && order.status !== "delivered_to_shop") {
+    throw new Error("Order can only be marked received when shipping or delivered to shop");
   }
+  order.status = "ready_for_collection";
+  await syncOrderPatch(orderId, { status: "ready_for_collection" });
+  await syncTimeline(orderId, "received_at_shop", { performedByName: byName, performedByRole: "staff" });
+  notify("Order ready for collection", order.orderNumber, orderId);
   return order;
 }
 
@@ -397,9 +405,9 @@ export async function supplierComplete(
     await addSupplierCompletionDb(orderId, input);
   }
   if (input.photoUrl) await addOrderFile(orderId, "completion", "completion-photo.jpg", input.photoUrl);
-  order.status = "ready_for_collection";
+  order.status = "delivered_to_shop";
   order.supplierLocked = true;
-  await syncOrderPatch(orderId, { status: "ready_for_collection", supplierLocked: true });
+  await syncOrderPatch(orderId, { status: "delivered_to_shop", supplierLocked: true });
   await syncTimeline(orderId, "completed", {
     comment: `Bill ${input.billNumber}`,
     performedByName: supplierName,

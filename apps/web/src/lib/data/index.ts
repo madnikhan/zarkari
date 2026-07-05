@@ -322,7 +322,7 @@ export type BridalOrderWithRelations = BridalOrder & {
 
 export async function getBridalOrdersWithRelations(filters: {
   supplierId?: string;
-  tab?: "active" | "overdue" | "due-week" | "completed";
+  tab?: "active" | "overdue" | "due-week" | "completed" | "cancelled" | "refunded";
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
@@ -336,6 +336,8 @@ export async function getBridalOrdersWithRelations(filters: {
   let orders = [...demoBridalOrders];
   if (filters.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
   if (filters.tab === "completed") orders = orders.filter((o) => o.status === "collected");
+  else if (filters.tab === "cancelled") orders = orders.filter((o) => o.status === "cancelled");
+  else if (filters.tab === "refunded") orders = orders.filter((o) => o.status === "refunded");
   else if (filters.tab === "overdue") {
     orders = orders.filter(
       (o) => new Date(o.deliveryDate) < now && !["collected", "cancelled", "refunded"].includes(o.status)

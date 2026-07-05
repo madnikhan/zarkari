@@ -12,11 +12,9 @@ interface Props {
 export default async function AdminOrdersPage({ searchParams }: Props) {
   const { tab = "active", page: pageStr = "1" } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
-  const tabKey = (["active", "overdue", "due-week", "completed"].includes(tab) ? tab : "active") as
-    | "active"
-    | "overdue"
-    | "due-week"
-    | "completed";
+  const tabKey = (
+    ["active", "overdue", "due-week", "completed", "cancelled", "refunded"].includes(tab) ? tab : "active"
+  ) as "active" | "overdue" | "due-week" | "completed" | "cancelled" | "refunded";
 
   const { orders, total } = await getBridalOrdersWithRelations({
     tab: tabKey,
@@ -39,6 +37,8 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
     { key: "overdue", label: "Overdue" },
     { key: "due-week", label: "Due This Week" },
     { key: "completed", label: "Completed" },
+    { key: "cancelled", label: "Cancelled" },
+    { key: "refunded", label: "Refunded" },
   ];
 
   return (

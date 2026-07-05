@@ -70,9 +70,19 @@ export function OrderActionBar({ orderId, status, isOwner, hasSupplier }: OrderA
             Send for Redesign
           </button>
         )}
-        {(status === "ready_for_collection" || status === "delivered_to_shop") && (
+        {(status === "shipping" || status === "delivered_to_shop") && (
+          <button
+            type="button"
+            disabled={!!loading}
+            onClick={() => action("receive-at-shop")}
+            className="px-4 py-2 text-xs tracking-wide uppercase bg-emerald-600 text-white rounded hover:bg-emerald-700"
+          >
+            Order Received
+          </button>
+        )}
+        {status === "ready_for_collection" && (
           <button type="button" onClick={() => setModal("collect")} className="px-4 py-2 text-xs tracking-wide uppercase bg-gold text-charcoal rounded hover:bg-gold/80">
-            Order Collected
+            Order Completed
           </button>
         )}
       </div>

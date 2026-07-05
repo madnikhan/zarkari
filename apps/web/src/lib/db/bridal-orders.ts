@@ -69,12 +69,14 @@ export type BridalOrderWithRelations = BridalOrder & {
   supplierName?: string;
 };
 
-export type OrdersTab = "active" | "overdue" | "due-week" | "completed";
+export type OrdersTab = "active" | "overdue" | "due-week" | "completed" | "cancelled" | "refunded";
 
 function ordersTabCondition(tab: OrdersTab = "active") {
   const now = new Date();
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
   if (tab === "completed") return eq(schema.bridalOrders.status, "collected");
+  if (tab === "cancelled") return eq(schema.bridalOrders.status, "cancelled");
+  if (tab === "refunded") return eq(schema.bridalOrders.status, "refunded");
   if (tab === "overdue") {
     return and(
       lte(schema.bridalOrders.deliveryDate, now),

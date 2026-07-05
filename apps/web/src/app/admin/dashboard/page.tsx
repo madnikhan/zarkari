@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart } from "lucide-react";
+import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart, XCircle } from "lucide-react";
 import { getBridalOrdersWithRelations, getDashboardStats } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { StatCard } from "@/components/boms/StatCard";
@@ -33,13 +33,14 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8" data-tour="stat-cards">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8" data-tour="stat-cards">
         <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
         <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
-        <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders" icon={Clock} accent="warning" />
-        <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders" icon={AlertTriangle} accent="danger" />
-        <StatCard label="Completed" value={stats.completed} subtitle="Collected" href="/admin/orders" icon={CheckCircle} accent="success" />
-        <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders" icon={RotateCcw} />
+        <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders?tab=due-week" icon={Clock} accent="warning" />
+        <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders?tab=overdue" icon={AlertTriangle} accent="danger" />
+        <StatCard label="Completed" value={stats.completed} subtitle="Completed" href="/admin/orders?tab=completed" icon={CheckCircle} accent="success" />
+        <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders?tab=refunded" icon={RotateCcw} />
+        <StatCard label="Cancelled" value={stats.cancelled} subtitle="Total cancelled" href="/admin/orders?tab=cancelled" icon={XCircle} accent="danger" />
       </div>
 
       <SocialInboxWidget />
