@@ -12,10 +12,19 @@ interface MyBridalOrderProps {
   order: BridalOrder;
   files: OrderFile[];
   messages: CustomerMessage[];
-  onSendMessage: (message: string) => Promise<void>;
+  onSendMessage: (message: string) => Promise<boolean>;
+  messageError?: string;
+  sending?: boolean;
 }
 
-export function MyBridalOrder({ order, files, messages, onSendMessage }: MyBridalOrderProps) {
+export function MyBridalOrder({
+  order,
+  files,
+  messages,
+  onSendMessage,
+  messageError,
+  sending,
+}: MyBridalOrderProps) {
   const designFiles = files.filter((f) => f.category === "design");
   const measurementFiles = files.filter((f) => f.category === "measurements");
   const staffMessages = messages.filter((m) => m.senderType === "staff");
@@ -90,6 +99,8 @@ export function MyBridalOrder({ order, files, messages, onSendMessage }: MyBrida
         measurementFiles={measurementFiles}
         messages={messages}
         onSendMessage={onSendMessage}
+        messageError={messageError}
+        sending={sending}
       />
     </div>
   );
@@ -101,12 +112,16 @@ function CustomerActionButtons({
   measurementFiles,
   messages,
   onSendMessage,
+  messageError,
+  sending,
 }: {
   order: BridalOrder;
   designFiles: OrderFile[];
   measurementFiles: OrderFile[];
   messages: CustomerMessage[];
-  onSendMessage: (message: string) => Promise<void>;
+  onSendMessage: (message: string) => Promise<boolean>;
+  messageError?: string;
+  sending?: boolean;
 }) {
   const [view, setView] = useState<"design" | "measurements" | "notes" | "message" | null>(null);
   const [message, setMessage] = useState("");
@@ -198,20 +213,30 @@ function CustomerActionButtons({
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    await onSendMessage(message);
-                    setMessage("");
+                    if (!message.trim() || sending) return;
+                    const text = message;
+                    const ok = await onSendMessage(text);
+                    if (ok) setMessage("");
                   }}
-                  className="flex gap-2"
+                  className="space-y-2"
                 >
-                  <input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="flex-1 border border-sand rounded px-3 py-2 text-sm"
-                    placeholder="Your message..."
-                  />
-                  <button type="submit" className="px-3 py-2 boms-btn-primary text-xs rounded-lg">
-                    Send
-                  </button>
+                  {messageError && <p className="text-xs text-red-600">{messageError}</p>}
+                  <div className="flex gap-2">
+                    <input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="flex-1 border border-sand rounded px-3 py-2 text-sm"
+                      placeholder="Your message..."
+                      disabled={sending}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !message.trim()}
+                      className="px-3 py-2 boms-btn-primary text-xs rounded-lg disabled:opacity-50"
+                    >
+                      {sending ? "Sending…" : "Send"}
+                    </button>
+                  </div>
                 </form>
               </>
             )}

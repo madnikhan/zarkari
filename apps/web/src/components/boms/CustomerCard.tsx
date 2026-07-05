@@ -6,9 +6,10 @@ interface Props {
   email?: string;
   address?: string;
   orderNumber?: string;
+  orderId?: string;
 }
 
-export function CustomerCard({ name, phone, email, address, orderNumber }: Props) {
+export function CustomerCard({ name, phone, email, address, orderNumber, orderId }: Props) {
   const initial = name.charAt(0).toUpperCase();
 
   return (
@@ -24,9 +25,12 @@ export function CustomerCard({ name, phone, email, address, orderNumber }: Props
           {email && <p className="text-sm text-slate-500">{email}</p>}
           {address && <p className="text-sm text-slate-500 mt-1">{address}</p>}
           {phone && (
-            <div className="mt-3">
-              <WhatsAppButton phone={phone} customerName={name} orderNumber={orderNumber} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700" />
-            </div>
+            <WhatsAppButton
+              phone={phone}
+              customerName={name}
+              orderNumber={orderNumber}
+              orderId={orderId}
+            />
           )}
         </div>
       </div>

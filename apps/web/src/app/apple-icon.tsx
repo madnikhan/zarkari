@@ -18,14 +18,14 @@ export default function AppleIcon() {
       >
         <span
           style={{
-            fontSize: 28,
-            fontWeight: 100,
-            letterSpacing: "0.18em",
-            color: "#1a1814",
-            fontFamily: "ui-sans-serif, system-ui, sans-serif",
+            fontSize: 120,
+            fontWeight: 600,
+            color: "#c9a962",
+            fontFamily: "Georgia, serif",
+            marginTop: 8,
           }}
         >
-          ZΛRKΛRI
+          Z
         </span>
       </div>
     ),

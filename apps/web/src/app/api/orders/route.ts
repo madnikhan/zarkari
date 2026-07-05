@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createBridalOrder, sendToSupplier } from "@/lib/data/actions";
 import { getSession } from "@/lib/auth/session";
+import { sendOrderTrackingWhatsApp } from "@/lib/customer-notifications";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -48,7 +49,16 @@ export async function POST(request: Request) {
       await sendToSupplier(order.id, session.name);
     }
 
-    return NextResponse.json({ id: order.id, orderNumber: order.orderNumber });
+    let whatsApp: { sent: boolean; skipped?: boolean; error?: string } | undefined;
+    if (body.notifyCustomerWhatsApp !== false) {
+      whatsApp = await sendOrderTrackingWhatsApp(
+        String(body.customerPhone).replace(/\s/g, ""),
+        body.customerName.trim(),
+        order.orderNumber
+      );
+    }
+
+    return NextResponse.json({ id: order.id, orderNumber: order.orderNumber, whatsApp });
   } catch (err) {
     console.error("Create order failed:", err);
     return NextResponse.json({ error: "Failed to create order" }, { status: 500 });

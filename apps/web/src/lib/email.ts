@@ -27,14 +27,6 @@ export async function sendOrderConfirmation(email: string, orderNumber: string, 
   });
 }
 
-export async function sendCustomerOtp(email: string, otp: string, orderNumber: string) {
-  return sendEmail({
-    to: email,
-    subject: `Your ZARKARI verification code — ${orderNumber}`,
-    html: `<p>Your verification code is: <strong>${otp}</strong></p><p>Valid for 10 minutes.</p>`,
-  });
-}
-
 export async function sendStageUpdateEmail(email: string, orderNumber: string, stage: string) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://zarkari.co.uk";
   return sendEmail({

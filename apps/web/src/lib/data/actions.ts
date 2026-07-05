@@ -409,15 +409,30 @@ export async function supplierComplete(
   return order;
 }
 
-export function addCustomerMessage(orderId: string, message: string, senderName?: string) {
-  demoMessages.push({
-    id: `msg-${Date.now()}`,
-    orderId,
-    senderType: "customer",
-    senderName,
-    message,
-    createdAt: new Date().toISOString(),
-  });
+export async function addCustomerMessage(orderId: string, message: string, senderName?: string) {
+  if (!isDbConfigured()) {
+    demoMessages.push({
+      id: `msg-${Date.now()}`,
+      orderId,
+      senderType: "customer",
+      senderName,
+      message,
+      createdAt: new Date().toISOString(),
+    });
+    return;
+  }
+  const { addMessageDb } = await import("@/lib/db/bridal-orders");
+  await addMessageDb(orderId, { senderType: "customer", senderName, message });
+
+  const order = await resolveOrder(orderId);
+  if (order) {
+    notify(
+      "Customer message",
+      `${order.orderNumber}: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
+      orderId,
+      `/admin/orders/${orderId}`
+    );
+  }
 }
 
 export async function addStaffMessage(orderId: string, message: string, senderName?: string) {

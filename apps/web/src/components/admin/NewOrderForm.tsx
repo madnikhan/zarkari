@@ -6,7 +6,7 @@ import { MessageCircle } from "lucide-react";
 import type { Supplier } from "@/lib/data/seed";
 import { MediaUploadZone, type UploadedFile } from "@/components/boms/MediaUploadZone";
 import { VoiceNoteRecorder, type AudioUploadedFile } from "@/components/boms/VoiceNoteRecorder";
-import { whatsAppUrl } from "@/lib/whatsapp";
+import { whatsAppUrl, orderTrackingMessage, getSiteUrl } from "@/lib/whatsapp";
 
 function defaultDeliveryDate(): string {
   const d = new Date(Date.now() + 56 * 86400000);
@@ -28,6 +28,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
     deliveryDate: defaultDeliveryDate(),
     customisationNotes: "",
     sendToSupplier: false,
+    notifyCustomerWhatsApp: true,
   });
 
   const remaining = useMemo(() => {
@@ -44,7 +45,14 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
 
   const waPreview =
     form.customerPhone.trim().length >= 10
-      ? whatsAppUrl(form.customerPhone, `Hi ${form.customerName || "there"}, your ZARKARI order will be confirmed shortly.`)
+      ? whatsAppUrl(
+          form.customerPhone,
+          orderTrackingMessage(
+            form.customerName || "there",
+            "BR-2026-XXXX",
+            getSiteUrl()
+          )
+        )
       : null;
 
   const voiceFiles = mediaFiles.filter((f): f is AudioUploadedFile => f.mediaType === "audio");
@@ -108,7 +116,13 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create order");
-      if (data.id) router.push(`/admin/orders/${data.id}`);
+      if (data.id) {
+        const params = new URLSearchParams();
+        if (data.whatsApp?.sent) params.set("wa", "sent");
+        else if (data.whatsApp?.error) params.set("wa", encodeURIComponent(data.whatsApp.error));
+        const qs = params.toString();
+        router.push(`/admin/orders/${data.id}${qs ? `?${qs}` : ""}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create order");
     } finally {
@@ -232,6 +246,15 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
           />
         </div>
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.notifyCustomerWhatsApp}
+          onChange={(e) => setForm({ ...form, notifyCustomerWhatsApp: e.target.checked })}
+        />
+        Send order tracking link on WhatsApp
+      </label>
 
       <label className="flex items-center gap-2 text-sm">
         <input

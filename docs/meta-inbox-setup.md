@@ -110,6 +110,44 @@ Without `DATABASE_URL`, the inbox uses in-memory demo data (resets on server res
 | Reply fails | `META_PAGE_ACCESS_TOKEN` valid; 24-hour messaging window for Messenger/IG |
 | WhatsApp reply fails | `WHATSAPP_PHONE_NUMBER_ID` + token; customer must have messaged first |
 
+## 8. Order tracking WhatsApp template
+
+When a new bridal order is created, BOMS can auto-send the customer a **my-order tracking link** via WhatsApp Cloud API. Business-initiated messages require a **pre-approved template** in Meta Business Manager.
+
+### Create the template
+
+1. Meta Business Suite → WhatsApp Manager → **Message templates** → Create.
+2. Category: **Utility** (or Marketing if approved for your use case).
+3. Name: e.g. `order_tracking` (must match env below).
+4. Language: English.
+5. Body example (3 variables):
+
+```
+Hi {{1}},
+
+Your ZARKARI order {{2}} is confirmed.
+
+Track your order anytime:
+{{3}}
+
+Enter your order number and WhatsApp number on that page to see live status and updates.
+
+Thank you,
+ZARKARI
+```
+
+6. Submit for approval.
+
+### Env var
+
+```bash
+WHATSAPP_ORDER_TEMPLATE_NAME=order_tracking
+```
+
+If unset, auto-send on order create is **skipped** (order creation still succeeds). Staff can still use **Open WhatsApp** / **Copy message** on the order detail page.
+
+Without a template, free-form `sendWhatsAppMessage` only works inside the 24-hour customer service window (after the customer has messaged your business number).
+
 ## Related env vars
 
 - `NEXT_PUBLIC_WHATSAPP_NUMBER` — storefront click-to-chat link (unchanged)

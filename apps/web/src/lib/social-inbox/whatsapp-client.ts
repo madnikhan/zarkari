@@ -73,6 +73,50 @@ export async function sendWhatsAppMessage(
   return { messageId: data.messages?.[0]?.id };
 }
 
+export async function sendWhatsAppTemplateMessage(
+  to: string,
+  templateName: string,
+  bodyParams: string[]
+): Promise<{ messageId?: string; error?: string }> {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  if (!token || !phoneId) {
+    return { error: "WhatsApp Cloud API not configured" };
+  }
+
+  const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "en" },
+        components: [
+          {
+            type: "body",
+            parameters: bodyParams.map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    }),
+  });
+
+  const data = (await res.json()) as {
+    messages?: Array<{ id?: string }>;
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    return { error: data.error?.message ?? `WhatsApp API error ${res.status}` };
+  }
+  return { messageId: data.messages?.[0]?.id };
+}
+
 export interface WhatsAppInboundMessage {
   from: string;
   messageId?: string;

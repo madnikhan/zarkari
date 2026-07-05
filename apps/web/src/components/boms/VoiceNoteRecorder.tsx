@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, X } from "lucide-react";
+import { Mic, Square, X, RotateCcw } from "lucide-react";
 import type { UploadedFile } from "@/components/boms/MediaUploadZone";
 import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
 import { uploadBlobWithProgress, type UploadProgressState } from "@/lib/upload/client";
@@ -9,6 +9,17 @@ import { uploadBlobWithProgress, type UploadProgressState } from "@/lib/upload/c
 const MAX_RECORDING_MS = 3 * 60 * 1000;
 
 export type AudioUploadedFile = UploadedFile & { mediaType: "audio" };
+
+interface PendingRecording {
+  id: string;
+  name: string;
+  localUrl: string;
+  blob: Blob;
+  mime: string;
+  error?: string;
+  uploading?: boolean;
+  progress?: UploadProgressState | null;
+}
 
 interface Props {
   recordings: AudioUploadedFile[];
@@ -37,10 +48,9 @@ function formatElapsed(ms: number): string {
 
 export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled = false }: Props) {
   const [recording, setRecording] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
-  const [progress, setProgress] = useState<UploadProgressState | null>(null);
+  const [pending, setPending] = useState<PendingRecording[]>([]);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -49,12 +59,14 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
   const startedAtRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blobUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoStopRef.current) clearTimeout(autoStopRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -72,46 +84,82 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
     }
   }
 
+  function revokeBlobUrl(url: string) {
+    if (blobUrlsRef.current.has(url)) {
+      URL.revokeObjectURL(url);
+      blobUrlsRef.current.delete(url);
+    }
+  }
+
+  async function uploadPending(item: PendingRecording) {
+    setPending((prev) =>
+      prev.map((p) => (p.id === item.id ? { ...p, uploading: true, error: undefined, progress: null } : p))
+    );
+    try {
+      const ext = extensionForMime(item.mime);
+      const fileName = item.name || `voice-note-${Date.now()}.${ext}`;
+      const result = await uploadBlobWithProgress(item.blob, fileName, item.mime, "order-voice", (state) => {
+        setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, progress: state } : p)));
+      });
+      onRecorded({ name: result.fileName, url: result.url, mediaType: "audio" });
+      revokeBlobUrl(item.localUrl);
+      setPending((prev) => prev.filter((p) => p.id !== item.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save voice note";
+      setPending((prev) =>
+        prev.map((p) =>
+          p.id === item.id
+            ? {
+                ...p,
+                uploading: false,
+                error: message,
+                progress: { label: "Upload failed", progress: 0, status: "error", error: message },
+              }
+            : p
+        )
+      );
+    }
+  }
+
   async function stopRecording() {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === "inactive") return;
 
     setRecording(false);
-    setUploading(true);
-    setError("");
-    setProgress(null);
 
     await new Promise<void>((resolve) => {
       recorder.addEventListener("stop", () => resolve(), { once: true });
       recorder.stop();
     });
 
-    try {
-      const mime = mimeRef.current || recorder.mimeType || "audio/webm";
-      const blob = new Blob(chunksRef.current, { type: mime });
-      const ext = extensionForMime(mime);
-      const fileName = `voice-note-${Date.now()}.${ext}`;
-      const result = await uploadBlobWithProgress(blob, fileName, mime, "order-voice", (state) =>
-        setProgress(state)
-      );
-      onRecorded({ name: result.fileName, url: result.url, mediaType: "audio" });
-      setTimeout(() => setProgress(null), 1000);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save voice note";
-      setError(message);
-      setProgress({ label: "Upload failed", progress: 0, status: "error", error: message });
-    } finally {
-      chunksRef.current = [];
-      setUploading(false);
-      setElapsed(0);
-      cleanupStream();
+    const mime = mimeRef.current || recorder.mimeType || "audio/webm";
+    const blob = new Blob(chunksRef.current, { type: mime });
+    chunksRef.current = [];
+    cleanupStream();
+    setElapsed(0);
+
+    if (blob.size === 0) {
+      setError("Recording was empty — try again.");
+      return;
     }
+
+    const ext = extensionForMime(mime);
+    const localUrl = URL.createObjectURL(blob);
+    blobUrlsRef.current.add(localUrl);
+    const item: PendingRecording = {
+      id: `pending-${Date.now()}`,
+      name: `voice-note-${Date.now()}.${ext}`,
+      localUrl,
+      blob,
+      mime,
+    };
+    setPending((prev) => [...prev, item]);
+    void uploadPending(item);
   }
 
   async function startRecording() {
-    if (disabled || recording || uploading) return;
+    if (disabled || recording) return;
     setError("");
-    setProgress(null);
 
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError("Voice recording is not supported in this browser.");
@@ -155,7 +203,15 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
     }
   }
 
-  const busy = recording || uploading;
+  function removePending(id: string) {
+    setPending((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item) revokeBlobUrl(item.localUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  const busy = recording || pending.some((p) => p.uploading);
 
   return (
     <div className="space-y-3">
@@ -187,13 +243,48 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
         <p className="text-xs text-slate-400">Up to 3 minutes per note</p>
       </div>
 
-      <UploadProgressBar state={progress} />
-      {error && progress?.status !== "error" && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {pending.map((item) => (
+        <div key={item.id} className="space-y-2 p-3 rounded-lg border border-slate-200 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <Mic className="h-4 w-4 text-[#4C3BCF] shrink-0" />
+            <audio controls src={item.localUrl} className="flex-1 min-w-0 h-9" preload="metadata" />
+            {!item.uploading && (
+              <button
+                type="button"
+                onClick={() => removePending(item.id)}
+                className="p-1 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50"
+                aria-label="Remove voice note"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <UploadProgressBar state={item.progress ?? null} />
+          {item.error && !item.uploading && (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-red-600 flex-1">{item.error}</p>
+              <button
+                type="button"
+                onClick={() => void uploadPending(item)}
+                className="inline-flex items-center gap-1 text-xs text-[#4C3BCF] hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Retry upload
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
 
       {recordings.length > 0 && (
         <ul className="space-y-2">
           {recordings.map((file, index) => (
-            <li key={`${file.url}-${index}`} className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50">
+            <li
+              key={`${file.url}-${index}`}
+              className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50"
+            >
               <Mic className="h-4 w-4 text-[#4C3BCF] shrink-0" />
               <audio controls src={file.url} className="flex-1 min-w-0 h-9" preload="metadata" />
               <button

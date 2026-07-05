@@ -13,6 +13,8 @@ export default function MyOrderDetailPage({ params }: Props) {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [error, setError] = useState("");
+  const [messageError, setMessageError] = useState("");
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     params.then(({ orderNumber }) => {
@@ -29,21 +31,39 @@ export default function MyOrderDetailPage({ params }: Props) {
     });
   }, [params]);
 
-  async function onSendMessage(message: string) {
-    if (!order) return;
-    const res = await fetch("/api/customer/message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id, message }),
-    });
-    if (res.ok) {
+  async function onSendMessage(message: string): Promise<boolean> {
+    if (!order || !message.trim()) return false;
+    setSending(true);
+    setMessageError("");
+    try {
+      const res = await fetch("/api/customer/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id, message: message.trim() }),
+      });
       const data = await res.json();
+      if (!res.ok) {
+        setMessageError(data.error ?? "Failed to send message");
+        return false;
+      }
       setMessages(data.messages ?? []);
+      return true;
+    } finally {
+      setSending(false);
     }
   }
 
   if (error) return <p className="text-red-600 text-sm text-center">{error}</p>;
   if (!order) return <p className="text-charcoal/50 text-sm text-center">Loading...</p>;
 
-  return <MyBridalOrder order={order} files={files} messages={messages} onSendMessage={onSendMessage} />;
+  return (
+    <MyBridalOrder
+      order={order}
+      files={files}
+      messages={messages}
+      onSendMessage={onSendMessage}
+      messageError={messageError}
+      sending={sending}
+    />
+  );
 }

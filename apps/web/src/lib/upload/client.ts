@@ -12,11 +12,8 @@ export interface UploadProgressState {
 type ProgressCallback = (state: UploadProgressState) => void;
 
 function shouldUseDirectUpload(file: File): boolean {
-  return (
-    file.type.startsWith("video/") ||
-    file.type.startsWith("audio/") ||
-    file.size > MAX_SERVER_UPLOAD_BYTES
-  );
+  if (file.type.startsWith("audio/") && file.size <= MAX_SERVER_UPLOAD_BYTES) return false;
+  return file.type.startsWith("video/") || file.size > MAX_SERVER_UPLOAD_BYTES;
 }
 
 function putWithProgress(

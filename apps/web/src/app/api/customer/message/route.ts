@@ -12,10 +12,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const trimmed = message?.trim();
+  if (!trimmed) {
+    return NextResponse.json({ error: "Message required" }, { status: 400 });
+  }
+
   const order = await getBridalOrderById(orderId);
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  addCustomerMessage(orderId, message);
+  await addCustomerMessage(orderId, trimmed);
   const messages = await getMessages(orderId);
 
   return NextResponse.json({ messages });

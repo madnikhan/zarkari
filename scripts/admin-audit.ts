@@ -79,22 +79,13 @@ async function pageHtml(path: string, cookie?: string): Promise<string> {
 }
 
 async function customerSession(orderNumber: string, phone: string): Promise<string | null> {
-  const step1 = await fetch(`${BASE}/api/customer/verify`, {
+  const res = await fetch(`${BASE}/api/customer/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ orderNumber, phone }),
   });
-  if (!step1.ok) return null;
-  const demoOtp = (await step1.json()) as { demoOtp?: string };
-  if (!demoOtp.demoOtp) return null;
-
-  const step2 = await fetch(`${BASE}/api/customer/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderNumber, phone, otp: demoOtp.demoOtp }),
-  });
-  if (!step2.ok) return null;
-  const raw = step2.headers.getSetCookie?.() ?? [step2.headers.get("set-cookie") ?? ""];
+  if (!res.ok) return null;
+  const raw = res.headers.getSetCookie?.() ?? [res.headers.get("set-cookie") ?? ""];
   const cookies = raw.flatMap((c) => (c ? [c.split(";")[0]] : []));
   const session = cookies.find((c) => c.startsWith("zarkari-customer-order="));
   return session ?? null;
@@ -376,8 +367,29 @@ async function main() {
         if (found) pass("Staff Messages", "Customer order API shows staff message");
         else partial("Staff Messages", "Customer order API shows staff message", "Message not found in response");
       } else partial("Staff Messages", "Customer order API shows staff message", `status ${customerOrder.status}`);
-    } else partial("Staff Messages", "Customer verify for message sync", "OTP flow unavailable");
+    } else partial("Staff Messages", "Customer verify for message sync", "Verify failed");
   } else partial("Staff Messages", "POST /api/orders/{id}/message", "No order created in audit");
+
+  // Customer portal login (no OTP)
+  const myOrderPage = await pageHtml("/my-order");
+  if (myOrderPage.includes("View Order Status")) pass("Customer Portal", "my-order login (no OTP step)");
+  else partial("Customer Portal", "my-order login (no OTP step)");
+  if (!myOrderPage.includes("Verification Code") && !myOrderPage.includes("6-digit")) {
+    pass("Customer Portal", "No OTP form on my-order page");
+  } else fail("Customer Portal", "No OTP form on my-order page");
+
+  if (auditOrderId && auditOrderNumber) {
+    const customerCookie = await customerSession(auditOrderNumber, auditPhone);
+    if (customerCookie) {
+      const custMsg = await fetch(`${BASE}/api/customer/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: customerCookie },
+        body: JSON.stringify({ orderId: auditOrderId, message: "Audit customer message test" }),
+      });
+      if (custMsg.status === 200) pass("Customer Portal", "POST customer message");
+      else fail("Customer Portal", "POST customer message", `status ${custMsg.status}`);
+    } else partial("Customer Portal", "POST customer message", "Could not verify customer session");
+  }
 
   // 21 PWA
   const manifest = await fetch(`${BASE}/manifest-boms.json`);

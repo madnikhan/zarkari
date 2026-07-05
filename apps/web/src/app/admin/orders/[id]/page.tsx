@@ -19,6 +19,7 @@ import { OrderActionButtons } from "@/components/boms/OrderActionButtons";
 import { StaffMessageForm } from "@/components/boms/StaffMessageForm";
 import { StatusBadge } from "@/components/boms/StatusBadge";
 import { CustomerCard } from "@/components/boms/CustomerCard";
+import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
 
 interface Props {
@@ -60,6 +61,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         ← Back to Orders
       </Link>
 
+      <OrderWhatsAppBanner />
+
       <div className="boms-card p-5 mb-4">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -80,6 +83,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
             email={customer.email}
             address={customer.address}
             orderNumber={order.orderNumber}
+            orderId={order.id}
           />
         </div>
       )}
