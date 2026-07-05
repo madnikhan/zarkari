@@ -38,6 +38,15 @@ export async function POST(request: Request) {
   }
 
   if (!isR2Configured()) {
+    if (contentType.startsWith("audio/")) {
+      return NextResponse.json({
+        uploadUrl: "/api/upload",
+        demo: true,
+        keepLocal: true,
+        key: "demo",
+        fileName,
+      });
+    }
     return NextResponse.json({
       uploadUrl: "/api/upload",
       publicUrl: "/catalog/guldaan/1.png",

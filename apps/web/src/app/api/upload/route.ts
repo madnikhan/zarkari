@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { transcodeVoiceToMp4, voiceNeedsTranscode } from "@/lib/audio/transcode-voice";
 import { createMediaDb } from "@/lib/db/media";
 import { isR2Configured, r2ObjectKey, r2PublicUrl, uploadToR2 } from "@/lib/r2";
 
 /** Vercel serverless request body limit is ~4.5 MB */
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+function isAudioMime(mimeType: string): boolean {
+  return mimeType.startsWith("audio/");
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -30,10 +35,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const fileName = file.name || "upload.jpg";
-    const mimeType = file.type || "application/octet-stream";
+    let fileName = file.name || "upload.jpg";
+    let mimeType = file.type || "application/octet-stream";
 
     if (!isR2Configured()) {
+      if (isAudioMime(mimeType)) {
+        return NextResponse.json({
+          demo: true,
+          keepLocal: true,
+          fileName,
+          category,
+          mimeType,
+        });
+      }
       const url = "/catalog/guldaan/1.png";
       const asset = await createMediaDb({
         fileName,
@@ -45,10 +59,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ demo: true, url, fileName, category, asset });
     }
 
+    let uploadBuffer: Buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isAudioMime(mimeType) && voiceNeedsTranscode(mimeType)) {
+      const ext = fileName.split(".").pop() ?? "webm";
+      const mp4 = await transcodeVoiceToMp4(uploadBuffer, ext);
+      if (mp4) {
+        uploadBuffer = mp4;
+        mimeType = "audio/mp4";
+        fileName = fileName.replace(/\.(webm|ogg|opus)$/i, ".m4a");
+        if (!/\.m4a$/i.test(fileName)) fileName = `${fileName.replace(/\.[^.]+$/, "")}.m4a`;
+      }
+    }
+
     const key = r2ObjectKey(category, fileName);
     const publicUrl = r2PublicUrl(key);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await uploadToR2(key, buffer, mimeType);
+    await uploadToR2(key, uploadBuffer, mimeType);
 
     const asset = await createMediaDb({
       fileName,
@@ -58,10 +84,9 @@ export async function POST(request: Request) {
       uploadedByUserId: session.id,
     });
 
-    return NextResponse.json({ url: publicUrl, key, fileName, category, asset });
+    return NextResponse.json({ url: publicUrl, key, fileName, category, mimeType, asset });
   }
 
-  // Legacy JSON body (demo / compatibility)
   const body = await request.json();
   const { fileName, contentType: mimeType, category } = body as {
     fileName?: string;
@@ -70,13 +95,17 @@ export async function POST(request: Request) {
   };
   const cat = category ?? "general";
   const name = fileName ?? "upload.jpg";
+  const mime = mimeType ?? "application/octet-stream";
 
   if (!isR2Configured()) {
+    if (isAudioMime(mime)) {
+      return NextResponse.json({ demo: true, keepLocal: true, fileName: name, category: cat, mimeType: mime });
+    }
     const url = body.url ?? "/catalog/guldaan/1.png";
     const asset = await createMediaDb({
       fileName: name,
       url,
-      mimeType,
+      mimeType: mime,
       category: cat,
       uploadedByUserId: session.id,
     });

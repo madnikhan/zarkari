@@ -30,6 +30,7 @@ function buildImageRemotePatterns(): NonNullable<NextConfig["images"]>["remotePa
 }
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["ffmpeg-static"],
   images: {
     remotePatterns: buildImageRemotePatterns(),
   },

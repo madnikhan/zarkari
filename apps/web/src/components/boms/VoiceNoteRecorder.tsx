@@ -3,12 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square, X, RotateCcw } from "lucide-react";
 import type { UploadedFile } from "@/components/boms/MediaUploadZone";
+import { AudioPlayer } from "@/components/boms/AudioPlayer";
 import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
+import {
+  extensionForAudioMime,
+  normalizeAudioMime,
+  pickRecorderMimeType,
+  shouldUseTimeslice,
+} from "@/lib/audio/mime";
 import { uploadBlobWithProgress, type UploadProgressState } from "@/lib/upload/client";
 
 const MAX_RECORDING_MS = 3 * 60 * 1000;
 
-export type AudioUploadedFile = UploadedFile & { mediaType: "audio" };
+export type AudioUploadedFile = UploadedFile & { mediaType: "audio"; mimeType?: string };
 
 interface PendingRecording {
   id: string;
@@ -16,6 +23,7 @@ interface PendingRecording {
   localUrl: string;
   blob: Blob;
   mime: string;
+  playbackError?: string;
   error?: string;
   uploading?: boolean;
   progress?: UploadProgressState | null;
@@ -28,22 +36,26 @@ interface Props {
   disabled?: boolean;
 }
 
-function pickMimeType(): string {
-  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
-  return types.find((t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)) ?? "";
-}
-
-function extensionForMime(mime: string): string {
-  if (mime.includes("mp4")) return "m4a";
-  if (mime.includes("ogg")) return "ogg";
-  return "webm";
-}
-
 function formatElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function waitForRemoteAudio(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.preload = "auto";
+    const done = (ok: boolean) => {
+      audio.src = "";
+      resolve(ok);
+    };
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) && audio.duration > 0);
+    audio.onerror = () => done(false);
+    setTimeout(() => done(false), 8000);
+    audio.src = url;
+  });
 }
 
 export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled = false }: Props) {
@@ -96,13 +108,33 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
       prev.map((p) => (p.id === item.id ? { ...p, uploading: true, error: undefined, progress: null } : p))
     );
     try {
-      const ext = extensionForMime(item.mime);
+      const ext = extensionForAudioMime(item.mime);
       const fileName = item.name || `voice-note-${Date.now()}.${ext}`;
-      const result = await uploadBlobWithProgress(item.blob, fileName, item.mime, "order-voice", (state) => {
-        setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, progress: state } : p)));
+      const result = await uploadBlobWithProgress(
+        item.blob,
+        fileName,
+        item.mime,
+        "order-voice",
+        (state) => {
+          setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, progress: state } : p)));
+        },
+        item.localUrl
+      );
+
+      const remoteOk = result.keepLocal || (await waitForRemoteAudio(result.url));
+      const finalUrl = remoteOk ? result.url : item.localUrl;
+      const finalMime = result.mimeType ?? item.mime;
+
+      onRecorded({
+        name: result.fileName,
+        url: finalUrl,
+        mediaType: "audio",
+        mimeType: finalMime,
       });
-      onRecorded({ name: result.fileName, url: result.url, mediaType: "audio" });
-      revokeBlobUrl(item.localUrl);
+
+      if (remoteOk && finalUrl !== item.localUrl) {
+        revokeBlobUrl(item.localUrl);
+      }
       setPending((prev) => prev.filter((p) => p.id !== item.id));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save voice note";
@@ -127,12 +159,20 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
 
     setRecording(false);
 
+    if (recorder.state === "recording") {
+      try {
+        recorder.requestData();
+      } catch {
+        // ignore — not all browsers support requestData
+      }
+    }
+
     await new Promise<void>((resolve) => {
       recorder.addEventListener("stop", () => resolve(), { once: true });
       recorder.stop();
     });
 
-    const mime = mimeRef.current || recorder.mimeType || "audio/webm";
+    const mime = normalizeAudioMime(recorder.mimeType || mimeRef.current || chunksRef.current[0]?.type || "audio/webm");
     const blob = new Blob(chunksRef.current, { type: mime });
     chunksRef.current = [];
     cleanupStream();
@@ -143,7 +183,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
       return;
     }
 
-    const ext = extensionForMime(mime);
+    const ext = extensionForAudioMime(mime);
     const localUrl = URL.createObjectURL(blob);
     blobUrlsRef.current.add(localUrl);
     const item: PendingRecording = {
@@ -166,7 +206,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
       return;
     }
 
-    const mime = pickMimeType();
+    const mime = pickRecorderMimeType();
     if (!mime && typeof MediaRecorder === "undefined") {
       setError("Voice recording is not supported in this browser.");
       return;
@@ -185,7 +225,13 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      recorder.start(250);
+      const encodedMime = normalizeAudioMime(recorder.mimeType || mime);
+      if (shouldUseTimeslice(encodedMime)) {
+        recorder.start(250);
+      } else {
+        recorder.start();
+      }
+
       startedAtRef.current = Date.now();
       setRecording(true);
       setElapsed(0);
@@ -249,7 +295,7 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
         <div key={item.id} className="space-y-2 p-3 rounded-lg border border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
             <Mic className="h-4 w-4 text-[#4C3BCF] shrink-0" />
-            <audio controls src={item.localUrl} className="flex-1 min-w-0 h-9" preload="metadata" />
+            <AudioPlayer src={item.localUrl} mimeType={item.mime} className="flex-1 min-w-0 h-9" />
             {!item.uploading && (
               <button
                 type="button"
@@ -286,7 +332,12 @@ export function VoiceNoteRecorder({ recordings, onRecorded, onRemove, disabled =
               className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50"
             >
               <Mic className="h-4 w-4 text-[#4C3BCF] shrink-0" />
-              <audio controls src={file.url} className="flex-1 min-w-0 h-9" preload="metadata" />
+              <AudioPlayer
+                src={file.url}
+                mimeType={file.mimeType ?? (file.name.endsWith(".m4a") ? "audio/mp4" : "audio/webm")}
+                className="flex-1 min-w-0 h-9"
+                label={file.name}
+              />
               <button
                 type="button"
                 onClick={() => onRemove(index)}

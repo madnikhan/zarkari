@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Camera, Upload, Video, X, ImageIcon, Mic } from "lucide-react";
+import { AudioPlayer } from "@/components/boms/AudioPlayer";
 import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
 import { uploadFileWithProgress, type UploadProgressState } from "@/lib/upload/client";
 import { assertVideoDurationAllowed } from "@/lib/upload/video";
@@ -164,7 +165,7 @@ export function MediaUploadZone({
               ) : isAudio(file) ? (
                 <div className="flex flex-col items-center justify-center h-full p-2 gap-1">
                   <Mic className="h-6 w-6 text-[#4C3BCF]" />
-                  <audio controls src={file.url} className="w-full h-8" preload="metadata" />
+                  <AudioPlayer src={file.url} className="w-full h-8" />
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-2 text-center">

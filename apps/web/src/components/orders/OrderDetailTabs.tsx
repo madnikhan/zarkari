@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AudioPlayer } from "@/components/boms/AudioPlayer";
 import { OrderTimeline } from "./OrderTimeline";
 import type { TimelineEvent, OrderFile, BridalOrder } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
@@ -51,7 +52,11 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
                   {f.fileName} ({f.category})
                 </p>
                 {isVoice ? (
-                  <audio controls src={f.url} className="w-full" preload="metadata" />
+                  <AudioPlayer
+                    src={f.url}
+                    mimeType={/\.m4a$/i.test(f.fileName) ? "audio/mp4" : undefined}
+                    className="w-full h-9"
+                  />
                 ) : (
                   <a href={f.url} target="_blank" rel="noreferrer" className="text-gold hover:underline">
                     Open file

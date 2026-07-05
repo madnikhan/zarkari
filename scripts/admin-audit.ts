@@ -3,7 +3,7 @@
  * Usage: tsx scripts/admin-audit.ts [baseUrl]
  */
 import { config } from "dotenv";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
 const root = resolve(__dirname, "..");
@@ -344,6 +344,60 @@ async function main() {
   });
   if (presignOk.status === 200) pass("Upload", "POST /api/upload/presign (video)");
   else partial("Upload", "POST /api/upload/presign (video)", `status ${presignOk.status}`);
+
+  const voiceFixture = resolve(root, "apps/web/public/audio/sample-voice.webm");
+  if (existsSync(voiceFixture)) {
+    const voiceBytes = readFileSync(voiceFixture);
+    const voiceForm = new FormData();
+    voiceForm.append("file", new Blob([voiceBytes], { type: "audio/webm" }), "sample-voice.webm");
+    voiceForm.append("category", "order-voice");
+    const voiceUpload = await fetch(`${BASE}/api/upload`, {
+      method: "POST",
+      headers: { Cookie: ownerCookie },
+      body: voiceForm,
+    });
+    if (voiceUpload.status === 200) {
+      const voiceBody = (await voiceUpload.json()) as {
+        url?: string;
+        keepLocal?: boolean;
+        mimeType?: string;
+      };
+      const badUrl =
+        voiceBody.url?.endsWith(".png") || voiceBody.url?.includes("/catalog/guldaan/");
+      if (voiceBody.keepLocal || (voiceBody.url && !badUrl)) {
+        pass("Voice notes", "POST /api/upload returns audio URL (not PNG placeholder)");
+      } else {
+        fail("Voice notes", "POST /api/upload returns audio URL (not PNG placeholder)", voiceBody.url ?? "no url");
+      }
+      if (voiceBody.mimeType?.startsWith("audio/") || voiceBody.keepLocal) {
+        pass("Voice notes", "Upload response includes audio mime or keepLocal");
+      } else partial("Voice notes", "Upload response includes audio mime or keepLocal");
+
+      const voiceMediaUrl =
+        voiceBody.url && !badUrl ? voiceBody.url : "/audio/sample-voice.webm";
+      const voiceOrder = await req("/api/orders", ownerCookie, {
+        method: "POST",
+        body: JSON.stringify({
+          customerName: "Voice Audit",
+          customerPhone: `07${String(Date.now() + 1).slice(-9)}`,
+          customerEmail: "voice-audit@test.com",
+          supplierId: supplierList[0]?.id,
+          dressType: "Lehenga",
+          totalPrice: "1500.00",
+          mediaFiles: [{ url: voiceMediaUrl, name: "sample-voice.webm", category: "voice" }],
+        }),
+      });
+      if (voiceOrder.status === 200 || voiceOrder.status === 201) {
+        pass("Voice notes", "POST /api/orders accepts voice mediaFiles");
+      } else {
+        partial("Voice notes", "POST /api/orders accepts voice mediaFiles", `status ${voiceOrder.status}`);
+      }
+    } else {
+      partial("Voice notes", "POST /api/upload voice fixture", `status ${voiceUpload.status}`);
+    }
+  } else {
+    partial("Voice notes", "Voice upload smoke test", "Missing apps/web/public/audio/sample-voice.webm");
+  }
 
   // 20 Staff messages + customer portal sync
   if (auditOrderId && auditOrderNumber) {
