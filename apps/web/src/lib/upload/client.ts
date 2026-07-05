@@ -1,4 +1,5 @@
 import { MAX_DIRECT_UPLOAD_BYTES, MAX_SERVER_UPLOAD_BYTES } from "./constants";
+import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 
 export type UploadProgressStatus = "uploading" | "processing" | "done" | "error";
 
@@ -18,13 +19,16 @@ export interface UploadResult {
   keepLocal?: boolean;
 }
 
+const MULTIPART_CHUNK_BYTES = Math.floor(3.5 * 1024 * 1024);
+
 function shouldUseDirectUpload(file: File): boolean {
+  if (isVideoFile(file)) return false;
   if (file.type.startsWith("audio/") && file.size <= MAX_SERVER_UPLOAD_BYTES) return false;
-  return file.type.startsWith("video/") || file.size > MAX_SERVER_UPLOAD_BYTES;
+  return file.size > MAX_SERVER_UPLOAD_BYTES;
 }
 
 function isAudioFile(file: File): boolean {
-  return file.type.startsWith("audio/");
+  return resolveFileMime(file).startsWith("audio/");
 }
 
 function rejectAudioPlaceholder(url: string | undefined, file: File): void {
@@ -53,7 +57,7 @@ function putWithProgress(
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`Upload failed (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
     xhr.send(body);
   });
 }
@@ -95,7 +99,7 @@ function postFormWithStagedProgress(
             resolve({
               url: localPreviewUrl,
               fileName: data.fileName ?? file.name,
-              mimeType: data.mimeType ?? file.type,
+              mimeType: data.mimeType ?? resolveFileMime(file),
               keepLocal: true,
             });
             return;
@@ -106,20 +110,123 @@ function postFormWithStagedProgress(
             resolve({
               url: data.url,
               fileName: data.fileName ?? file.name,
-              mimeType: data.mimeType ?? file.type,
+              mimeType: data.mimeType ?? resolveFileMime(file),
             });
             return;
           }
         }
-        reject(new Error(data.error ?? "Upload failed"));
+        reject(new Error(data.error ?? `Upload failed (${xhr.status})`));
       } catch {
-        reject(new Error("Upload failed"));
+        reject(new Error(`Upload failed (${xhr.status})`));
       }
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
     onProgress?.({ label, progress: 30, status: "uploading" });
     xhr.send(form);
   });
+}
+
+async function uploadPartChunk(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: Blob
+): Promise<{ partNumber: number; etag: string }> {
+  const form = new FormData();
+  form.append("uploadId", uploadId);
+  form.append("key", key);
+  form.append("partNumber", String(partNumber));
+  form.append("file", chunk, `part-${partNumber}`);
+
+  const res = await fetch("/api/upload/multipart/part", { method: "POST", body: form });
+  const data = (await res.json()) as { etag?: string; error?: string };
+  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+  if (!data.etag) throw new Error("Upload part failed — no etag returned");
+  return { partNumber, etag: data.etag };
+}
+
+async function uploadVideoViaMultipart(
+  file: File,
+  category: string,
+  mimeType: string,
+  onProgress?: ProgressCallback
+): Promise<UploadResult> {
+  const label = "Uploading video…";
+  onProgress?.({ label, progress: 2, status: "uploading" });
+
+  const initRes = await fetch("/api/upload/multipart/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: mimeType,
+      category,
+      fileSize: file.size,
+    }),
+  });
+  const initData = (await initRes.json()) as {
+    demo?: boolean;
+    uploadId?: string;
+    key?: string;
+    publicUrl?: string;
+    fileName?: string;
+    error?: string;
+  };
+
+  if (!initRes.ok) throw new Error(initData.error ?? `Could not start upload (${initRes.status})`);
+
+  if (initData.demo) {
+    if (file.size > MAX_SERVER_UPLOAD_BYTES) {
+      throw new Error(
+        `Video is too large for demo upload (${Math.round(file.size / 1024 / 1024)} MB). Configure R2 storage or use a file under 4 MB.`
+      );
+    }
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    return postFormWithStagedProgress("/api/upload", form, label, file, onProgress);
+  }
+
+  const uploadId = initData.uploadId!;
+  const key = initData.key!;
+  const publicUrl = initData.publicUrl!;
+  const totalParts = Math.max(1, Math.ceil(file.size / MULTIPART_CHUNK_BYTES));
+  const parts: { partNumber: number; etag: string }[] = [];
+
+  for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+    const start = (partNumber - 1) * MULTIPART_CHUNK_BYTES;
+    const chunk = file.slice(start, start + MULTIPART_CHUNK_BYTES);
+    const part = await uploadPartChunk(uploadId, key, partNumber, chunk);
+    parts.push(part);
+    const pct = Math.min(90, Math.round((partNumber / totalParts) * 90));
+    onProgress?.({ label, progress: pct, status: "uploading" });
+  }
+
+  onProgress?.({ label: "Processing upload…", progress: 92, status: "processing" });
+
+  const completeRes = await fetch("/api/upload/multipart/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uploadId,
+      key,
+      fileName: initData.fileName ?? file.name,
+      contentType: mimeType,
+      category,
+      publicUrl,
+      parts,
+    }),
+  });
+  const completeData = (await completeRes.json()) as { url?: string; fileName?: string; error?: string };
+  if (!completeRes.ok) throw new Error(completeData.error ?? `Upload failed (${completeRes.status})`);
+  if (!completeData.url) throw new Error("Upload failed — no URL returned");
+
+  onProgress?.({ label: "Upload complete", progress: 100, status: "done" });
+  return {
+    url: completeData.url,
+    fileName: completeData.fileName ?? file.name,
+    mimeType,
+  };
 }
 
 export async function uploadFileWithProgress(
@@ -128,23 +235,30 @@ export async function uploadFileWithProgress(
   onProgress?: ProgressCallback,
   localPreviewUrl?: string
 ): Promise<UploadResult> {
-  const label = file.type.startsWith("video/")
-    ? `Uploading video…`
-    : file.type.startsWith("audio/")
-      ? `Uploading voice note…`
-      : `Uploading file…`;
+  const resolved = withResolvedMime(file);
+  const mimeType = resolveFileMime(resolved);
 
-  if (file.size > MAX_DIRECT_UPLOAD_BYTES) {
+  const label = isVideoFile(resolved)
+    ? "Uploading video…"
+    : mimeType.startsWith("audio/")
+      ? "Uploading voice note…"
+      : "Uploading file…";
+
+  if (resolved.size > MAX_DIRECT_UPLOAD_BYTES) {
     throw new Error(
-      `File is too large (${Math.round(file.size / 1024 / 1024)} MB). Maximum is ${Math.round(MAX_DIRECT_UPLOAD_BYTES / 1024 / 1024)} MB.`
+      `File is too large (${Math.round(resolved.size / 1024 / 1024)} MB). Maximum is ${Math.round(MAX_DIRECT_UPLOAD_BYTES / 1024 / 1024)} MB.`
     );
   }
 
-  if (!shouldUseDirectUpload(file)) {
+  if (isVideoFile(resolved)) {
+    return uploadVideoViaMultipart(resolved, category, mimeType, onProgress);
+  }
+
+  if (!shouldUseDirectUpload(resolved)) {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", resolved);
     form.append("category", category);
-    return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
+    return postFormWithStagedProgress("/api/upload", form, label, resolved, onProgress, localPreviewUrl);
   }
 
   onProgress?.({ label, progress: 5, status: "uploading" });
@@ -153,10 +267,10 @@ export async function uploadFileWithProgress(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      fileName: resolved.name,
+      contentType: mimeType,
       category,
-      fileSize: file.size,
+      fileSize: resolved.size,
     }),
   });
   const presignData = await presignRes.json();
@@ -164,12 +278,12 @@ export async function uploadFileWithProgress(
 
   if (presignData.demo || presignData.keepLocal) {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", resolved);
     form.append("category", category);
-    return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
+    return postFormWithStagedProgress("/api/upload", form, label, resolved, onProgress, localPreviewUrl);
   }
 
-  await putWithProgress(presignData.uploadUrl, file, file.type || "application/octet-stream", (pct) => {
+  await putWithProgress(presignData.uploadUrl, resolved, mimeType, (pct) => {
     onProgress?.({ label, progress: Math.min(90, pct), status: "uploading" });
   });
 
@@ -181,7 +295,7 @@ export async function uploadFileWithProgress(
     body: JSON.stringify({
       key: presignData.key,
       fileName: presignData.fileName,
-      contentType: file.type || "application/octet-stream",
+      contentType: mimeType,
       category,
       publicUrl: presignData.publicUrl,
     }),
@@ -189,12 +303,12 @@ export async function uploadFileWithProgress(
   const completeData = await completeRes.json();
   if (!completeRes.ok) throw new Error(completeData.error ?? "Upload failed");
 
-  rejectAudioPlaceholder(completeData.url, file);
+  rejectAudioPlaceholder(completeData.url, resolved);
   onProgress?.({ label: "Upload complete", progress: 100, status: "done" });
   return {
     url: completeData.url,
-    fileName: completeData.fileName ?? file.name,
-    mimeType: file.type,
+    fileName: completeData.fileName ?? resolved.name,
+    mimeType,
   };
 }
 

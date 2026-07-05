@@ -1,6 +1,10 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+export function getR2Bucket(): string {
+  return process.env.R2_BUCKET!;
+}
+
 export function isR2Configured(): boolean {
   return Boolean(
     process.env.R2_ACCOUNT_ID?.trim() &&
@@ -11,7 +15,7 @@ export function isR2Configured(): boolean {
   );
 }
 
-function getR2Client(): S3Client {
+export function getR2Client(): S3Client {
   return new S3Client({
     region: "auto",
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,

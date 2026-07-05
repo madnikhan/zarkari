@@ -1,4 +1,5 @@
 import { MAX_VIDEO_DURATION_SEC } from "./constants";
+import { isVideoFile, resolveFileMime } from "./mime";
 
 export function getVideoDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -18,7 +19,7 @@ export function getVideoDuration(file: File): Promise<number> {
 }
 
 export async function assertVideoDurationAllowed(file: File): Promise<void> {
-  if (!file.type.startsWith("video/")) return;
+  if (!isVideoFile(file)) return;
   const duration = await getVideoDuration(file);
   if (!Number.isFinite(duration) || duration <= 0) return;
   if (duration > MAX_VIDEO_DURATION_SEC) {
@@ -26,3 +27,9 @@ export async function assertVideoDurationAllowed(file: File): Promise<void> {
     throw new Error(`Video is ${mins} minutes long. Maximum allowed is 10 minutes.`);
   }
 }
+
+export function isVideoUpload(file: File): boolean {
+  return isVideoFile(file);
+}
+
+export { resolveFileMime };

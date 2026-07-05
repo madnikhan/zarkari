@@ -5,6 +5,9 @@ import { X } from "lucide-react";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 import { MediaAssetGrid } from "@/components/admin/content/MediaAssetGrid";
 
+const CMS_ACCEPT = "image/*,video/*,.mov";
+const CMS_HINT = "Images up to 4 MB · Videos up to 10 min / 200 MB";
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -12,6 +15,7 @@ interface Props {
   multiple?: boolean;
   onSelectMultiple?: (urls: string[]) => void;
   title?: string;
+  imagesOnly?: boolean;
 }
 
 export function MediaPickerModal({
@@ -21,6 +25,7 @@ export function MediaPickerModal({
   multiple = false,
   onSelectMultiple,
   title = "Choose image",
+  imagesOnly = false,
 }: Props) {
   const [tab, setTab] = useState<"library" | "upload">("library");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -104,9 +109,14 @@ export function MediaPickerModal({
         <div className="flex-1 overflow-y-auto p-4">
           {tab === "upload" ? (
             <MediaUploadZone
-              label="Upload images for products, collections, or blog"
-              accept="image/*"
+              label={
+                imagesOnly
+                  ? "Upload images for products, collections, or blog"
+                  : "Upload images or videos for products, collections, or blog"
+              }
+              accept={imagesOnly ? "image/*" : CMS_ACCEPT}
               category="cms"
+              sizeHint={imagesOnly ? "Images up to 4 MB" : CMS_HINT}
               onUploaded={handleUploaded}
               onSingleUploaded={handleSingleUploaded}
             />
@@ -117,7 +127,12 @@ export function MediaPickerModal({
               onSelect={handleSelect}
               refreshKey={refreshKey}
               showCopy={false}
-              emptyMessage="No images yet. Switch to Upload to add one."
+              imagesOnly={imagesOnly}
+              emptyMessage={
+                imagesOnly
+                  ? "No images yet. Switch to Upload to add one."
+                  : "No media yet. Switch to Upload to add one."
+              }
             />
           )}
         </div>

@@ -122,6 +122,7 @@ export function ProductImageGallery({ images, featuredUrl, onChange }: Props) {
         multiple
         onSelectMultiple={addImages}
         title="Add product images"
+        imagesOnly
       />
     </div>
   );

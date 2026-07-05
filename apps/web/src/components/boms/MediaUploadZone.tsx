@@ -5,7 +5,8 @@ import { Camera, Upload, Video, X, ImageIcon, Mic } from "lucide-react";
 import { AudioPlayer } from "@/components/boms/AudioPlayer";
 import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
 import { uploadFileWithProgress, type UploadProgressState } from "@/lib/upload/client";
-import { assertVideoDurationAllowed } from "@/lib/upload/video";
+import { assertVideoDurationAllowed, isVideoUpload } from "@/lib/upload/video";
+import { isVideoFile, resolveFileMime } from "@/lib/upload/mime";
 
 export type MediaFileType = "image" | "video" | "audio";
 
@@ -19,6 +20,7 @@ interface Props {
   label?: string;
   accept?: string;
   category?: string;
+  sizeHint?: string;
   onUploaded?: (files: UploadedFile[]) => void;
   onSingleUploaded?: (file: UploadedFile) => void;
   showCameraButtons?: boolean;
@@ -28,6 +30,7 @@ export function MediaUploadZone({
   label = "Upload photos or videos",
   accept = "image/*,video/*",
   category = "supplier-completion",
+  sizeHint = "Photos up to 4 MB · Videos up to 10 minutes",
   onUploaded,
   onSingleUploaded,
   showCameraButtons = false,
@@ -41,7 +44,7 @@ export function MediaUploadZone({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function mediaTypeForFile(file: File): MediaFileType {
-    if (file.type.startsWith("video/")) return "video";
+    if (isVideoFile(file)) return "video";
     if (file.type.startsWith("audio/")) return "audio";
     return "image";
   }
@@ -54,8 +57,9 @@ export function MediaUploadZone({
     const uploaded: UploadedFile[] = [];
 
     try {
-      for (const file of selected) {
-        if (file.type.startsWith("video/")) {
+      for (const raw of selected) {
+        const file = raw.type ? raw : new File([raw], raw.name, { type: resolveFileMime(raw) });
+        if (isVideoUpload(file)) {
           await assertVideoDurationAllowed(file);
         }
         const result = await uploadFileWithProgress(file, category, (state) => setProgress(state));
@@ -129,7 +133,7 @@ export function MediaUploadZone({
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-8 cursor-pointer hover:border-[#4C3BCF]/40 hover:bg-[#F4F3FF]/50 transition-colors">
           <Upload className="h-8 w-8 text-slate-300 mb-2" />
           <span className="text-sm text-slate-500">{uploading ? "Uploading…" : label}</span>
-          <span className="text-xs text-slate-400 mt-1">Photos up to 4 MB · Videos up to 10 minutes</span>
+          <span className="text-xs text-slate-400 mt-1">{sizeHint}</span>
           <input
             ref={fileInputRef}
             type="file"
@@ -149,7 +153,7 @@ export function MediaUploadZone({
       )}
 
       {showCameraButtons && (
-        <p className="text-xs text-slate-400">Photos up to 4 MB · Videos up to 10 minutes</p>
+        <p className="text-xs text-slate-400">{sizeHint}</p>
       )}
 
       <UploadProgressBar state={progress} />

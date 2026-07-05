@@ -74,6 +74,7 @@ export function ImageField({ label = "Image", value, onChange }: Props) {
         onClose={() => setPickerOpen(false)}
         onSelect={(url) => onChange(url)}
         title={`Select ${label.toLowerCase()}`}
+        imagesOnly
       />
     </div>
   );

@@ -399,6 +399,80 @@ async function main() {
     partial("Voice notes", "Voice upload smoke test", "Missing apps/web/public/audio/sample-voice.webm");
   }
 
+  const videoFixture =
+    resolve(root, "apps/web/public/video/sample-audit.webm");
+  const videoFixtureFallback = resolve(root, "apps/web/public/audio/sample-voice.webm");
+  const videoBytesPath = existsSync(videoFixture) ? videoFixture : videoFixtureFallback;
+  if (existsSync(videoBytesPath)) {
+    const videoBytes = readFileSync(videoBytesPath);
+    const videoInit = await req("/api/upload/multipart/init", ownerCookie, {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: "audit-sample.mov",
+        contentType: "video/quicktime",
+        category: "cms",
+        fileSize: videoBytes.length,
+      }),
+    });
+    const initBody = videoInit.body as {
+      demo?: boolean;
+      uploadId?: string;
+      key?: string;
+      publicUrl?: string;
+      fileName?: string;
+      error?: string;
+    };
+    if (videoInit.status === 200 && initBody.uploadId && initBody.key && initBody.publicUrl) {
+      pass("Video upload", "POST /api/upload/multipart/init");
+      const partForm = new FormData();
+      partForm.append("uploadId", initBody.uploadId);
+      partForm.append("key", initBody.key);
+      partForm.append("partNumber", "1");
+      partForm.append("file", new Blob([videoBytes], { type: "video/quicktime" }), "part-1");
+      const partRes = await fetch(`${BASE}/api/upload/multipart/part`, {
+        method: "POST",
+        headers: { Cookie: ownerCookie },
+        body: partForm,
+      });
+      if (partRes.status === 200) {
+        pass("Video upload", "POST /api/upload/multipart/part");
+        const partBody = (await partRes.json()) as { etag?: string; partNumber?: number };
+        const complete = await req("/api/upload/multipart/complete", ownerCookie, {
+          method: "POST",
+          body: JSON.stringify({
+            uploadId: initBody.uploadId,
+            key: initBody.key,
+            fileName: initBody.fileName ?? "audit-sample.mov",
+            contentType: "video/quicktime",
+            category: "cms",
+            publicUrl: initBody.publicUrl,
+            parts: [{ partNumber: partBody.partNumber ?? 1, etag: partBody.etag }],
+          }),
+        });
+        if (complete.status === 200) {
+          const completeBody = complete.body as { url?: string };
+          const badVideoUrl =
+            completeBody.url?.endsWith(".png") || completeBody.url?.includes("/catalog/guldaan/");
+          if (completeBody.url && !badVideoUrl) {
+            pass("Video upload", "Multipart complete returns video URL (not PNG)");
+          } else {
+            fail("Video upload", "Multipart complete returns video URL (not PNG)", completeBody.url ?? "no url");
+          }
+        } else {
+          partial("Video upload", "POST /api/upload/multipart/complete", `status ${complete.status}`);
+        }
+      } else {
+        partial("Video upload", "POST /api/upload/multipart/part", `status ${partRes.status}`);
+      }
+    } else if (initBody.demo) {
+      partial("Video upload", "Multipart init (R2 not configured)", "demo mode");
+    } else {
+      partial("Video upload", "POST /api/upload/multipart/init", `status ${videoInit.status}`);
+    }
+  } else {
+    partial("Video upload", "Video multipart smoke test", "Missing video fixture");
+  }
+
   // 20 Staff messages + customer portal sync
   if (auditOrderId && auditOrderNumber) {
     const staffMsg = await req(`/api/orders/${auditOrderId}/message`, ownerCookie, {
