@@ -1,4 +1,4 @@
-import { MAX_DIRECT_UPLOAD_BYTES, MAX_SERVER_UPLOAD_BYTES } from "./constants";
+import { MAX_DIRECT_UPLOAD_BYTES, MAX_SERVER_UPLOAD_BYTES, MULTIPART_CHUNK_BYTES } from "./constants";
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 import { parseJsonResponse, parseXhrJson } from "./parse-json";
 
@@ -19,9 +19,6 @@ export interface UploadResult {
   mimeType?: string;
   keepLocal?: boolean;
 }
-
-/** Stay under Vercel's ~4.5 MB request body limit including multipart form overhead. */
-const MULTIPART_CHUNK_BYTES = 3 * 1024 * 1024;
 
 function shouldUseDirectUpload(file: File): boolean {
   if (isVideoFile(file)) return false;

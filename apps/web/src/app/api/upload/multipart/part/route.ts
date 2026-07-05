@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { uploadMultipartPart } from "@/lib/r2-multipart";
 import { isR2Configured } from "@/lib/r2";
+import { MULTIPART_CHUNK_BYTES } from "@/lib/upload/constants";
 import { requireUploadSession } from "@/lib/upload/upload-auth";
 
-/** Match client chunk size; stay under Vercel ~4.5 MB request body limit. */
-const MAX_PART_BYTES = 3 * 1024 * 1024;
+const MAX_PART_BYTES = MULTIPART_CHUNK_BYTES;
 
 export const maxDuration = 60;
 
@@ -34,7 +34,10 @@ export async function POST(request: Request) {
     }
 
     if (chunk.size > MAX_PART_BYTES) {
-      return NextResponse.json({ error: "Chunk too large (max 3 MB)" }, { status: 413 });
+      return NextResponse.json(
+        { error: `Chunk too large (max ${Math.round(MAX_PART_BYTES / 1024 / 1024)} MB)` },
+        { status: 413 }
+      );
     }
 
     const buffer = Buffer.from(await chunk.arrayBuffer());

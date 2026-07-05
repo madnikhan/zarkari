@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export function getR2Bucket(): string {
@@ -59,4 +59,27 @@ export function r2PublicUrl(key: string): string {
 export function r2ObjectKey(category: string, fileName: string): string {
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]+/g, "-");
   return `uploads/${category}/${Date.now()}-${safeName}`;
+}
+
+/** Extract R2 object key from a public URL (R2_PUBLIC_URL prefix + key path). */
+export function r2KeyFromPublicUrl(publicUrl: string): string | null {
+  const base = process.env.R2_PUBLIC_URL?.replace(/\/$/, "") ?? "";
+  if (!base || !publicUrl.startsWith(base)) {
+    try {
+      const u = new URL(publicUrl);
+      return u.pathname.replace(/^\//, "");
+    } catch {
+      return null;
+    }
+  }
+  return publicUrl.slice(base.length + 1);
+}
+
+export async function deleteFromR2(key: string): Promise<void> {
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: getR2Bucket(),
+      Key: key,
+    })
+  );
 }

@@ -450,7 +450,7 @@ async function main() {
           }),
         });
         if (complete.status === 200) {
-          const completeBody = complete.body as { url?: string };
+          const completeBody = complete.body as { url?: string; asset?: { id?: string } };
           const badVideoUrl =
             completeBody.url?.endsWith(".png") || completeBody.url?.includes("/catalog/guldaan/");
           if (completeBody.url && !badVideoUrl) {
@@ -458,6 +458,11 @@ async function main() {
           } else {
             fail("Video upload", "Multipart complete returns video URL (not PNG)", completeBody.url ?? "no url");
           }
+          if (completeBody.asset?.id) {
+            const mediaDel = await req(`/api/media/${completeBody.asset.id}`, ownerCookie, { method: "DELETE" });
+            if (mediaDel.status === 200) pass("Media library", "DELETE /api/media/{id}");
+            else partial("Media library", "DELETE /api/media/{id}", `status ${mediaDel.status}`);
+          } else partial("Media library", "DELETE /api/media/{id}", "No asset id from upload");
         } else {
           partial("Video upload", "POST /api/upload/multipart/complete", `status ${complete.status}`);
         }
@@ -472,6 +477,10 @@ async function main() {
   } else {
     partial("Video upload", "Video multipart smoke test", "Missing video fixture");
   }
+
+  const mediaList = await req("/api/media?type=video&category=cms", ownerCookie);
+  if (mediaList.status === 200) pass("Media library", "GET /api/media with type and category filters");
+  else partial("Media library", "GET /api/media with filters", `status ${mediaList.status}`);
 
   // 20 Staff messages + customer portal sync
   if (auditOrderId && auditOrderNumber) {
