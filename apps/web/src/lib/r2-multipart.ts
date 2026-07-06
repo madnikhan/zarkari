@@ -4,6 +4,7 @@ import {
   CreateMultipartUploadCommand,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getR2Bucket, getR2Client } from "@/lib/r2";
 
 export async function createMultipartUpload(key: string, contentType: string): Promise<string> {
@@ -35,6 +36,21 @@ export async function uploadMultipartPart(
   );
   if (!result.ETag) throw new Error(`Upload part ${partNumber} failed`);
   return result.ETag;
+}
+
+export async function getPresignedPartUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  expiresIn = 3600
+): Promise<string> {
+  const command = new UploadPartCommand({
+    Bucket: getR2Bucket(),
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  });
+  return getSignedUrl(getR2Client(), command, { expiresIn });
 }
 
 export async function completeMultipartUpload(

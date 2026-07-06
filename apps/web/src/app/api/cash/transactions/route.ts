@@ -8,6 +8,7 @@ import {
   type CashDirection,
   type CashTransactionType,
 } from "@/lib/db/cash-ledger";
+import { addSupplierLedgerEntry } from "@/lib/supplier-ledger/service";
 import { todayDateString } from "@/lib/cash/labels";
 
 export async function GET(request: Request) {
@@ -49,6 +50,8 @@ export async function POST(request: Request) {
     orderId,
     retailOrderId,
     supplierId,
+    amountPkr,
+    exchangeRate,
   } = body as {
     direction?: CashDirection;
     type?: CashTransactionType;
@@ -60,6 +63,8 @@ export async function POST(request: Request) {
     orderId?: string;
     retailOrderId?: string;
     supplierId?: string;
+    amountPkr?: string;
+    exchangeRate?: string;
   };
 
   if (!direction || !type || !amount || !method) {
@@ -82,7 +87,24 @@ export async function POST(request: Request) {
   });
 
   if (!tx) return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 });
+
+  if (type === "supplier_payment" && supplierId) {
+    await addSupplierLedgerEntry({
+      supplierId,
+      type: "payment",
+      description: description ?? reference ?? "Supplier payment",
+      amountGbp: amount,
+      amountPkr: amountPkr ?? "0",
+      exchangeRate,
+      businessDate: businessDate ?? todayDateString(),
+      cashTransactionId: tx.id,
+    });
+    revalidatePath("/admin/suppliers/payments");
+    revalidatePath(`/admin/suppliers/${supplierId}/khata`);
+  }
+
   revalidatePath("/admin/cash");
   revalidatePath("/admin/cash/analytics");
+  revalidatePath("/admin/reports");
   return NextResponse.json({ transaction: tx });
 }

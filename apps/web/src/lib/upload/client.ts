@@ -125,23 +125,49 @@ function postFormWithStagedProgress(
   });
 }
 
+async function uploadPartChunkDirect(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: Blob
+): Promise<{ partNumber: number; etag: string }> {
+  const presignRes = await fetch("/api/upload/multipart/presign-part", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadId, key, partNumber }),
+  });
+  const presignData = await parseJsonResponse<{ uploadUrl?: string; error?: string }>(presignRes);
+  if (!presignRes.ok) throw new Error(presignData.error ?? `Could not presign part ${partNumber}`);
+
+  const etag = await new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", presignData.uploadUrl!);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const raw = xhr.getResponseHeader("ETag") ?? xhr.getResponseHeader("etag");
+        if (!raw) {
+          reject(new Error(`Upload part ${partNumber} failed — no ETag`));
+          return;
+        }
+        resolve(raw.replace(/"/g, ""));
+      } else {
+        reject(new Error(`Upload part ${partNumber} failed (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error(`Upload part ${partNumber} failed — check connection`));
+    xhr.send(chunk);
+  });
+
+  return { partNumber, etag };
+}
+
 async function uploadPartChunk(
   uploadId: string,
   key: string,
   partNumber: number,
   chunk: Blob
 ): Promise<{ partNumber: number; etag: string }> {
-  const form = new FormData();
-  form.append("uploadId", uploadId);
-  form.append("key", key);
-  form.append("partNumber", String(partNumber));
-  form.append("file", chunk, `part-${partNumber}`);
-
-  const res = await fetch("/api/upload/multipart/part", { method: "POST", body: form });
-  const data = await parseJsonResponse<{ etag?: string; error?: string }>(res);
-  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
-  if (!data.etag) throw new Error("Upload part failed — no etag returned");
-  return { partNumber, etag: data.etag };
+  return uploadPartChunkDirect(uploadId, key, partNumber, chunk);
 }
 
 async function uploadVideoViaMultipart(
@@ -250,6 +276,12 @@ export async function uploadFileWithProgress(
   }
 
   if (isVideoFile(resolved)) {
+    if (resolved.size <= MAX_SERVER_UPLOAD_BYTES) {
+      const form = new FormData();
+      form.append("file", resolved);
+      form.append("category", category);
+      return postFormWithStagedProgress("/api/upload", form, label, resolved, onProgress);
+    }
     return uploadVideoViaMultipart(resolved, category, mimeType, onProgress);
   }
 

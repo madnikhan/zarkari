@@ -136,10 +136,41 @@ export default function SupplierOrderPage({ params }: Props) {
         <p className="text-sm text-slate-500 boms-card p-4 mb-6">Files unlock after you accept this order.</p>
       )}
 
-      {filesUnlocked && nextStage && !canComplete && order.status !== "ready_for_collection" && (
-        <button type="button" disabled={loading} onClick={() => action("advance", { stage: nextStage })} className="w-full py-3.5 mb-6 boms-btn-primary rounded-lg text-sm font-medium">
-          Mark: {getStatusLabel(nextStage)}
-        </button>
+      {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">Production Stages</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {PRODUCTION_STAGES.map((stage, idx) => {
+              const currentIdx = PRODUCTION_STAGES.indexOf(
+                order.status as (typeof PRODUCTION_STAGES)[number]
+              );
+              const isDone = currentIdx > idx;
+              const isCurrent = order.status === stage;
+              const isNext = currentIdx >= 0 && idx === currentIdx + 1;
+              const canClick = isNext && nextStage === stage;
+
+              return (
+                <button
+                  key={stage}
+                  type="button"
+                  disabled={loading || !canClick}
+                  onClick={() => canClick && action("advance", { stage })}
+                  className={`py-2.5 px-2 rounded-lg text-xs font-medium transition-colors ${
+                    isDone
+                      ? "bg-green-50 text-green-800 border border-green-200"
+                      : isCurrent
+                        ? "bg-[#4C3BCF] text-white"
+                        : canClick
+                          ? "boms-btn-primary"
+                          : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  }`}
+                >
+                  {getStatusLabel(stage)}
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {canComplete && !order.supplierLocked && (

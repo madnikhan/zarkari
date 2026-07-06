@@ -22,7 +22,6 @@ import {
   Wallet,
   FileText,
   Banknote,
-  LineChart,
   GraduationCap,
   HelpCircle,
 } from "lucide-react";
@@ -36,7 +35,6 @@ type NavItem = { label: string; href: string; icon: React.ComponentType<{ classN
 const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Daily Cash", href: "/admin/cash", icon: Banknote },
-  { label: "Cash Analytics", href: "/admin/cash/analytics", icon: LineChart, ownerOnly: true },
   { label: "Orders", href: "/admin/orders", icon: ShoppingBag },
   { label: "Shop Orders", href: "/admin/orders/retail", icon: Store },
   { label: "Inbox", href: "/admin/inbox", icon: Inbox },
@@ -44,9 +42,9 @@ const adminNav: NavItem[] = [
   { label: "New Order", href: "/admin/orders/new", icon: PlusCircle },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Suppliers", href: "/admin/suppliers", icon: Truck },
+  { label: "Supplier Payments", href: "/admin/suppliers/payments", icon: Wallet },
   { label: "Calendar", href: "/admin/calendar", icon: Calendar },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
-  { label: "Finance", href: "/admin/finance", icon: Wallet, ownerOnly: true },
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
   { label: "Training", href: "/admin/training", icon: GraduationCap },
   { label: "Notifications", href: "/admin/notifications", icon: Bell },

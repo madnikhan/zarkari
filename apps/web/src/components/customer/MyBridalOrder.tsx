@@ -152,10 +152,26 @@ function CustomerActionButtons({
         href={`/api/customer/receipt?orderId=${order.id}`}
         target="_blank"
         rel="noreferrer"
-        className="block w-full py-3.5 text-center text-xs tracking-wide uppercase boms-btn-primary rounded-lg"
+        className="block w-full py-3.5 text-center text-xs tracking-wide uppercase boms-btn-primary rounded-lg mb-6"
       >
         Download Receipt
       </a>
+
+      <section className="boms-card p-5">
+        <h2 className="text-sm font-semibold text-slate-900 mb-2">Terms &amp; Conditions</h2>
+        <p className="text-sm text-slate-600 mb-3">
+          By placing this order you agree to our terms regarding deposits, delivery timelines, colour and design
+          changes, alterations, and collection. Custom orders may not be eligible for refund once production has started.
+        </p>
+        <ul className="text-xs text-slate-500 space-y-1 mb-3 list-disc pl-4">
+          <li>Deposits are non-refundable once the order is sent to the supplier.</li>
+          <li>Colour and design changes are not guaranteed after production begins.</li>
+          <li>Remaining balance is due on collection unless agreed otherwise.</li>
+        </ul>
+        <a href="/pages/terms" target="_blank" rel="noreferrer" className="text-sm text-[#4C3BCF] hover:underline">
+          Read full terms &amp; conditions
+        </a>
+      </section>
 
       {view && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">

@@ -29,6 +29,7 @@ export function OrdersTable({ rows, baseHref = "/admin/orders" }: OrdersTablePro
               <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">Supplier</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">Delivery</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Amount</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">Balance</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Status</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500 hidden sm:table-cell">Time Left</th>
               <th className="px-4 py-3" />
@@ -61,6 +62,11 @@ export function OrdersTable({ rows, baseHref = "/admin/orders" }: OrdersTablePro
                     {new Date(order.deliveryDate).toLocaleDateString("en-GB")}
                   </td>
                   <td className="px-4 py-3 font-medium">{formatPrice(order.totalPrice)}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">
+                    {["collected", "cancelled", "refunded"].includes(order.status)
+                      ? "—"
+                      : formatPrice(order.remainingBalance)}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={order.status} />
                   </td>

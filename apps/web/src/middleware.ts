@@ -9,15 +9,14 @@ export async function middleware(request: NextRequest) {
 
   if (path.startsWith("/admin") && !path.startsWith("/admin/login")) {
     if (!user) return NextResponse.redirect(new URL("/login?redirect=/admin/dashboard", request.url));
-    const isInbox = path.startsWith("/admin/inbox");
-    if (!isInbox && user.role !== "owner" && user.role !== "staff") {
+    if (user.role !== "owner" && user.role !== "staff") {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     if (path.startsWith("/admin/finance") && user.role !== "owner") {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
     if (path.startsWith("/admin/cash/analytics") && user.role !== "owner") {
-      return NextResponse.redirect(new URL("/admin/cash", request.url));
+      return NextResponse.redirect(new URL("/admin/reports", request.url));
     }
     if (path.startsWith("/admin/users") && user.role !== "owner") {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));

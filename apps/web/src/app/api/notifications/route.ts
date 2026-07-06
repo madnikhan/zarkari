@@ -4,11 +4,24 @@ import { markAllNotificationsRead } from "@/lib/data/actions";
 import { getSession } from "@/lib/auth/session";
 import { isDbConfigured } from "@/lib/db";
 import { markNotificationReadDb } from "@/lib/db/notifications";
+import { getBridalOrderById } from "@/lib/data";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const notifications = await getNotifications();
+
+  if (session.role === "supplier") {
+    const notifications = await getNotifications(false, session.id);
+    const supplierScoped = [];
+    for (const n of notifications) {
+      if (!n.orderId) continue;
+      const order = await getBridalOrderById(n.orderId);
+      if (order?.supplierId === session.supplierId) supplierScoped.push(n);
+    }
+    return NextResponse.json({ notifications: supplierScoped });
+  }
+
+  const notifications = await getNotifications(false, session.id);
   return NextResponse.json({ notifications });
 }
 
@@ -25,6 +38,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  markAllNotificationsRead();
+  markAllNotificationsRead(session.id);
   return NextResponse.json({ ok: true });
 }

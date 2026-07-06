@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import type { CashDirection, CashTransactionType } from "@/lib/db/cash-ledger";
 import { CASH_TYPE_LABELS, CASH_IN_TYPES, CASH_OUT_TYPES } from "@/lib/cash/labels";
 import { formatPrice } from "@/lib/utils";
+import { GbpPkrConverter } from "@/components/admin/suppliers/GbpPkrConverter";
 
 interface PayableOrder {
   id: string;
@@ -14,6 +15,11 @@ interface PayableOrder {
   remainingBalance: string;
   depositPaid: string;
   totalPrice: string;
+}
+
+interface SupplierOption {
+  id: string;
+  name: string;
 }
 
 interface Props {
@@ -39,6 +45,10 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
   const [payableOrders, setPayableOrders] = useState<PayableOrder[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [supplierId, setSupplierId] = useState("");
+  const [amountPkr, setAmountPkr] = useState("");
+  const [exchangeRate, setExchangeRate] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -49,6 +59,9 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
     setAmount("");
     setMethod("cash");
     setOrderId("");
+    setSupplierId("");
+    setAmountPkr("");
+    setExchangeRate("");
     setReference("");
     setDescription("");
     setError("");
@@ -62,18 +75,28 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       .then((d) => setPayableOrders(d.orders ?? []))
       .catch(() => setPayableOrders([]))
       .finally(() => setLoadingOrders(false));
+    fetch("/api/suppliers")
+      .then((r) => r.json())
+      .then((d) => setSuppliers(d.suppliers ?? []))
+      .catch(() => setSuppliers([]));
   }, [open]);
 
   if (!open) return null;
 
   const types = direction === "in" ? CASH_IN_TYPES : CASH_OUT_TYPES;
   const showOrderPicker = needsOrderPicker(type);
+  const showSupplierPicker = type === "supplier_payment";
   const selectedOrder = payableOrders.find((o) => o.id === orderId);
 
   function handleTypeChange(next: CashTransactionType) {
     setType(next);
     if (!needsOrderPicker(next)) {
       setOrderId("");
+    }
+    if (next !== "supplier_payment") {
+      setSupplierId("");
+      setAmountPkr("");
+      setExchangeRate("");
     }
   }
 
@@ -100,6 +123,12 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
     try {
       if (showOrderPicker && !orderId) {
         throw new Error("Please select an order / invoice number");
+      }
+      if (showSupplierPicker && !supplierId) {
+        throw new Error("Please select a supplier");
+      }
+      if (!amount || parseFloat(amount) <= 0) {
+        throw new Error("Please enter an amount");
       }
 
       if ((type === "order_deposit" || type === "order_collection") && orderId) {
@@ -130,6 +159,9 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             description: description || undefined,
             businessDate: date,
             orderId: orderId || undefined,
+            supplierId: supplierId || undefined,
+            amountPkr: showSupplierPicker ? amountPkr || undefined : undefined,
+            exchangeRate: showSupplierPicker ? exchangeRate || undefined : undefined,
           }),
         });
         const data = await res.json();
@@ -196,7 +228,38 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {showSupplierPicker && (
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Supplier</label>
+              <select
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                required
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Select supplier…</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {showSupplierPicker && (
+            <GbpPkrConverter
+              amountGbp={amount}
+              amountPkr={amountPkr}
+              exchangeRate={exchangeRate}
+              onGbpChange={setAmount}
+              onPkrChange={setAmountPkr}
+              onRateChange={setExchangeRate}
+            />
+          )}
+
+          <div className={showSupplierPicker ? "" : "grid grid-cols-2 gap-3"}>
+            {!showSupplierPicker && (
             <div>
               <label className="text-xs text-slate-500 uppercase">Amount (£)</label>
               <input
@@ -218,7 +281,8 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
                 </button>
               )}
             </div>
-            <div>
+            )}
+            <div className={showSupplierPicker ? "w-full" : ""}>
               <label className="text-xs text-slate-500 uppercase">Method</label>
               <select
                 value={method}

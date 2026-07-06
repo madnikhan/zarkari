@@ -414,6 +414,17 @@ export async function supplierComplete(
     performedByRole: "supplier",
   });
   notify("Supplier completed order", order.orderNumber, orderId);
+  if (order.supplierId) {
+    const { addSupplierLedgerEntry } = await import("@/lib/supplier-ledger/service");
+    await addSupplierLedgerEntry({
+      supplierId: order.supplierId,
+      type: "bill",
+      orderId,
+      billNumber: input.billNumber,
+      description: `Order ${order.orderNumber} — Bill ${input.billNumber}`,
+      businessDate: input.deliveryDate?.slice(0, 10),
+    });
+  }
   return order;
 }
 
@@ -467,13 +478,13 @@ export async function addOrderFile(orderId: string, category: string, fileName: 
   }
 }
 
-export function markAllNotificationsRead() {
+export function markAllNotificationsRead(userId?: string) {
   demoNotifications.forEach((n) => {
-    n.read = true;
+    if (!userId || n.userId === userId) n.read = true;
   });
   if (isDbConfigured()) {
     import("@/lib/db/notifications")
-      .then((m) => m.markAllNotificationsReadDb())
+      .then((m) => m.markAllNotificationsReadDb(userId))
       .catch(console.error);
   }
 }
