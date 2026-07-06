@@ -1,9 +1,30 @@
 "use client";
 
 import type { UploadProgressState } from "@/lib/upload/client";
+import { formatBytes, formatSpeed } from "@/lib/upload/upload-speed";
 
 interface Props {
   state: UploadProgressState | null;
+}
+
+function formatEta(seconds: number): string {
+  if (seconds < 60) return `~${seconds}s left`;
+  const mins = Math.ceil(seconds / 60);
+  return `~${mins}m left`;
+}
+
+function formatTransferDetail(state: UploadProgressState): string | null {
+  if (state.status === "done" || state.status === "processing") return null;
+  if (state.bytesTotal == null || state.bytesLoaded == null) return null;
+
+  const parts = [`${formatBytes(state.bytesLoaded)} / ${formatBytes(state.bytesTotal)}`];
+  if (state.speedBps != null && state.speedBps > 0) {
+    parts.push(formatSpeed(state.speedBps));
+  }
+  if (state.etaSec != null && state.etaSec > 0) {
+    parts.push(formatEta(state.etaSec));
+  }
+  return parts.join(" · ");
 }
 
 export function UploadProgressBar({ state }: Props) {
@@ -19,6 +40,7 @@ export function UploadProgressBar({ state }: Props) {
   }
 
   const pct = Math.max(0, Math.min(100, state.progress));
+  const transferDetail = formatTransferDetail(state);
 
   return (
     <div className="space-y-1.5">
@@ -34,6 +56,9 @@ export function UploadProgressBar({ state }: Props) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      {transferDetail && (
+        <p className="text-xs text-slate-500">{transferDetail}</p>
+      )}
       {state.status === "done" && (
         <p className="text-xs text-emerald-600">Upload complete</p>
       )}

@@ -8,7 +8,13 @@ Large video and file uploads send data **directly from the browser to Cloudflare
 
 Small files (≤ 4 MB) use server upload (`POST /api/upload`) and do **not** need CORS.
 
-Videos and large files (> 4 MB) use a **single presigned PUT** from the browser to R2 (`POST /api/upload/presign` → PUT → `POST /api/upload/complete`). One PUT per file — not multipart chunks.
+## Upload paths by file size
+
+| Size | Path |
+|------|------|
+| ≤ 4 MB | Server upload (`POST /api/upload`) — no CORS |
+| 4–10 MB video | Single presigned PUT (`/api/upload/presign` → PUT → `/api/upload/complete`) |
+| > 10 MB video | Parallel multipart (up to 4 concurrent 5 MB PUTs to R2) |
 
 ## Configure CORS in Cloudflare
 
@@ -34,16 +40,16 @@ Videos and large files (> 4 MB) use a **single presigned PUT** from the browser 
 
 4. Save. Changes apply immediately — no Vercel redeploy required.
 
-### Why `ExposeHeaders: ["ETag"]` is included
+### Why `ExposeHeaders: ["ETag"]` matters
 
-`ETag` is optional for single PUT uploads but recommended if you use multipart APIs elsewhere. Keep it in the policy for compatibility.
+Videos over 10 MB use parallel multipart uploads. Each part reads the `ETag` response header after PUT. If `ETag` is not exposed, multipart uploads fail even when CORS origins are correct.
 
 ## Verify
 
 1. Hard-refresh `https://www.zarkari.co.uk/admin/orders/new`
-2. Upload a `.MOV` or `.MP4` larger than 5 MB
-3. In browser DevTools → **Network**, find the `PUT` to `r2.cloudflarestorage.com`
-4. Expect **200** and an `ETag` response header
+2. Upload a `.MOV` or `.MP4` larger than 10 MB
+3. In browser DevTools → **Network**, find multiple `PUT` requests to `r2.cloudflarestorage.com` (up to 4 in flight)
+4. Expect **200** and an `ETag` response header on each part
 
 ## Troubleshooting
 
@@ -53,7 +59,10 @@ Videos and large files (> 4 MB) use a **single presigned PUT** from the browser 
 | Upload OK but "ETag missing" | Add `ETag` to `ExposeHeaders` |
 | Works locally, fails on production | Ensure `https://www.zarkari.co.uk` is in `AllowedOrigins` |
 | Files ≤ 4 MB fail | Check `/api/upload` and R2 credentials on Vercel, not CORS |
-| Files > 5 MB fail after CORS fix | Confirm presigned URL returns 200; check R2 API token permissions |
+| Files > 10 MB fail after CORS fix | Confirm presigned part URLs return 200; check R2 API token permissions |
+| Upload very slow (10+ min for 25 MB) | Check upload speed in progress bar; turn off VPN; home upload may be ~30–40 KB/s |
+
+iPhone `.MOV` files are often large (high bitrate) even for short clips — 25 MB for 9 seconds is normal. Slow uploads are usually network bandwidth, not the app.
 
 ## Related env vars
 
