@@ -2,11 +2,13 @@
 
 Large video and file uploads send data **directly from the browser to Cloudflare R2** using presigned URLs. Without a CORS policy on the bucket, the browser blocks these requests and you may see:
 
-- `Upload part 1 failed — check connection`
+- `Upload blocked by storage CORS`
 - `CORS header 'Access-Control-Allow-Origin' missing`
 - Status `403` on requests to `*.r2.cloudflarestorage.com`
 
 Small files (≤ 4 MB) use server upload (`POST /api/upload`) and do **not** need CORS.
+
+Videos and large files (> 4 MB) use a **single presigned PUT** from the browser to R2 (`POST /api/upload/presign` → PUT → `POST /api/upload/complete`). One PUT per file — not multipart chunks.
 
 ## Configure CORS in Cloudflare
 
@@ -32,9 +34,9 @@ Small files (≤ 4 MB) use server upload (`POST /api/upload`) and do **not** nee
 
 4. Save. Changes apply immediately — no Vercel redeploy required.
 
-### Why `ExposeHeaders: ["ETag"]` matters
+### Why `ExposeHeaders: ["ETag"]` is included
 
-Multipart video uploads read the `ETag` response header after each part. If `ETag` is not exposed, uploads can fail even when CORS origins are correct.
+`ETag` is optional for single PUT uploads but recommended if you use multipart APIs elsewhere. Keep it in the policy for compatibility.
 
 ## Verify
 
