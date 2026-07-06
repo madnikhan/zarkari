@@ -2,18 +2,24 @@ import {
   MAX_DIRECT_UPLOAD_BYTES,
   MAX_SERVER_UPLOAD_BYTES,
   MULTIPART_CHUNK_BYTES,
+  MULTIPART_SLOW_CONCURRENCY,
   MULTIPART_UPLOAD_CONCURRENCY,
   PARALLEL_MULTIPART_THRESHOLD_BYTES,
+  SLOW_UPLOAD_THRESHOLD_BPS,
+  UPLOAD_PART_MAX_RETRIES,
+  UPLOAD_PART_RETRY_DELAYS_MS,
+  UPLOAD_SINGLE_PUT_TIMEOUT_MS,
+  ADAPTIVE_SPEED_CHECK_MS,
+  partUploadTimeoutMs,
 } from "./constants";
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 import { parseJsonResponse, parseXhrJson } from "./parse-json";
-import { UploadSpeedTracker } from "./upload-speed";
+import { formatBytes, UploadSpeedTracker } from "./upload-speed";
 
 const CORS_ERROR_MESSAGE =
   "Upload blocked by storage CORS. Configure R2 CORS for this site (see docs/r2-cors-setup.md).";
 const ETAG_ERROR_MESSAGE =
   "Upload succeeded but ETag missing — add ETag to R2 CORS ExposeHeaders.";
-const UPLOAD_PUT_TIMEOUT_MS = 15 * 60 * 1000;
 
 export type UploadProgressStatus = "uploading" | "processing" | "done" | "error";
 
@@ -37,6 +43,40 @@ export interface UploadResult {
   keepLocal?: boolean;
 }
 
+class UploadConcurrencyLimiter {
+  private max: number;
+  private active = 0;
+  private waiters: (() => void)[] = [];
+
+  constructor(initialMax: number) {
+    this.max = initialMax;
+  }
+
+  setMax(n: number) {
+    this.max = Math.max(1, n);
+    while (this.active < this.max && this.waiters.length > 0) {
+      this.waiters.shift()?.();
+    }
+  }
+
+  async acquire(): Promise<void> {
+    while (this.active >= this.max) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+    this.active++;
+  }
+
+  release() {
+    this.active--;
+    const next = this.waiters.shift();
+    if (next) next();
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function shouldUseDirectUpload(file: File): boolean {
   if (isVideoFile(file)) return false;
   if (file.type.startsWith("audio/") && file.size <= MAX_SERVER_UPLOAD_BYTES) return false;
@@ -52,6 +92,21 @@ function rejectAudioPlaceholder(url: string | undefined, file: File): void {
   if (!url || url.endsWith(".png") || url.includes("/catalog/guldaan/")) {
     throw new Error("Voice note upload returned an invalid audio URL");
   }
+}
+
+function isRetryableUploadError(err: Error): boolean {
+  const msg = err.message;
+  if (msg.includes("storage CORS") || msg.includes("ETag missing")) return false;
+  return true;
+}
+
+function formatPartTimeoutError(
+  partNumber: number,
+  totalParts: number,
+  bytesLoaded: number,
+  bytesTotal: number
+): string {
+  return `Upload timed out on part ${partNumber}/${totalParts} at ${formatBytes(bytesLoaded)} / ${formatBytes(bytesTotal)}. Try turning off VPN, using Wi‑Fi, or a smaller file.`;
 }
 
 function buildProgressState(
@@ -77,13 +132,14 @@ function putWithProgress(
   url: string,
   body: Blob | File,
   contentType: string,
+  timeoutMs: number,
   onBytesProgress?: (loaded: number, total: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", contentType);
-    xhr.timeout = UPLOAD_PUT_TIMEOUT_MS;
+    xhr.timeout = timeoutMs;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onBytesProgress) {
         onBytesProgress(e.loaded, e.total);
@@ -170,28 +226,31 @@ function postFormWithStagedProgress(
   });
 }
 
-async function uploadPartWithProgress(
-  uploadId: string,
-  key: string,
-  partNumber: number,
-  chunk: Blob,
-  onPartProgress: (partNumber: number, loaded: number) => void
-): Promise<{ partNumber: number; etag: string }> {
-  const presignRes = await fetch("/api/upload/multipart/presign-part", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uploadId, key, partNumber }),
-  });
-  const presignData = await parseJsonResponse<{ uploadUrl?: string; error?: string }>(presignRes);
-  if (!presignRes.ok) throw new Error(presignData.error ?? `Could not presign part ${partNumber}`);
+async function abortMultipartUploadClient(uploadId: string, key: string): Promise<void> {
+  try {
+    await fetch("/api/upload/multipart/abort", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uploadId, key }),
+    });
+  } catch {
+    // Best-effort cleanup
+  }
+}
 
-  const etag = await new Promise<string>((resolve, reject) => {
+async function putPartChunk(
+  uploadUrl: string,
+  chunk: Blob,
+  timeoutMs: number,
+  onPartProgress: (loaded: number) => void
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("PUT", presignData.uploadUrl!);
-    xhr.timeout = UPLOAD_PUT_TIMEOUT_MS;
+    xhr.open("PUT", uploadUrl);
+    xhr.timeout = timeoutMs;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        onPartProgress(partNumber, e.loaded);
+        onPartProgress(e.loaded);
       }
     };
     xhr.onload = () => {
@@ -208,16 +267,77 @@ async function uploadPartWithProgress(
         reject(new Error(CORS_ERROR_MESSAGE));
         return;
       }
-      reject(new Error(`Upload part ${partNumber} failed (${xhr.status})`));
+      reject(new Error(`Upload part failed (${xhr.status})`));
     };
     xhr.onerror = () => reject(new Error(CORS_ERROR_MESSAGE));
-    xhr.ontimeout = () =>
-      reject(new Error("Upload timed out — check your connection and try again"));
+    xhr.ontimeout = () => reject(new Error("__PART_TIMEOUT__"));
     xhr.send(chunk);
+  });
+}
+
+async function uploadPartOnce(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: Blob,
+  onPartProgress: (partNumber: number, loaded: number) => void
+): Promise<{ partNumber: number; etag: string }> {
+  const presignRes = await fetch("/api/upload/multipart/presign-part", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadId, key, partNumber }),
+  });
+  const presignData = await parseJsonResponse<{ uploadUrl?: string; error?: string }>(presignRes);
+  if (!presignRes.ok) throw new Error(presignData.error ?? `Could not presign part ${partNumber}`);
+
+  const timeoutMs = partUploadTimeoutMs(chunk.size);
+  const etag = await putPartChunk(presignData.uploadUrl!, chunk, timeoutMs, (loaded) => {
+    onPartProgress(partNumber, loaded);
   });
 
   onPartProgress(partNumber, chunk.size);
   return { partNumber, etag };
+}
+
+async function uploadPartWithRetry(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  totalParts: number,
+  chunk: Blob,
+  fileSize: number,
+  getBytesLoaded: () => number,
+  onPartProgress: (partNumber: number, loaded: number) => void,
+  onRetry?: (partNumber: number, attempt: number, totalParts: number) => void
+): Promise<{ partNumber: number; etag: string }> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < UPLOAD_PART_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = UPLOAD_PART_RETRY_DELAYS_MS[attempt - 1] ?? 10000;
+      onRetry?.(partNumber, attempt + 1, totalParts);
+      await sleep(delay);
+      onPartProgress(partNumber, 0);
+    }
+
+    try {
+      return await uploadPartOnce(uploadId, key, partNumber, chunk, onPartProgress);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (error.message === "__PART_TIMEOUT__") {
+        lastError = new Error(
+          formatPartTimeoutError(partNumber, totalParts, getBytesLoaded(), fileSize)
+        );
+      } else {
+        lastError = error;
+      }
+      if (!isRetryableUploadError(lastError) || attempt === UPLOAD_PART_MAX_RETRIES - 1) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Upload part ${partNumber} failed`);
 }
 
 async function uploadVideoViaParallelMultipart(
@@ -228,9 +348,7 @@ async function uploadVideoViaParallelMultipart(
   onProgress?: ProgressCallback
 ): Promise<UploadResult> {
   const speedTracker = new UploadSpeedTracker();
-  onProgress?.(
-    buildProgressState(label, "uploading", 5, 0, file.size, speedTracker)
-  );
+  onProgress?.(buildProgressState(label, "uploading", 5, 0, file.size, speedTracker));
 
   const initRes = await fetch("/api/upload/multipart/init", {
     method: "POST",
@@ -272,61 +390,117 @@ async function uploadVideoViaParallelMultipart(
   const partLoaded = new Map<number, number>();
   const completedParts: { partNumber: number; etag: string }[] = [];
   const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
+  const limiter = new UploadConcurrencyLimiter(
+    Math.min(MULTIPART_UPLOAD_CONCURRENCY, totalParts)
+  );
 
-  function reportAggregatedProgress() {
+  function aggregateBytesLoaded(): number {
     let bytesLoaded = 0;
     for (const loaded of partLoaded.values()) {
       bytesLoaded += loaded;
     }
+    return bytesLoaded;
+  }
+
+  function reportAggregatedProgress(progressLabel = label) {
+    const bytesLoaded = aggregateBytesLoaded();
     const progress = Math.min(90, Math.round(5 + (bytesLoaded / file.size) * 85));
-    onProgress?.(buildProgressState(label, "uploading", progress, bytesLoaded, file.size, speedTracker));
+    onProgress?.(
+      buildProgressState(progressLabel, "uploading", progress, bytesLoaded, file.size, speedTracker)
+    );
   }
 
-  async function worker() {
-    while (queue.length > 0) {
-      const partNumber = queue.shift();
-      if (partNumber == null) break;
-      const start = (partNumber - 1) * MULTIPART_CHUNK_BYTES;
-      const chunk = file.slice(start, start + MULTIPART_CHUNK_BYTES);
-      partLoaded.set(partNumber, 0);
-
-      const part = await uploadPartWithProgress(uploadId, key, partNumber, chunk, (pn, loaded) => {
-        partLoaded.set(pn, loaded);
-        reportAggregatedProgress();
-      });
-
-      completedParts.push(part);
+  const speedCheckTimer = setTimeout(() => {
+    const sample = speedTracker.sample(aggregateBytesLoaded(), file.size);
+    if (sample.speedBps != null && sample.speedBps < SLOW_UPLOAD_THRESHOLD_BPS) {
+      limiter.setMax(MULTIPART_SLOW_CONCURRENCY);
     }
+  }, ADAPTIVE_SPEED_CHECK_MS);
+
+  try {
+    async function worker() {
+      while (queue.length > 0) {
+        const partNumber = queue.shift();
+        if (partNumber == null) break;
+
+        await limiter.acquire();
+        try {
+          const start = (partNumber - 1) * MULTIPART_CHUNK_BYTES;
+          const chunk = file.slice(start, start + MULTIPART_CHUNK_BYTES);
+          partLoaded.set(partNumber, 0);
+
+          const part = await uploadPartWithRetry(
+            uploadId,
+            key,
+            partNumber,
+            totalParts,
+            chunk,
+            file.size,
+            aggregateBytesLoaded,
+            (pn, loaded) => {
+              partLoaded.set(pn, loaded);
+              reportAggregatedProgress();
+            },
+            (pn, attempt, total) => {
+              reportAggregatedProgress(`Retrying part ${pn}/${total} (attempt ${attempt})…`);
+            }
+          );
+
+          completedParts.push(part);
+        } finally {
+          limiter.release();
+        }
+      }
+    }
+
+    const workerCount = Math.min(MULTIPART_UPLOAD_CONCURRENCY, totalParts);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+    onProgress?.({
+      label: "Processing upload…",
+      progress: 92,
+      status: "processing",
+      bytesLoaded: file.size,
+      bytesTotal: file.size,
+    });
+
+    const completeRes = await fetch("/api/upload/multipart/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId,
+        key,
+        fileName: initData.fileName ?? file.name,
+        contentType: mimeType,
+        category,
+        publicUrl,
+        parts: completedParts,
+      }),
+    });
+    const completeData = await parseJsonResponse<{ url?: string; fileName?: string; error?: string }>(
+      completeRes
+    );
+    if (!completeRes.ok) throw new Error(completeData.error ?? `Upload failed (${completeRes.status})`);
+    if (!completeData.url) throw new Error("Upload failed — no URL returned");
+
+    onProgress?.({
+      label: "Upload complete",
+      progress: 100,
+      status: "done",
+      bytesLoaded: file.size,
+      bytesTotal: file.size,
+    });
+    return {
+      url: completeData.url,
+      fileName: completeData.fileName ?? file.name,
+      mimeType,
+    };
+  } catch (err) {
+    await abortMultipartUploadClient(uploadId, key);
+    throw err;
+  } finally {
+    clearTimeout(speedCheckTimer);
   }
-
-  const workerCount = Math.min(MULTIPART_UPLOAD_CONCURRENCY, totalParts);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-
-  onProgress?.({ label: "Processing upload…", progress: 92, status: "processing", bytesLoaded: file.size, bytesTotal: file.size });
-
-  const completeRes = await fetch("/api/upload/multipart/complete", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      uploadId,
-      key,
-      fileName: initData.fileName ?? file.name,
-      contentType: mimeType,
-      category,
-      publicUrl,
-      parts: completedParts,
-    }),
-  });
-  const completeData = await parseJsonResponse<{ url?: string; fileName?: string; error?: string }>(completeRes);
-  if (!completeRes.ok) throw new Error(completeData.error ?? `Upload failed (${completeRes.status})`);
-  if (!completeData.url) throw new Error("Upload failed — no URL returned");
-
-  onProgress?.({ label: "Upload complete", progress: 100, status: "done", bytesLoaded: file.size, bytesTotal: file.size });
-  return {
-    url: completeData.url,
-    fileName: completeData.fileName ?? file.name,
-    mimeType,
-  };
 }
 
 async function uploadViaPresignedPut(
@@ -372,12 +546,24 @@ async function uploadViaPresignedPut(
     throw new Error(presignData.error ?? "Could not start upload");
   }
 
-  await putWithProgress(presignData.uploadUrl, file, mimeType, (loaded, total) => {
-    const progress = Math.min(90, Math.round((loaded / total) * 90));
-    onProgress?.(buildProgressState(label, "uploading", progress, loaded, total, speedTracker));
-  });
+  await putWithProgress(
+    presignData.uploadUrl,
+    file,
+    mimeType,
+    UPLOAD_SINGLE_PUT_TIMEOUT_MS,
+    (loaded, total) => {
+      const progress = Math.min(90, Math.round((loaded / total) * 90));
+      onProgress?.(buildProgressState(label, "uploading", progress, loaded, total, speedTracker));
+    }
+  );
 
-  onProgress?.({ label: "Processing upload…", progress: 92, status: "processing", bytesLoaded: file.size, bytesTotal: file.size });
+  onProgress?.({
+    label: "Processing upload…",
+    progress: 92,
+    status: "processing",
+    bytesLoaded: file.size,
+    bytesTotal: file.size,
+  });
 
   const completeRes = await fetch("/api/upload/complete", {
     method: "POST",
@@ -395,7 +581,13 @@ async function uploadViaPresignedPut(
   if (!completeData.url) throw new Error("Upload failed — no URL returned");
 
   rejectAudioPlaceholder(completeData.url, file);
-  onProgress?.({ label: "Upload complete", progress: 100, status: "done", bytesLoaded: file.size, bytesTotal: file.size });
+  onProgress?.({
+    label: "Upload complete",
+    progress: 100,
+    status: "done",
+    bytesLoaded: file.size,
+    bytesTotal: file.size,
+  });
   return {
     url: completeData.url,
     fileName: completeData.fileName ?? file.name,

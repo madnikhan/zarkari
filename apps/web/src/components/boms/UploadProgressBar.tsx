@@ -5,6 +5,7 @@ import { formatBytes, formatSpeed } from "@/lib/upload/upload-speed";
 
 interface Props {
   state: UploadProgressState | null;
+  onRetry?: () => void;
 }
 
 function formatEta(seconds: number): string {
@@ -27,12 +28,21 @@ function formatTransferDetail(state: UploadProgressState): string | null {
   return parts.join(" · ");
 }
 
-export function UploadProgressBar({ state }: Props) {
+export function UploadProgressBar({ state, onRetry }: Props) {
   if (!state || state.status === "error") {
     if (state?.status === "error") {
       return (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {state.error ?? "Upload failed"}
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 space-y-2">
+          <p className="text-xs text-red-700">{state.error ?? "Upload failed"}</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-xs font-medium text-[#4C3BCF] hover:underline"
+            >
+              Retry upload
+            </button>
+          )}
         </div>
       );
     }
@@ -56,9 +66,7 @@ export function UploadProgressBar({ state }: Props) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      {transferDetail && (
-        <p className="text-xs text-slate-500">{transferDetail}</p>
-      )}
+      {transferDetail && <p className="text-xs text-slate-500">{transferDetail}</p>}
       {state.status === "done" && (
         <p className="text-xs text-emerald-600">Upload complete</p>
       )}

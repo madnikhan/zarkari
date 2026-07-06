@@ -39,6 +39,7 @@ export function MediaUploadZone({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<UploadProgressState | null>(null);
+  const [retryFiles, setRetryFiles] = useState<File[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,11 +55,14 @@ export function MediaUploadZone({
     setUploading(true);
     setError("");
     setProgress(null);
+    setRetryFiles([]);
     const uploaded: UploadedFile[] = [];
+    let failedAt: File[] = selected;
 
     try {
       for (const raw of selected) {
         const file = raw.type ? raw : new File([raw], raw.name, { type: resolveFileMime(raw) });
+        failedAt = [file];
         if (isVideoUpload(file)) {
           await assertVideoDurationAllowed(file);
         }
@@ -71,12 +75,20 @@ export function MediaUploadZone({
       const next = [...files, ...uploaded];
       setFiles(next);
       onUploaded?.(next);
+      setRetryFiles([]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
+      setRetryFiles(failedAt);
       setProgress({ label: "Upload failed", progress: 0, status: "error", error: message });
     } finally {
       setUploading(false);
+    }
+  }
+
+  function handleRetry() {
+    if (retryFiles.length > 0) {
+      void uploadFiles(retryFiles);
     }
   }
 
@@ -156,7 +168,7 @@ export function MediaUploadZone({
         <p className="text-xs text-slate-400">{sizeHint}</p>
       )}
 
-      <UploadProgressBar state={progress} />
+      <UploadProgressBar state={progress} onRetry={retryFiles.length > 0 ? handleRetry : undefined} />
       {error && progress?.status !== "error" && <p className="text-xs text-red-600">{error}</p>}
 
       {files.length > 0 && (
