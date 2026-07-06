@@ -2,6 +2,11 @@ import { MAX_DIRECT_UPLOAD_BYTES, MAX_SERVER_UPLOAD_BYTES, MULTIPART_CHUNK_BYTES
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 import { parseJsonResponse, parseXhrJson } from "./parse-json";
 
+const CORS_ERROR_MESSAGE =
+  "Upload blocked by storage CORS. Configure R2 CORS for this site (see docs/r2-cors-setup.md).";
+const ETAG_ERROR_MESSAGE =
+  "Upload succeeded but ETag missing — add ETag to R2 CORS ExposeHeaders.";
+
 export type UploadProgressStatus = "uploading" | "processing" | "done" | "error";
 
 export interface UploadProgressState {
@@ -56,7 +61,7 @@ function putWithProgress(
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`Upload failed (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
+    xhr.onerror = () => reject(new Error(CORS_ERROR_MESSAGE));
     xhr.send(body);
   });
 }
@@ -125,6 +130,25 @@ function postFormWithStagedProgress(
   });
 }
 
+async function uploadPartChunkViaServer(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: Blob
+): Promise<{ partNumber: number; etag: string }> {
+  const form = new FormData();
+  form.append("uploadId", uploadId);
+  form.append("key", key);
+  form.append("partNumber", String(partNumber));
+  form.append("file", chunk, `part-${partNumber}`);
+
+  const res = await fetch("/api/upload/multipart/part", { method: "POST", body: form });
+  const data = await parseJsonResponse<{ etag?: string; error?: string }>(res);
+  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+  if (!data.etag) throw new Error("Upload part failed — no etag returned");
+  return { partNumber, etag: data.etag };
+}
+
 async function uploadPartChunkDirect(
   uploadId: string,
   key: string,
@@ -139,26 +163,35 @@ async function uploadPartChunkDirect(
   const presignData = await parseJsonResponse<{ uploadUrl?: string; error?: string }>(presignRes);
   if (!presignRes.ok) throw new Error(presignData.error ?? `Could not presign part ${partNumber}`);
 
-  const etag = await new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", presignData.uploadUrl!);
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const raw = xhr.getResponseHeader("ETag") ?? xhr.getResponseHeader("etag");
-        if (!raw) {
-          reject(new Error(`Upload part ${partNumber} failed — no ETag`));
-          return;
+  try {
+    const etag = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", presignData.uploadUrl!);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const raw = xhr.getResponseHeader("ETag") ?? xhr.getResponseHeader("etag");
+          if (!raw) {
+            reject(new Error(ETAG_ERROR_MESSAGE));
+            return;
+          }
+          resolve(raw.replace(/"/g, ""));
+        } else if (xhr.status === 403 || xhr.status === 0) {
+          reject(new Error(CORS_ERROR_MESSAGE));
+        } else {
+          reject(new Error(`Upload part ${partNumber} failed (${xhr.status})`));
         }
-        resolve(raw.replace(/"/g, ""));
-      } else {
-        reject(new Error(`Upload part ${partNumber} failed (${xhr.status})`));
-      }
-    };
-    xhr.onerror = () => reject(new Error(`Upload part ${partNumber} failed — check connection`));
-    xhr.send(chunk);
-  });
+      };
+      xhr.onerror = () => reject(new Error(CORS_ERROR_MESSAGE));
+      xhr.send(chunk);
+    });
 
-  return { partNumber, etag };
+    return { partNumber, etag };
+  } catch (err) {
+    if (chunk.size <= MAX_SERVER_UPLOAD_BYTES) {
+      return uploadPartChunkViaServer(uploadId, key, partNumber, chunk);
+    }
+    throw err;
+  }
 }
 
 async function uploadPartChunk(
