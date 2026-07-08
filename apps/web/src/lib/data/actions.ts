@@ -62,7 +62,8 @@ async function syncOrderPatch(
   orderId: string,
   patch: Partial<{
     status: BridalStatus;
-    filesUnlockedAt: Date;
+    filesUnlockedAt: Date | null;
+    lastSupplierActionAt: Date | null;
     supplierLocked: boolean;
     remainingBalance: string;
     depositPaid: string;
@@ -213,12 +214,68 @@ export async function sendToSupplier(orderId: string, byName?: string) {
   return order;
 }
 
+function within24Hours(iso?: string) {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t <= 24 * 60 * 60 * 1000;
+}
+
+export async function supplierRevertAccept(orderId: string, reason: string, supplierName?: string) {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+  if (order.status !== "order_received") throw new Error("Order cannot be reverted in current status");
+  if (!within24Hours(order.lastSupplierActionAt)) throw new Error("You can only revert within 24 hours");
+
+  order.status = "sent_to_supplier";
+  order.filesUnlockedAt = undefined;
+  order.lastSupplierActionAt = new Date().toISOString();
+  await syncOrderPatch(orderId, {
+    status: "sent_to_supplier",
+    filesUnlockedAt: null,
+    lastSupplierActionAt: new Date(),
+  });
+  await syncTimeline(orderId, "stage_update", {
+    comment: `Supplier reverted acceptance: ${reason}`,
+    performedByName: supplierName,
+    performedByRole: "supplier",
+  });
+  return order;
+}
+
+export async function supplierRevertStage(
+  orderId: string,
+  prevStage: BridalStatus,
+  reason: string,
+  supplierName?: string
+) {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+  if (!within24Hours(order.lastSupplierActionAt)) throw new Error("You can only revert within 24 hours");
+  if (order.supplierLocked) throw new Error("Order is locked");
+
+  order.status = prevStage;
+  order.lastSupplierActionAt = new Date().toISOString();
+  await syncOrderPatch(orderId, { status: prevStage, lastSupplierActionAt: new Date() });
+  await syncTimeline(orderId, "stage_update", {
+    comment: `Supplier reverted stage to ${prevStage.replace(/_/g, " ")}: ${reason}`,
+    performedByName: supplierName,
+    performedByRole: "supplier",
+  });
+  return order;
+}
+
 export async function supplierAccept(orderId: string, supplierName?: string) {
   const order = await resolveOrder(orderId);
   if (!order) return null;
   order.status = "order_received";
   order.filesUnlockedAt = new Date().toISOString();
-  await syncOrderPatch(orderId, { status: "order_received", filesUnlockedAt: new Date() });
+  order.lastSupplierActionAt = new Date().toISOString();
+  await syncOrderPatch(orderId, {
+    status: "order_received",
+    filesUnlockedAt: new Date(),
+    lastSupplierActionAt: new Date(),
+  });
   await syncTimeline(orderId, "accepted", { performedByName: supplierName, performedByRole: "supplier" });
   return order;
 }
@@ -236,7 +293,8 @@ export async function advanceProductionStage(orderId: string, stage: BridalStatu
   const order = await resolveOrder(orderId);
   if (!order) return null;
   order.status = stage;
-  await syncOrderPatch(orderId, { status: stage });
+  order.lastSupplierActionAt = new Date().toISOString();
+  await syncOrderPatch(orderId, { status: stage, lastSupplierActionAt: new Date() });
   await syncTimeline(orderId, "stage_update", {
     comment: stage.replace(/_/g, " "),
     performedByName: supplierName,
@@ -248,13 +306,26 @@ export async function advanceProductionStage(orderId: string, stage: BridalStatu
 export async function markReceivedAtShop(orderId: string, byName?: string) {
   const order = await resolveOrder(orderId);
   if (!order) return null;
-  if (order.status !== "shipping" && order.status !== "delivered_to_shop") {
-    throw new Error("Order can only be marked received when shipping or delivered to shop");
+  if (order.status !== "delivered_to_shop") {
+    throw new Error("Order can only be marked ready for collection after it arrives in the UK");
   }
   order.status = "ready_for_collection";
   await syncOrderPatch(orderId, { status: "ready_for_collection" });
-  await syncTimeline(orderId, "received_at_shop", { performedByName: byName, performedByRole: "staff" });
+  await syncTimeline(orderId, "ready_for_collection", { performedByName: byName, performedByRole: "staff" });
   notify("Order ready for collection", order.orderNumber, orderId);
+  return order;
+}
+
+export async function markArrivedAtUkBoutique(orderId: string, byName?: string) {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+  if (order.status !== "shipping") {
+    throw new Error("Order can only be marked arrived in the UK when it is dispatched/shipping");
+  }
+  order.status = "delivered_to_shop";
+  await syncOrderPatch(orderId, { status: "delivered_to_shop" });
+  await syncTimeline(orderId, "received_at_shop", { performedByName: byName, performedByRole: "staff" });
+  notify("Order arrived at UK boutique", order.orderNumber, orderId);
   return order;
 }
 
@@ -387,7 +458,14 @@ export async function markCollected(
 
 export async function supplierComplete(
   orderId: string,
-  input: { deliveryDate: string; billNumber: string; courierName?: string; trackingNumber?: string; photoUrl?: string },
+  input: {
+    deliveryDate: string;
+    billNumber: string;
+    courierName?: string;
+    trackingNumber?: string;
+    manufacturingCostPkr?: string;
+    photoUrl?: string;
+  },
   supplierName?: string
 ) {
   const order = await resolveOrder(orderId);
@@ -399,17 +477,19 @@ export async function supplierComplete(
     billNumber: input.billNumber,
     courierName: input.courierName,
     trackingNumber: input.trackingNumber,
+    manufacturingCostPkr: input.manufacturingCostPkr,
   });
   if (isDbConfigured()) {
     const { addSupplierCompletionDb } = await import("@/lib/db/bridal-orders");
     await addSupplierCompletionDb(orderId, input);
   }
   if (input.photoUrl) await addOrderFile(orderId, "completion", "completion-photo.jpg", input.photoUrl);
-  order.status = "delivered_to_shop";
+  // Supplier dispatches from Pakistan; shop marks arrival in the UK later.
+  order.status = "shipping";
   order.supplierLocked = true;
-  await syncOrderPatch(orderId, { status: "delivered_to_shop", supplierLocked: true });
-  await syncTimeline(orderId, "completed", {
-    comment: `Bill ${input.billNumber}`,
+  await syncOrderPatch(orderId, { status: "shipping", supplierLocked: true });
+  await syncTimeline(orderId, "stage_update", {
+    comment: `Dispatched from Pakistan — Bill ${input.billNumber}${input.trackingNumber ? `, Tracking ${input.trackingNumber}` : ""}`,
     performedByName: supplierName,
     performedByRole: "supplier",
   });
@@ -422,6 +502,7 @@ export async function supplierComplete(
       orderId,
       billNumber: input.billNumber,
       description: `Order ${order.orderNumber} — Bill ${input.billNumber}`,
+      amountPkr: input.manufacturingCostPkr ?? "0",
       businessDate: input.deliveryDate?.slice(0, 10),
     });
   }

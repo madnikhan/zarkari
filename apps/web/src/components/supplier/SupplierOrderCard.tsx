@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { BomsActionButton } from "@/components/boms/BomsActionButton";
-import { formatPrice } from "@/lib/utils";
 
 interface Props {
   orderId: string;
   orderNumber: string;
   customerName: string;
   dressType?: string;
-  totalPrice: string;
   deliveryDate: string;
   status: string;
 }
@@ -22,7 +20,6 @@ export function SupplierOrderCard({
   orderNumber,
   customerName,
   dressType,
-  totalPrice,
   deliveryDate,
   status,
 }: Props) {
@@ -64,7 +61,6 @@ export function SupplierOrderCard({
         </div>
         <div className="text-right">
           <CountdownBadge deliveryDate={deliveryDate} />
-          <p className="text-base font-semibold text-slate-900 mt-2">{formatPrice(totalPrice)}</p>
         </div>
       </div>
 

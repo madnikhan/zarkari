@@ -4,7 +4,7 @@ import { createCargoCompany, listCargoCompanies } from "@/lib/cargo/service";
 
 export async function GET() {
   const session = await getSession();
-  if (!session || !["owner", "staff"].includes(session.role)) {
+  if (!session || !["owner", "staff", "supplier"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const companies = await listCargoCompanies();

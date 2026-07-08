@@ -23,6 +23,7 @@ export interface CashTransaction {
   method: CashPaymentMethod;
   reference?: string;
   description?: string;
+  expenseCategory?: string;
   businessDate: string;
   occurredAt: string;
   orderId?: string;
@@ -64,6 +65,7 @@ function mapTransaction(row: typeof schema.cashTransactions.$inferSelect): CashT
     method: row.method as CashPaymentMethod,
     reference: row.reference ?? undefined,
     description: row.description ?? undefined,
+    expenseCategory: row.expenseCategory ?? undefined,
     businessDate: row.businessDate,
     occurredAt: row.occurredAt.toISOString(),
     orderId: row.orderId ?? undefined,
@@ -417,6 +419,7 @@ export async function createCashTransaction(input: {
   method: CashPaymentMethod;
   reference?: string;
   description?: string;
+  expenseCategory?: string;
   businessDate?: string | Date;
   occurredAt?: Date;
   orderId?: string;
@@ -440,6 +443,7 @@ export async function createCashTransaction(input: {
       method: input.method,
       reference: input.reference ?? null,
       description: input.description ?? null,
+      expenseCategory: input.expenseCategory ?? null,
       businessDate,
       occurredAt,
       orderId: input.orderId ?? null,
@@ -579,6 +583,7 @@ export async function getCashAnalytics(input: {
       direction: schema.cashTransactions.direction,
       method: schema.cashTransactions.method,
       type: schema.cashTransactions.type,
+      expenseCategory: schema.cashTransactions.expenseCategory,
     })
     .from(schema.cashTransactions)
     .where(
@@ -607,7 +612,9 @@ export async function getCashAnalytics(input: {
     }
 
     if (row.direction === "out") {
-      expenseMap.set(row.type, (expenseMap.get(row.type) ?? 0) + amt);
+      const key =
+        row.type === "business_expense" ? (row.expenseCategory ?? row.type) : row.type;
+      expenseMap.set(key, (expenseMap.get(key) ?? 0) + amt);
     }
   }
 

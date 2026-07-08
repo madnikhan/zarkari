@@ -51,6 +51,7 @@ export const cashTransactions = pgTable("cash_transactions", {
   method: cashPaymentMethodEnum("method").notNull(),
   reference: text("reference"),
   description: text("description"),
+  expenseCategory: text("expense_category"),
   businessDate: date("business_date").notNull(),
   occurredAt: timestamp("occurred_at").notNull(),
   orderId: uuid("order_id"),

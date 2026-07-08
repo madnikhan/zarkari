@@ -34,6 +34,10 @@ export function CashTransactionTable({ title, accent, transactions, total, group
   const grouped = groupByDay ? groupTransactions(transactions) : null;
 
   function renderRow(tx: CashTransaction) {
+    const typeLabel =
+      tx.type === "business_expense" && tx.expenseCategory
+        ? `${CASH_TYPE_LABELS[tx.type]} — ${tx.expenseCategory}`
+        : CASH_TYPE_LABELS[tx.type];
     return (
       <tr
         key={tx.id}
@@ -51,7 +55,7 @@ export function CashTransactionTable({ title, accent, transactions, total, group
                 minute: "2-digit",
               })}
         </td>
-        <td className="px-3 py-2">{CASH_TYPE_LABELS[tx.type]}</td>
+        <td className="px-3 py-2">{typeLabel}</td>
         <td className="px-3 py-2 hidden sm:table-cell text-slate-600">{tx.reference ?? "—"}</td>
         <td className="px-3 py-2 text-slate-600 max-w-[140px] md:max-w-[200px] truncate underline decoration-dotted underline-offset-2">
           {tx.description ?? "—"}

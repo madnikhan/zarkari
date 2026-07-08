@@ -31,6 +31,7 @@ function mapOrder(row: typeof schema.bridalOrders.$inferSelect): BridalOrder {
     comments: row.comments ?? undefined,
     customisationNotes: row.customisationNotes ?? undefined,
     filesUnlockedAt: row.filesUnlockedAt?.toISOString(),
+    lastSupplierActionAt: row.lastSupplierActionAt?.toISOString(),
     supplierLocked: row.supplierLocked,
     createdById: row.createdById ?? undefined,
   };
@@ -776,7 +777,13 @@ export async function addCollectionDb(
 
 export async function addSupplierCompletionDb(
   orderId: string,
-  input: { deliveryDate: string; billNumber: string; courierName?: string; trackingNumber?: string }
+  input: {
+    deliveryDate: string;
+    billNumber: string;
+    courierName?: string;
+    trackingNumber?: string;
+    manufacturingCostPkr?: string;
+  }
 ): Promise<void> {
   const db = getDb();
   if (!db) return;
@@ -786,6 +793,7 @@ export async function addSupplierCompletionDb(
     billNumber: input.billNumber,
     courierName: input.courierName ?? null,
     trackingNumber: input.trackingNumber ?? null,
+    manufacturingCostPkr: input.manufacturingCostPkr ?? "0",
   });
 }
 
@@ -793,7 +801,8 @@ export async function updateBridalOrderDb(
   id: string,
   patch: Partial<{
     status: BridalStatus;
-    filesUnlockedAt: Date;
+    filesUnlockedAt: Date | null;
+    lastSupplierActionAt: Date | null;
     supplierLocked: boolean;
     remainingBalance: string;
     depositPaid: string;

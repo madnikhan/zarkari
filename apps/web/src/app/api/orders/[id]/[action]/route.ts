@@ -6,11 +6,19 @@ import {
   refundOrder,
   sendForRedesign,
   markCollected,
+  markArrivedAtUkBoutique,
   markReceivedAtShop,
 } from "@/lib/data/actions";
 import { getSession, canRefund } from "@/lib/auth/session";
 
-type Action = "send-to-supplier" | "cancel" | "refund" | "redesign" | "collect" | "receive-at-shop";
+type Action =
+  | "send-to-supplier"
+  | "cancel"
+  | "refund"
+  | "redesign"
+  | "collect"
+  | "arrived-uk"
+  | "receive-at-shop";
 
 interface Props {
   params: Promise<{ id: string; action: string }>;
@@ -23,7 +31,9 @@ export async function POST(request: Request, { params }: Props) {
   }
 
   const { id, action } = await params;
-  if (!["send-to-supplier", "cancel", "refund", "redesign", "collect", "receive-at-shop"].includes(action)) {
+  if (
+    !["send-to-supplier", "cancel", "refund", "redesign", "collect", "arrived-uk", "receive-at-shop"].includes(action)
+  ) {
     return NextResponse.json({ error: "Unknown action" }, { status: 404 });
   }
 
@@ -57,6 +67,9 @@ export async function POST(request: Request, { params }: Props) {
           amountPaid: body.amountPaid,
           alterationNotes: body.alterationNotes,
         });
+        break;
+      case "arrived-uk":
+        await markArrivedAtUkBoutique(id, session.name);
         break;
       case "receive-at-shop":
         await markReceivedAtShop(id, session.name);

@@ -40,6 +40,12 @@ export function CashTransactionDetailModal({ transaction, onClose }: Props) {
             <dt className="text-slate-400">Type</dt>
             <dd className="font-medium">{CASH_TYPE_LABELS[transaction.type]}</dd>
           </div>
+          {transaction.type === "business_expense" && transaction.expenseCategory && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-400">Category</dt>
+              <dd className="font-medium">{transaction.expenseCategory}</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4">
             <dt className="text-slate-400">Direction</dt>
             <dd className="font-medium capitalize">{transaction.direction}</dd>

@@ -46,6 +46,7 @@ export const bridalOrders = pgTable("bridal_orders", {
   comments: text("comments"),
   customisationNotes: text("customisation_notes"),
   filesUnlockedAt: timestamp("files_unlocked_at"),
+  lastSupplierActionAt: timestamp("last_supplier_action_at"),
   supplierLocked: boolean("supplier_locked").default(false).notNull(),
   createdById: uuid("created_by_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -142,6 +143,7 @@ export const supplierCompletions = pgTable("supplier_completions", {
   billNumber: text("bill_number").notNull(),
   courierName: text("courier_name"),
   trackingNumber: text("tracking_number"),
+  manufacturingCostPkr: decimal("manufacturing_cost_pkr", { precision: 14, scale: 2 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

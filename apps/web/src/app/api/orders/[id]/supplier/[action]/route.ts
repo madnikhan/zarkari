@@ -4,6 +4,8 @@ import {
   supplierReject,
   advanceProductionStage,
   supplierComplete,
+  supplierRevertAccept,
+  supplierRevertStage,
 } from "@/lib/data/actions";
 import { getBridalOrderById, getOrderFiles, getTimeline } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
@@ -20,6 +22,12 @@ function getNextProductionStage(status: BridalStatus): BridalStatus | null {
     return PRODUCTION_STAGES[idx + 1]!;
   }
   if (status === "redesign_in_progress") return "embroidery";
+  return null;
+}
+
+function getPrevProductionStage(status: BridalStatus): BridalStatus | null {
+  const idx = PRODUCTION_STAGES.indexOf(status);
+  if (idx > 0) return PRODUCTION_STAGES[idx - 1]!;
   return null;
 }
 
@@ -45,6 +53,9 @@ export async function POST(request: Request, { params }: Props) {
         }
         await supplierAccept(id, session.name);
         break;
+      case "revert-accept":
+        await supplierRevertAccept(id, body.reason ?? "Reverted", session.name);
+        break;
       case "reject":
         if (order.status !== "sent_to_supplier") {
           return NextResponse.json({ error: "Order cannot be rejected in current status" }, { status: 400 });
@@ -63,14 +74,26 @@ export async function POST(request: Request, { params }: Props) {
         await advanceProductionStage(id, requestedStage, session.name);
         break;
       }
+      case "revert-stage": {
+        if (order.supplierLocked) {
+          return NextResponse.json({ error: "Order is locked" }, { status: 400 });
+        }
+        const prev = getPrevProductionStage(order.status);
+        if (!prev) return NextResponse.json({ error: "No previous stage to revert to" }, { status: 400 });
+        await supplierRevertStage(id, prev, body.reason ?? "Reverted", session.name);
+        break;
+      }
       case "complete":
         if (order.supplierLocked) {
           return NextResponse.json({ error: "Order is locked" }, { status: 400 });
         }
-        if (order.status !== "delivered_to_shop" && order.status !== "shipping") {
+        if (order.status !== "shipping" && order.status !== "delivered_to_shop") {
           return NextResponse.json({ error: "Order is not ready to complete" }, { status: 400 });
         }
         if (!body.billNumber) return NextResponse.json({ error: "Bill number required" }, { status: 400 });
+        if (!body.trackingNumber) return NextResponse.json({ error: "Tracking number required" }, { status: 400 });
+        if (!body.manufacturingCostPkr)
+          return NextResponse.json({ error: "Manufacturing cost (PKR) required" }, { status: 400 });
         await supplierComplete(
           id,
           {
@@ -78,6 +101,7 @@ export async function POST(request: Request, { params }: Props) {
             billNumber: body.billNumber,
             courierName: body.courierName,
             trackingNumber: body.trackingNumber,
+            manufacturingCostPkr: body.manufacturingCostPkr,
             photoUrl: body.photoUrl,
           },
           session.name

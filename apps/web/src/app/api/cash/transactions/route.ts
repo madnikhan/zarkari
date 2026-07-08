@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     method,
     reference,
     description,
+    expenseCategory,
     businessDate,
     orderId,
     retailOrderId,
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     method?: "cash" | "online";
     reference?: string;
     description?: string;
+    expenseCategory?: string;
     businessDate?: string;
     orderId?: string;
     retailOrderId?: string;
@@ -78,6 +80,7 @@ export async function POST(request: Request) {
     method,
     reference,
     description,
+    expenseCategory: type === "business_expense" ? expenseCategory : undefined,
     businessDate: businessDate ?? todayDateString(),
     orderId,
     retailOrderId,

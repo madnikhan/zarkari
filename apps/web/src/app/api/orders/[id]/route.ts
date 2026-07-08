@@ -25,8 +25,18 @@ export async function GET(_request: Request, { params }: Props) {
     getOrderFiles(order.id, filesUnlocked),
   ]);
 
+  const safeOrder =
+    session.role === "supplier"
+      ? {
+          ...order,
+          totalPrice: "0",
+          depositPaid: "0",
+          remainingBalance: "0",
+        }
+      : order;
+
   return NextResponse.json({
-    order,
+    order: safeOrder,
     customerName: customer?.name,
     timeline,
     files,

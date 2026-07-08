@@ -78,14 +78,24 @@ export function OrderActionButtons({
               </BomsActionButton>
             </>
           )}
-          {(status === "shipping" || status === "delivered_to_shop") && (
+          {status === "shipping" && (
+            <BomsActionButton
+              color="purple"
+              disabled={!!loading}
+              onClick={() => action("arrived-uk")}
+              className="col-span-2"
+            >
+              {loading === "arrived-uk" ? "Updating…" : "Arrived at UK Boutique"}
+            </BomsActionButton>
+          )}
+          {status === "delivered_to_shop" && (
             <BomsActionButton
               color="green"
               disabled={!!loading}
               onClick={() => action("receive-at-shop")}
               className="col-span-2"
             >
-              {loading === "receive-at-shop" ? "Updating…" : "Order Received"}
+              {loading === "receive-at-shop" ? "Updating…" : "Ready for Collection"}
             </BomsActionButton>
           )}
           {status === "ready_for_collection" && (

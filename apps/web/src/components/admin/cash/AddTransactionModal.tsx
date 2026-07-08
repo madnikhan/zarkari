@@ -44,6 +44,8 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
   const [orderId, setOrderId] = useState("");
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseOther, setExpenseOther] = useState("");
   const [payableOrders, setPayableOrders] = useState<PayableOrder[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [supplierId, setSupplierId] = useState("");
@@ -64,6 +66,8 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
     setExchangeRate("");
     setReference("");
     setDescription("");
+    setExpenseCategory("");
+    setExpenseOther("");
     setError("");
   }, [open, defaultType, direction]);
 
@@ -86,6 +90,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
   const types = direction === "in" ? CASH_IN_TYPES : CASH_OUT_TYPES;
   const showOrderPicker = needsOrderPicker(type);
   const showSupplierPicker = type === "supplier_payment";
+  const showExpenseCategory = type === "business_expense";
   const selectedOrder = payableOrders.find((o) => o.id === orderId);
 
   function handleTypeChange(next: CashTransactionType) {
@@ -127,6 +132,10 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       if (showSupplierPicker && !supplierId) {
         throw new Error("Please select a supplier");
       }
+      if (type === "business_expense") {
+        if (!expenseCategory) throw new Error("Please select an expense category");
+        if (expenseCategory === "Other" && !expenseOther.trim()) throw new Error("Please enter a custom expense name");
+      }
       if (!amount || parseFloat(amount) <= 0) {
         throw new Error("Please enter an amount");
       }
@@ -157,6 +166,12 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             method,
             reference: reference || undefined,
             description: description || undefined,
+            expenseCategory:
+              type === "business_expense"
+                ? expenseCategory === "Other"
+                  ? expenseOther.trim() || undefined
+                  : expenseCategory || undefined
+                : undefined,
             businessDate: date,
             orderId: orderId || undefined,
             supplierId: supplierId || undefined,
@@ -256,6 +271,41 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
               onPkrChange={setAmountPkr}
               onRateChange={setExchangeRate}
             />
+          )}
+
+          {showExpenseCategory && (
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-slate-500 uppercase">Expense category</label>
+                <select
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  required
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Select category…</option>
+                  <option value="Rent">Rent</option>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Staff wages">Staff wages</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Cargo / freight">Cargo / freight</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              {expenseCategory === "Other" && (
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Custom expense name</label>
+                  <input
+                    value={expenseOther}
+                    onChange={(e) => setExpenseOther(e.target.value)}
+                    required
+                    placeholder="e.g. Shop repairs"
+                    className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           <div className={showSupplierPicker ? "" : "grid grid-cols-2 gap-3"}>

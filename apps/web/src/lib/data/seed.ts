@@ -68,6 +68,7 @@ export interface BridalOrder {
   comments?: string;
   customisationNotes?: string;
   filesUnlockedAt?: string;
+  lastSupplierActionAt?: string;
   supplierLocked: boolean;
   createdById?: string;
 }
@@ -312,6 +313,7 @@ export interface SupplierCompletion {
   billNumber: string;
   courierName?: string;
   trackingNumber?: string;
+  manufacturingCostPkr?: string;
 }
 
 export interface BridalPayment {
