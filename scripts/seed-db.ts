@@ -129,6 +129,83 @@ async function seedSettings(db: ReturnType<typeof drizzle<typeof schema>>) {
   }
 }
 
+const CARGO_COMPANIES = ["DHL Cargo", "FedEx", "UPS", "Leopards Cargo"];
+
+async function seedCargo(db: ReturnType<typeof drizzle<typeof schema>>, supplierId: string) {
+  const existing = await db.select().from(schema.cargoCompanies).limit(1);
+  if (existing.length) {
+    console.log("Cargo data already seeded — skipping.");
+    return;
+  }
+
+  const companyIds: string[] = [];
+  for (const name of CARGO_COMPANIES) {
+    const [row] = await db.insert(schema.cargoCompanies).values({ name }).returning();
+    companyIds.push(row.id);
+  }
+  console.log(`Seeded ${CARGO_COMPANIES.length} cargo companies.`);
+
+  const orders = await db.select().from(schema.bridalOrders).limit(3);
+  const year = new Date().getFullYear();
+
+  const boxes = [
+    {
+      boxNumber: `BOX-${year}-0001`,
+      cargoCompanyId: companyIds[0],
+      trackingNumber: "DHL1234567890",
+      receivedDate: "2026-06-15",
+      weightKg: "12.50",
+      notes: "Karachi shipment — bridal lehengas",
+    },
+    {
+      boxNumber: `BOX-${year}-0002`,
+      cargoCompanyId: companyIds[3],
+      trackingNumber: "LCP9876543210",
+      receivedDate: "2026-06-20",
+      weightKg: "8.25",
+      notes: "Accessories and fabric samples",
+    },
+  ];
+
+  for (let i = 0; i < boxes.length; i++) {
+    const spec = boxes[i];
+    const [box] = await db
+      .insert(schema.cargoBoxes)
+      .values({
+        ...spec,
+        supplierId,
+        exchangeRate: "355.50",
+      })
+      .returning();
+
+    const items = [
+      {
+        itemDate: spec.receivedDate,
+        articleName: i === 0 ? "Bridal Lehenga — Red" : "Embroidered Dupatta",
+        bridalOrderId: orders[i]?.id ?? null,
+        costPkr: i === 0 ? "85000" : "12000",
+        costGbp: i === 0 ? "239.10" : "33.75",
+        exchangeRate: "355.50",
+        sortOrder: 0,
+      },
+      {
+        itemDate: spec.receivedDate,
+        articleName: i === 0 ? "Matching Blouse" : "Fabric swatches",
+        bridalOrderId: orders[i + 1]?.id ?? null,
+        costPkr: i === 0 ? "22000" : "5000",
+        costGbp: i === 0 ? "61.88" : "14.06",
+        exchangeRate: "355.50",
+        sortOrder: 1,
+      },
+    ];
+
+    for (const item of items) {
+      await db.insert(schema.cargoBoxItems).values({ boxId: box.id, ...item });
+    }
+    console.log(`Seeded cargo box: ${spec.boxNumber}`);
+  }
+}
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -172,6 +249,7 @@ async function main() {
 
   await seedCatalog(db);
   await seedSettings(db);
+  await seedCargo(db, supplierId);
 
   console.log("Done. Run `npm run db:push` first if tables are missing.");
   await client.end();

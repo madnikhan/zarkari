@@ -61,6 +61,36 @@ export const TRAINING_SECTIONS: TrainingSection[] = [
     ],
   },
   {
+    id: "cargo",
+    title: "Cargo & Boxes",
+    href: "/admin/cargo",
+    summary:
+      "Track incoming shipment boxes from Pakistan — cargo company, tracking, weight, line items with PKR/GBP costs, linked to bridal orders. Optionally post totals to supplier khata.",
+    steps: [
+      {
+        element: "[data-tour='nav-cargo']",
+        title: "Cargo & Boxes",
+        description: "Search boxes by tracking number or supplier. Select a box to view contents and costs.",
+      },
+      {
+        element: "[data-tour='cargo-add-box']",
+        title: "Add box",
+        description: "Record a new shipment with cargo company, tracking, supplier, and received date.",
+      },
+      {
+        element: "[data-tour='cargo-items']",
+        title: "Box items",
+        description: "Add articles with PKR/GBP costs. Link each line to a bridal order (ORD-xxx) when applicable.",
+      },
+      {
+        element: "[data-tour='cargo-khata']",
+        title: "Post to khata",
+        description:
+          "When ready, post the box total to the supplier khata as a stock entry — or keep cargo-only for manual khata later.",
+      },
+    ],
+  },
+  {
     id: "inbox",
     title: "Inbox",
     href: "/admin/inbox",
@@ -112,5 +142,9 @@ export const TRAINING_FAQ = [
   {
     q: "How do I print a report?",
     a: "On Reports or Cash Analytics, tap 'Print / Save PDF' or 'Download PDF'.",
+  },
+  {
+    q: "What is the difference between Cargo & Boxes and supplier khata?",
+    a: "Cargo records track physical shipment boxes and their contents. Khata is the supplier account ledger. Use 'Post to khata' on a box when you want the box total added as a stock entry on the supplier's khata.",
   },
 ];

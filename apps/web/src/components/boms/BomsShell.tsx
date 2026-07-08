@@ -24,13 +24,20 @@ import {
   Banknote,
   GraduationCap,
   HelpCircle,
+  Package,
 } from "lucide-react";
 import { useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 import { NotificationBell } from "@/components/admin/NotificationBell";
 import { cn } from "@/lib/utils";
 
-type NavItem = { label: string; href: string; icon: React.ComponentType<{ className?: string }>; ownerOnly?: boolean };
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
+  dataTour?: string;
+};
 
 const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -42,6 +49,7 @@ const adminNav: NavItem[] = [
   { label: "New Order", href: "/admin/orders/new", icon: PlusCircle },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Suppliers", href: "/admin/suppliers", icon: Truck },
+  { label: "Cargo & Boxes", href: "/admin/cargo", icon: Package, dataTour: "nav-cargo" },
   { label: "Supplier Payments", href: "/admin/suppliers/payments", icon: Wallet },
   { label: "Calendar", href: "/admin/calendar", icon: Calendar },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
@@ -64,7 +72,7 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isOwner = userRole === "owner";
 
-  const nav =
+  const nav: NavItem[] =
     role === "supplier"
       ? [
           { label: "Dashboard", href: "/supplier", icon: LayoutDashboard },
@@ -114,7 +122,7 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
                 key={item.href + item.label}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                data-tour={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                data-tour={item.dataTour ?? `nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                   active ? "bg-[#4C3BCF] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
