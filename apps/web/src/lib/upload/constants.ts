@@ -18,6 +18,9 @@ export const UPLOAD_PART_MAX_TIMEOUT_MS = 60 * 60 * 1000;
 /** Assume at least this speed when scaling per-part timeout (50 KB/s) */
 export const UPLOAD_PART_MIN_SPEED_BPS = 50_000;
 export const UPLOAD_SINGLE_PUT_TIMEOUT_MS = 60 * 60 * 1000;
+/** Client → server relay slices (Vercel body limit ~4.5 MB) */
+export const SERVER_RELAY_CHUNK_BYTES = 4 * 1024 * 1024;
+export const R2_MIN_PART_BYTES = 5 * 1024 * 1024;
 
 export function partUploadTimeoutMs(chunkSize: number): number {
   const scaled = Math.ceil((chunkSize / UPLOAD_PART_MIN_SPEED_BPS) * 1000);

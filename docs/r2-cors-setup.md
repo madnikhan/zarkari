@@ -14,7 +14,9 @@ Small files (≤ 4 MB) use server upload (`POST /api/upload`) and do **not** nee
 |------|------|
 | ≤ 4 MB | Server upload (`POST /api/upload`) — no CORS |
 | 4–10 MB video | Single presigned PUT (`/api/upload/presign` → PUT → `/api/upload/complete`) |
-| > 10 MB video | Parallel multipart (up to 4 concurrent 5 MB PUTs; drops to 1 on slow connections) |
+| > 10 MB video | Parallel multipart to R2, or **server relay** if CORS blocks direct upload |
+
+If R2 CORS is not configured, uploads automatically fall back to **server relay** (4 MB slices through your app to R2 — no CORS needed).
 
 Large uploads (66 MB+) retry failed parts automatically (up to 3 attempts) and abort incomplete multipart uploads on failure.
 
@@ -57,7 +59,7 @@ Videos over 10 MB use parallel multipart uploads. Each part reads the `ETag` res
 
 | Symptom | Fix |
 |---------|-----|
-| CORS missing on PUT | Add/update CORS policy above |
+| `Upload blocked by storage CORS` | App should auto-retry via server; if it persists, add CORS policy below |
 | Upload OK but "ETag missing" | Add `ETag` to `ExposeHeaders` |
 | Works locally, fails on production | Ensure `https://www.zarkari.co.uk` is in `AllowedOrigins` |
 | Files ≤ 4 MB fail | Check `/api/upload` and R2 credentials on Vercel, not CORS |

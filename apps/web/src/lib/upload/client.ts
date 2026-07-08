@@ -11,13 +11,14 @@ import {
   UPLOAD_SINGLE_PUT_TIMEOUT_MS,
   ADAPTIVE_SPEED_CHECK_MS,
   partUploadTimeoutMs,
+  SERVER_RELAY_CHUNK_BYTES,
 } from "./constants";
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 import { parseJsonResponse, parseXhrJson } from "./parse-json";
 import { formatBytes, UploadSpeedTracker } from "./upload-speed";
 
 const CORS_ERROR_MESSAGE =
-  "Upload blocked by storage CORS. Configure R2 CORS for this site (see docs/r2-cors-setup.md).";
+  "Direct storage upload blocked (CORS). Retrying via server…";
 const ETAG_ERROR_MESSAGE =
   "Upload succeeded but ETag missing — add ETag to R2 CORS ExposeHeaders.";
 
@@ -91,6 +92,217 @@ function rejectAudioPlaceholder(url: string | undefined, file: File): void {
   if (!isAudioFile(file)) return;
   if (!url || url.endsWith(".png") || url.includes("/catalog/guldaan/")) {
     throw new Error("Voice note upload returned an invalid audio URL");
+  }
+}
+
+function isCorsError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("storage CORS");
+}
+
+async function probeDirectR2Upload(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/upload/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: ".cors-probe",
+        contentType: "application/octet-stream",
+        category: "_probe",
+        fileSize: 32,
+      }),
+    });
+    const data = await parseJsonResponse<{ uploadUrl?: string; demo?: boolean; error?: string }>(res);
+    if (!res.ok || data.demo || !data.uploadUrl) return false;
+    await putPartChunk(
+      data.uploadUrl,
+      new Blob([new Uint8Array(32)]),
+      30_000,
+      () => {}
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function initMultipartVideo(
+  file: File,
+  category: string,
+  mimeType: string
+): Promise<{
+  demo?: boolean;
+  uploadId?: string;
+  key?: string;
+  publicUrl?: string;
+  fileName?: string;
+  error?: string;
+}> {
+  const initRes = await fetch("/api/upload/multipart/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: mimeType,
+      category,
+      fileSize: file.size,
+    }),
+  });
+  const initData = await parseJsonResponse<{
+    demo?: boolean;
+    uploadId?: string;
+    key?: string;
+    publicUrl?: string;
+    fileName?: string;
+    error?: string;
+  }>(initRes);
+  if (!initRes.ok) throw new Error(initData.error ?? `Could not start upload (${initRes.status})`);
+  return initData;
+}
+
+async function completeMultipartVideo(
+  initData: {
+    uploadId: string;
+    key: string;
+    publicUrl: string;
+    fileName?: string;
+  },
+  file: File,
+  category: string,
+  mimeType: string,
+  parts: { partNumber: number; etag: string }[]
+): Promise<{ url: string; fileName: string }> {
+  const completeRes = await fetch("/api/upload/multipart/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uploadId: initData.uploadId,
+      key: initData.key,
+      fileName: initData.fileName ?? file.name,
+      contentType: mimeType,
+      category,
+      publicUrl: initData.publicUrl,
+      parts,
+    }),
+  });
+  const completeData = await parseJsonResponse<{ url?: string; fileName?: string; error?: string }>(
+    completeRes
+  );
+  if (!completeRes.ok) throw new Error(completeData.error ?? `Upload failed (${completeRes.status})`);
+  if (!completeData.url) throw new Error("Upload failed — no URL returned");
+  return { url: completeData.url, fileName: completeData.fileName ?? file.name };
+}
+
+async function postRelayChunkWithProgress(
+  uploadId: string,
+  key: string,
+  chunk: Blob,
+  onLoaded: (loaded: number, total: number) => void
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const form = new FormData();
+    form.append("uploadId", uploadId);
+    form.append("key", key);
+    form.append("file", chunk, "relay-chunk");
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload/multipart/relay");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onLoaded(e.loaded, e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else {
+        try {
+          const data = parseXhrJson<{ error?: string }>(xhr.responseText, xhr.status);
+          reject(new Error(data.error ?? `Upload failed (${xhr.status})`));
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(`Upload failed (${xhr.status})`));
+        }
+      }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
+    xhr.send(form);
+  });
+}
+
+async function uploadViaServerRelay(
+  file: File,
+  category: string,
+  mimeType: string,
+  label: string,
+  onProgress?: ProgressCallback
+): Promise<UploadResult> {
+  const speedTracker = new UploadSpeedTracker();
+  const relayLabel = label.includes("server") ? label : `${label.replace(/…$/, "")} via server…`;
+  onProgress?.(buildProgressState(relayLabel, "uploading", 5, 0, file.size, speedTracker));
+
+  const initData = await initMultipartVideo(file, category, mimeType);
+  if (initData.demo) {
+    if (file.size > MAX_SERVER_UPLOAD_BYTES) {
+      throw new Error(
+        `Video is too large for demo upload (${Math.round(file.size / 1024 / 1024)} MB). Configure R2 storage or use a file under 4 MB.`
+      );
+    }
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    return postFormWithStagedProgress("/api/upload", form, label, file, onProgress);
+  }
+
+  const uploadId = initData.uploadId!;
+  const key = initData.key!;
+  const publicUrl = initData.publicUrl!;
+  let bytesSent = 0;
+
+  try {
+    for (let offset = 0; offset < file.size; offset += SERVER_RELAY_CHUNK_BYTES) {
+      const chunk = file.slice(offset, offset + SERVER_RELAY_CHUNK_BYTES);
+      const chunkStart = bytesSent;
+      await postRelayChunkWithProgress(uploadId, key, chunk, (loaded) => {
+        const bytesLoaded = chunkStart + loaded;
+        const progress = Math.min(90, Math.round(5 + (bytesLoaded / file.size) * 85));
+        onProgress?.(
+          buildProgressState(relayLabel, "uploading", progress, bytesLoaded, file.size, speedTracker)
+        );
+      });
+      bytesSent += chunk.size;
+      onProgress?.(
+        buildProgressState(relayLabel, "uploading", Math.min(90, Math.round(5 + (bytesSent / file.size) * 85)), bytesSent, file.size, speedTracker)
+      );
+    }
+
+    onProgress?.({ label: "Processing upload…", progress: 92, status: "processing", bytesLoaded: file.size, bytesTotal: file.size });
+
+    const flushRes = await fetch("/api/upload/multipart/relay/flush", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uploadId, key }),
+    });
+    const flushData = await parseJsonResponse<{ parts?: { partNumber: number; etag: string }[]; error?: string }>(
+      flushRes
+    );
+    if (!flushRes.ok) throw new Error(flushData.error ?? `Upload failed (${flushRes.status})`);
+    if (!flushData.parts?.length) throw new Error("Upload failed — no parts uploaded");
+
+    const completed = await completeMultipartVideo(
+      { uploadId, key, publicUrl, fileName: initData.fileName },
+      file,
+      category,
+      mimeType,
+      flushData.parts
+    );
+
+    onProgress?.({
+      label: "Upload complete",
+      progress: 100,
+      status: "done",
+      bytesLoaded: file.size,
+      bytesTotal: file.size,
+    });
+    return { url: completed.url, fileName: completed.fileName, mimeType };
+  } catch (err) {
+    await abortMultipartUploadClient(uploadId, key);
+    throw err;
   }
 }
 
@@ -350,26 +562,11 @@ async function uploadVideoViaParallelMultipart(
   const speedTracker = new UploadSpeedTracker();
   onProgress?.(buildProgressState(label, "uploading", 5, 0, file.size, speedTracker));
 
-  const initRes = await fetch("/api/upload/multipart/init", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      contentType: mimeType,
-      category,
-      fileSize: file.size,
-    }),
-  });
-  const initData = await parseJsonResponse<{
-    demo?: boolean;
-    uploadId?: string;
-    key?: string;
-    publicUrl?: string;
-    fileName?: string;
-    error?: string;
-  }>(initRes);
+  if (!(await probeDirectR2Upload())) {
+    return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+  }
 
-  if (!initRes.ok) throw new Error(initData.error ?? `Could not start upload (${initRes.status})`);
+  const initData = await initMultipartVideo(file, category, mimeType);
 
   if (initData.demo) {
     if (file.size > MAX_SERVER_UPLOAD_BYTES) {
@@ -497,6 +694,9 @@ async function uploadVideoViaParallelMultipart(
     };
   } catch (err) {
     await abortMultipartUploadClient(uploadId, key);
+    if (isCorsError(err)) {
+      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+    }
     throw err;
   } finally {
     clearTimeout(speedCheckTimer);
@@ -546,16 +746,34 @@ async function uploadViaPresignedPut(
     throw new Error(presignData.error ?? "Could not start upload");
   }
 
-  await putWithProgress(
-    presignData.uploadUrl,
-    file,
-    mimeType,
-    UPLOAD_SINGLE_PUT_TIMEOUT_MS,
-    (loaded, total) => {
-      const progress = Math.min(90, Math.round((loaded / total) * 90));
-      onProgress?.(buildProgressState(label, "uploading", progress, loaded, total, speedTracker));
+  const canDirect = await probeDirectR2Upload();
+  if (!canDirect) {
+    return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+  }
+
+  try {
+    await putWithProgress(
+      presignData.uploadUrl,
+      file,
+      mimeType,
+      UPLOAD_SINGLE_PUT_TIMEOUT_MS,
+      (loaded, total) => {
+        const progress = Math.min(90, Math.round((loaded / total) * 90));
+        onProgress?.(buildProgressState(label, "uploading", progress, loaded, total, speedTracker));
+      }
+    );
+  } catch (err) {
+    if (isCorsError(err)) {
+      if (file.size <= MAX_SERVER_UPLOAD_BYTES) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("category", category);
+        return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
+      }
+      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
     }
-  );
+    throw err;
+  }
 
   onProgress?.({
     label: "Processing upload…",
