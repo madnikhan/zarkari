@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
+import { createCashTransaction } from "@/lib/db/cash-ledger";
+import { todayDateString } from "@/lib/cash/labels";
 import {
   addSupplierLedgerEntry,
   getSupplierLedgerBalances,
@@ -37,6 +39,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "supplierId and type required" }, { status: 400 });
   }
 
+  const businessDate = body.businessDate ?? todayDateString();
+  let cashTransactionId: string | undefined = body.cashTransactionId;
+
+  if (body.type === "payment" && !cashTransactionId) {
+    const method = body.method === "online" ? "online" : "cash";
+    const tx = await createCashTransaction({
+      direction: "out",
+      type: "supplier_payment",
+      amount: body.amountGbp ?? "0",
+      method,
+      description: body.description ?? "Supplier payment (khata)",
+      businessDate,
+      supplierId: body.supplierId,
+      createdByUserId: session.id,
+      source: "manual",
+    });
+    if (!tx) {
+      return NextResponse.json({ error: "Failed to create cash-out transaction" }, { status: 500 });
+    }
+    cashTransactionId = tx.id;
+  }
+
   const entry = await addSupplierLedgerEntry({
     supplierId: body.supplierId,
     type: body.type,
@@ -46,12 +70,17 @@ export async function POST(request: Request) {
     amountGbp: body.amountGbp ?? "0",
     amountPkr: body.amountPkr ?? "0",
     exchangeRate: body.exchangeRate,
-    businessDate: body.businessDate,
-    cashTransactionId: body.cashTransactionId,
+    businessDate,
+    cashTransactionId,
   });
 
   revalidatePath("/admin/suppliers/payments");
   revalidatePath(`/admin/suppliers/${body.supplierId}/khata`);
+  if (body.type === "payment") {
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin/cash/analytics");
+    revalidatePath("/admin/reports");
+  }
   return NextResponse.json({ entry });
 }
 

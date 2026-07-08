@@ -107,7 +107,14 @@ export async function addSupplierLedgerEntry(input: {
 
 export async function updateSupplierLedgerEntry(
   id: string,
-  patch: Partial<{ description: string; amountGbp: string; amountPkr: string; exchangeRate: string; businessDate: string }>
+  patch: Partial<{
+    description: string;
+    amountGbp: string;
+    amountPkr: string;
+    exchangeRate: string;
+    businessDate: string;
+    cashTransactionId: string;
+  }>
 ): Promise<SupplierLedgerEntry | null> {
   if (isDbConfigured()) {
     const { updateSupplierLedgerEntryDb } = await import("@/lib/db/supplier-ledger");
@@ -141,4 +148,43 @@ export function computeRunningBalances(entries: SupplierLedgerEntry[]): (Supplie
     }
     return { ...e, runningGbp, runningPkr };
   });
+}
+
+export async function backfillOrphanedKhataPayments(): Promise<{ linked: number; skipped: number }> {
+  if (!isDbConfigured()) {
+    return { linked: 0, skipped: 0 };
+  }
+
+  const { listOrphanedKhataPaymentsDb, updateSupplierLedgerEntryDb } = await import(
+    "@/lib/db/supplier-ledger"
+  );
+  const { createCashTransaction } = await import("@/lib/db/cash-ledger");
+
+  const orphans = await listOrphanedKhataPaymentsDb();
+  let linked = 0;
+  let skipped = 0;
+
+  for (const entry of orphans) {
+    const tx = await createCashTransaction({
+      direction: "out",
+      type: "supplier_payment",
+      amount: entry.amountGbp,
+      method: "cash",
+      description: entry.description ?? "Supplier payment (khata backfill)",
+      businessDate: entry.businessDate,
+      supplierId: entry.supplierId,
+      source: "manual",
+    });
+
+    if (!tx) {
+      skipped++;
+      continue;
+    }
+
+    const updated = await updateSupplierLedgerEntryDb(entry.id, { cashTransactionId: tx.id });
+    if (updated) linked++;
+    else skipped++;
+  }
+
+  return { linked, skipped };
 }

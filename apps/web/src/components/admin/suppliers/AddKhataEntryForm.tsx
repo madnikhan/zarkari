@@ -17,6 +17,7 @@ export function AddKhataEntryForm({ supplierId }: Props) {
   const [amountPkr, setAmountPkr] = useState("");
   const [exchangeRate, setExchangeRate] = useState("");
   const [businessDate, setBusinessDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,6 +38,7 @@ export function AddKhataEntryForm({ supplierId }: Props) {
           amountPkr: amountPkr || "0",
           exchangeRate: exchangeRate || undefined,
           businessDate,
+          method: type === "payment" ? paymentMethod : undefined,
         }),
       });
       const data = await res.json();
@@ -92,6 +94,20 @@ export function AddKhataEntryForm({ supplierId }: Props) {
           placeholder="Bill / invoice number (optional)"
           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
         />
+      )}
+      {type === "payment" && (
+        <div>
+          <label className="text-xs text-slate-500 uppercase">Payment method</label>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as "cash" | "online")}
+            className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="cash">Cash</option>
+            <option value="online">Online / bank transfer</option>
+          </select>
+          <p className="text-xs text-slate-400 mt-1">Also recorded in Daily Cash cash out</p>
+        </div>
       )}
       <GbpPkrConverter
         amountGbp={amountGbp}

@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, isNull, and, sql } from "drizzle-orm";
 import { getDb, schema } from "./index";
 import type { SupplierLedgerBalance, SupplierLedgerEntry } from "@/lib/supplier-ledger/demo-store";
 
@@ -71,6 +71,7 @@ export async function updateSupplierLedgerEntryDb(
     amountPkr: string;
     exchangeRate: string;
     businessDate: string;
+    cashTransactionId: string;
   }>
 ): Promise<SupplierLedgerEntry | null> {
   const db = getDb();
@@ -120,4 +121,20 @@ export async function getSupplierLedgerBalancesDb(): Promise<SupplierLedgerBalan
       };
     })
     .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+}
+
+export async function listOrphanedKhataPaymentsDb(): Promise<SupplierLedgerEntry[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(schema.supplierLedgerEntries)
+    .where(
+      and(
+        eq(schema.supplierLedgerEntries.type, "payment"),
+        isNull(schema.supplierLedgerEntries.cashTransactionId)
+      )
+    )
+    .orderBy(schema.supplierLedgerEntries.businessDate);
+  return rows.map(mapRow);
 }
