@@ -24,5 +24,14 @@ export async function GET(request: Request) {
     getMessages(order.id),
   ]);
 
+  import("@/lib/firebase/sync")
+    .then((m) => {
+      m.syncOrderLive(order.id, { status: order.status, deliveryDate: order.deliveryDate });
+      for (const msg of messages) {
+        m.syncOrderMessage(order.id, msg);
+      }
+    })
+    .catch(console.error);
+
   return NextResponse.json({ order, files, messages });
 }

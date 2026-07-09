@@ -2,7 +2,7 @@ import { BomsShell } from "@/components/boms/BomsShell";
 import { MobileBottomNav } from "@/components/boms/MobileBottomNav";
 import { SampleDataBanner } from "@/components/admin/SampleDataBanner";
 import { PwaInstallBanner } from "@/components/boms/PwaInstallBanner";
-import { PwaServiceWorkerRegister } from "@/components/boms/PwaServiceWorkerRegister";
+import { PushPermissionPrompt } from "@/components/boms/PushPermissionPrompt";
 import { TrainingWelcomePrompt } from "@/components/admin/training/TrainingWelcomePrompt";
 import { getSession } from "@/lib/auth/session";
 import { hasSampleData } from "@/lib/data/sample-status";
@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <>
       <BomsShell userName={session?.name} userRole={session?.role}>
-        <PwaServiceWorkerRegister />
+        <PushPermissionPrompt variant="staff" />
         <PwaInstallBanner />
         <TrainingWelcomePrompt />
         {showSampleBanner && <SampleDataBanner />}

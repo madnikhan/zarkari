@@ -155,7 +155,7 @@ export async function getBridalOrders(filters?: {
 }): Promise<BridalOrder[]> {
   if (isDbConfigured()) {
     const { listBridalOrdersDb } = await import("@/lib/db/bridal-orders");
-    return listBridalOrdersDb({ ...filters, limit: filters?.limit ?? 5000 });
+    return listBridalOrdersDb({ ...filters, limit: filters?.limit ?? 100 });
   }
   let orders = [...demoBridalOrders];
   if (filters?.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
@@ -323,6 +323,7 @@ export type BridalOrderWithRelations = BridalOrder & {
 export async function getBridalOrdersWithRelations(filters: {
   supplierId?: string;
   tab?: "active" | "overdue" | "due-week" | "completed" | "cancelled" | "refunded";
+  supplierTab?: "new" | "in-progress" | "completed" | "cancelled";
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
@@ -335,7 +336,16 @@ export async function getBridalOrdersWithRelations(filters: {
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
   let orders = [...demoBridalOrders];
   if (filters.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
-  if (filters.tab === "completed") orders = orders.filter((o) => o.status === "collected");
+  if (filters.supplierTab === "new") orders = orders.filter((o) => o.status === "sent_to_supplier");
+  else if (filters.supplierTab === "completed") orders = orders.filter((o) => o.status === "collected");
+  else if (filters.supplierTab === "cancelled") {
+    orders = orders.filter((o) => ["cancelled", "refunded", "supplier_rejected"].includes(o.status));
+  } else if (filters.supplierTab === "in-progress") {
+    orders = orders.filter(
+      (o) =>
+        !["collected", "cancelled", "refunded", "sent_to_supplier", "supplier_rejected"].includes(o.status)
+    );
+  } else if (filters.tab === "completed") orders = orders.filter((o) => o.status === "collected");
   else if (filters.tab === "cancelled") orders = orders.filter((o) => o.status === "cancelled");
   else if (filters.tab === "refunded") orders = orders.filter((o) => o.status === "refunded");
   else if (filters.tab === "overdue") {
@@ -366,6 +376,28 @@ export async function getBridalOrdersWithRelations(filters: {
     };
   });
   return { orders: withRelations, total };
+}
+
+export async function getSupplierTabCounts(supplierId: string): Promise<{
+  new: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+}> {
+  if (isDbConfigured()) {
+    const { getSupplierTabCountsDb } = await import("@/lib/db/bridal-orders");
+    return getSupplierTabCountsDb(supplierId);
+  }
+  const orders = demoBridalOrders.filter((o) => o.supplierId === supplierId);
+  return {
+    new: orders.filter((o) => o.status === "sent_to_supplier").length,
+    inProgress: orders.filter(
+      (o) =>
+        !["collected", "cancelled", "refunded", "sent_to_supplier", "supplier_rejected"].includes(o.status)
+    ).length,
+    completed: orders.filter((o) => o.status === "collected").length,
+    cancelled: orders.filter((o) => ["cancelled", "refunded", "supplier_rejected"].includes(o.status)).length,
+  };
 }
 
 export async function getFinanceSummary() {

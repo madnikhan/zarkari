@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MyBridalOrder } from "@/components/customer/MyBridalOrder";
+import { MyBridalOrderLive } from "@/components/customer/MyBridalOrderLive";
 import type { BridalOrder, CustomerMessage, OrderFile } from "@/lib/data/seed";
 
 interface Props {
@@ -13,8 +13,6 @@ export default function MyOrderDetailPage({ params }: Props) {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [error, setError] = useState("");
-  const [messageError, setMessageError] = useState("");
-  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     params.then(({ orderNumber }) => {
@@ -33,8 +31,6 @@ export default function MyOrderDetailPage({ params }: Props) {
 
   async function onSendMessage(message: string): Promise<boolean> {
     if (!order || !message.trim()) return false;
-    setSending(true);
-    setMessageError("");
     try {
       const res = await fetch("/api/customer/message", {
         method: "POST",
@@ -42,14 +38,11 @@ export default function MyOrderDetailPage({ params }: Props) {
         body: JSON.stringify({ orderId: order.id, message: message.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setMessageError(data.error ?? "Failed to send message");
-        return false;
-      }
-      setMessages(data.messages ?? []);
+      if (!res.ok) return false;
+      if (data.messages) setMessages(data.messages ?? []);
       return true;
-    } finally {
-      setSending(false);
+    } catch {
+      return false;
     }
   }
 
@@ -57,13 +50,11 @@ export default function MyOrderDetailPage({ params }: Props) {
   if (!order) return <p className="text-charcoal/50 text-sm text-center">Loading...</p>;
 
   return (
-    <MyBridalOrder
+    <MyBridalOrderLive
       order={order}
       files={files}
-      messages={messages}
+      initialMessages={messages}
       onSendMessage={onSendMessage}
-      messageError={messageError}
-      sending={sending}
     />
   );
 }

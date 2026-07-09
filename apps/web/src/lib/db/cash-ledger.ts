@@ -201,23 +201,53 @@ export async function getRangeCashSummary(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, v]) => ({ date, cashIn: v.cashIn, cashOut: v.cashOut, net: v.cashIn - v.cashOut }));
 
-  const openingSummary = await getDailyCashSummary(start);
-  const closingSummary = await getDailyCashSummary(end);
+  const opening = await resolveOpeningForDay(start);
+
+  const methodRows = await db
+    .select({
+      amount: schema.cashTransactions.amount,
+      method: schema.cashTransactions.method,
+      direction: schema.cashTransactions.direction,
+    })
+    .from(schema.cashTransactions)
+    .where(
+      and(
+        gte(schema.cashTransactions.businessDate, start),
+        lte(schema.cashTransactions.businessDate, end)
+      )
+    );
+
+  let cashIn = 0;
+  let onlineIn = 0;
+  let cashOut = 0;
+  let onlineOut = 0;
+  for (const row of methodRows) {
+    const amt = parseFloat(row.amount);
+    if (row.direction === "in") {
+      if (row.method === "cash") cashIn += amt;
+      else onlineIn += amt;
+    } else if (row.method === "cash") cashOut += amt;
+    else onlineOut += amt;
+  }
+
+  const closingCash = opening.cashInHand + cashIn - cashOut;
+  const closingOnline = opening.onlineBank + onlineIn - onlineOut;
+  const outstanding = await getOutstandingBridalTotals();
 
   return {
     startDate: start,
     endDate: end,
-    openingCash: openingSummary.openingCash,
-    openingOnline: openingSummary.openingOnline,
-    openingTotal: openingSummary.openingTotal,
+    openingCash: opening.cashInHand,
+    openingOnline: opening.onlineBank,
+    openingTotal: opening.cashInHand + opening.onlineBank,
     totalCashIn,
     totalCashOut,
     netPeriod: totalCashIn - totalCashOut,
-    closingCash: closingSummary.closingCash,
-    closingOnline: closingSummary.closingOnline,
-    closingTotal: closingSummary.closingTotal,
-    outstandingOrders: closingSummary.outstandingOrders,
-    outstandingBalance: closingSummary.outstandingBalance,
+    closingCash,
+    closingOnline,
+    closingTotal: closingCash + closingOnline,
+    outstandingOrders: outstanding.count,
+    outstandingBalance: outstanding.balance,
     dailyBreakdown,
   };
 }
@@ -281,6 +311,60 @@ async function getOutstandingBridalTotals() {
   return { count: Number(row?.count ?? 0), balance: Number(row?.balance ?? 0) };
 }
 
+async function sumRangeTransactionTotalsByDay(
+  startDate: string,
+  endDate: string
+): Promise<Map<string, { cashIn: number; onlineIn: number; cashOut: number; onlineOut: number }>> {
+  const db = getDb();
+  const map = new Map<string, { cashIn: number; onlineIn: number; cashOut: number; onlineOut: number }>();
+  if (!db || startDate > endDate) return map;
+
+  const rows = await db
+    .select({
+      businessDate: schema.cashTransactions.businessDate,
+      amount: schema.cashTransactions.amount,
+      method: schema.cashTransactions.method,
+      direction: schema.cashTransactions.direction,
+    })
+    .from(schema.cashTransactions)
+    .where(
+      and(
+        gte(schema.cashTransactions.businessDate, startDate),
+        lte(schema.cashTransactions.businessDate, endDate)
+      )
+    );
+
+  for (const row of rows) {
+    const amt = parseFloat(row.amount);
+    const entry = map.get(row.businessDate) ?? { cashIn: 0, onlineIn: 0, cashOut: 0, onlineOut: 0 };
+    if (row.direction === "in") {
+      if (row.method === "cash") entry.cashIn += amt;
+      else entry.onlineIn += amt;
+    } else if (row.method === "cash") entry.cashOut += amt;
+    else entry.onlineOut += amt;
+    map.set(row.businessDate, entry);
+  }
+  return map;
+}
+
+function addDaysIso(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return toDateString(d);
+}
+
+function eachDayInclusive(start: string, end: string): string[] {
+  if (start > end) return [];
+  const days: string[] = [];
+  let walk = new Date(`${start}T12:00:00Z`);
+  const target = new Date(`${end}T12:00:00Z`);
+  while (walk <= target) {
+    days.push(toDateString(walk));
+    walk.setUTCDate(walk.getUTCDate() + 1);
+  }
+  return days;
+}
+
 async function resolveOpeningForDay(businessDate: string): Promise<{ cashInHand: number; onlineBank: number }> {
   const stored = await getOpeningBalanceForDay(businessDate);
   if (stored) return stored;
@@ -295,40 +379,43 @@ async function resolveOpeningForDay(businessDate: string): Promise<{ cashInHand:
     .orderBy(desc(schema.cashOpeningBalances.businessDate))
     .limit(1);
 
-  let cursor = anchor?.businessDate ?? null;
   let cash = anchor ? parseFloat(anchor.cashInHand) : 0;
   let online = anchor ? parseFloat(anchor.onlineBank) : 0;
 
-  if (cursor) {
-    const dayTotals = await sumDayTransactionTotals(cursor);
-    cash += dayTotals.cashIn - dayTotals.cashOut;
-    online += dayTotals.onlineIn - dayTotals.onlineOut;
-  }
+  const firstDay = anchor?.businessDate ?? "1970-01-01";
+  const lastDay = addDaysIso(businessDate, -1);
+  if (firstDay > lastDay) return { cashInHand: cash, onlineBank: online };
 
-  const start = cursor
-    ? (() => {
-        const d = new Date(`${cursor}T12:00:00Z`);
-        d.setUTCDate(d.getUTCDate() + 1);
-        return toDateString(d);
-      })()
-    : "1970-01-01";
+  const explicitRows = await db
+    .select()
+    .from(schema.cashOpeningBalances)
+    .where(
+      and(
+        gte(schema.cashOpeningBalances.businessDate, firstDay),
+        lte(schema.cashOpeningBalances.businessDate, lastDay)
+      )
+    );
 
-  const target = new Date(`${businessDate}T12:00:00Z`);
-  let walk = new Date(`${start}T12:00:00Z`);
-  let iterations = 0;
+  const explicitMap = new Map(
+    explicitRows.map((row) => [
+      row.businessDate,
+      { cashInHand: parseFloat(row.cashInHand), onlineBank: parseFloat(row.onlineBank) },
+    ])
+  );
 
-  while (walk < target && iterations < 120) {
-    const day = toDateString(walk);
-    const explicit = await getOpeningBalanceForDay(day);
+  const dailyTotals = await sumRangeTransactionTotalsByDay(firstDay, lastDay);
+
+  for (const day of eachDayInclusive(firstDay, lastDay)) {
+    const explicit = explicitMap.get(day);
     if (explicit) {
       cash = explicit.cashInHand;
       online = explicit.onlineBank;
     }
-    const totals = await sumDayTransactionTotals(day);
-    cash += totals.cashIn - totals.cashOut;
-    online += totals.onlineIn - totals.onlineOut;
-    walk.setUTCDate(walk.getUTCDate() + 1);
-    iterations += 1;
+    const totals = dailyTotals.get(day);
+    if (totals) {
+      cash += totals.cashIn - totals.cashOut;
+      online += totals.onlineIn - totals.onlineOut;
+    }
   }
 
   return { cashInHand: cash, onlineBank: online };

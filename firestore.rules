@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isStaff() {
+      return request.auth != null &&
+        request.auth.token.role in ['admin', 'supplier'];
+    }
+
+    function isCustomerForOrder(orderId) {
+      return request.auth != null &&
+        request.auth.token.role == 'customer' &&
+        request.auth.token.orderId == orderId;
+    }
+
+    match /live_orders/{orderId} {
+      allow read: if isStaff() || isCustomerForOrder(orderId);
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isStaff() || isCustomerForOrder(orderId);
+        allow write: if false;
+      }
+    }
+
+    match /staff_inbox/{docId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+  }
+}

@@ -16,7 +16,7 @@ import { notFound } from "next/navigation";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { OrderDetailTabs } from "@/components/orders/OrderDetailTabs";
 import { OrderActionButtons } from "@/components/boms/OrderActionButtons";
-import { StaffMessageForm } from "@/components/boms/StaffMessageForm";
+import { OrderMessagesLive } from "@/components/admin/OrderMessagesLive";
 import { StatusBadge } from "@/components/boms/StatusBadge";
 import { CustomerCard } from "@/components/boms/CustomerCard";
 import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
@@ -104,20 +104,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
 
       <div className="boms-card p-5">
         <OrderDetailTabs data={{ order, timeline, files, redesigns, cancellations, refunds, payments }} />
-        {messages.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-900 mb-2">Notes</h3>
-            <ul className="space-y-2 text-sm">
-              {messages.map((m) => (
-                <li key={m.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                  <span className="text-xs text-slate-400 capitalize">{m.senderType}</span>
-                  <p>{m.message}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <StaffMessageForm orderId={order.id} />
+        <OrderMessagesLive orderId={order.id} initialMessages={messages} />
       </div>
     </div>
   );

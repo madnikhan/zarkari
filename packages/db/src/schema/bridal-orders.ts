@@ -8,6 +8,7 @@ import {
   boolean,
   pgEnum,
   jsonb,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const bridalStatusEnum = pgEnum("bridal_status", [
@@ -29,29 +30,39 @@ export const bridalStatusEnum = pgEnum("bridal_status", [
   "refunded",
 ]);
 
-export const bridalOrders = pgTable("bridal_orders", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orderNumber: text("order_number").notNull().unique(),
-  customerId: uuid("customer_id").notNull(),
-  supplierId: uuid("supplier_id"),
-  status: bridalStatusEnum("status").default("order_created").notNull(),
-  bookingDate: timestamp("booking_date").defaultNow().notNull(),
-  deliveryDate: timestamp("delivery_date").notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-  depositPaid: decimal("deposit_paid", { precision: 10, scale: 2 }).default("0").notNull(),
-  remainingBalance: decimal("remaining_balance", { precision: 10, scale: 2 }).notNull(),
-  dressType: text("dress_type"),
-  colour: text("colour"),
-  size: text("size"),
-  comments: text("comments"),
-  customisationNotes: text("customisation_notes"),
-  filesUnlockedAt: timestamp("files_unlocked_at"),
-  lastSupplierActionAt: timestamp("last_supplier_action_at"),
-  supplierLocked: boolean("supplier_locked").default(false).notNull(),
-  createdById: uuid("created_by_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const bridalOrders = pgTable(
+  "bridal_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderNumber: text("order_number").notNull().unique(),
+    customerId: uuid("customer_id").notNull(),
+    supplierId: uuid("supplier_id"),
+    status: bridalStatusEnum("status").default("order_created").notNull(),
+    bookingDate: timestamp("booking_date").defaultNow().notNull(),
+    deliveryDate: timestamp("delivery_date").notNull(),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+    depositPaid: decimal("deposit_paid", { precision: 10, scale: 2 }).default("0").notNull(),
+    remainingBalance: decimal("remaining_balance", { precision: 10, scale: 2 }).notNull(),
+    dressType: text("dress_type"),
+    colour: text("colour"),
+    size: text("size"),
+    comments: text("comments"),
+    customisationNotes: text("customisation_notes"),
+    filesUnlockedAt: timestamp("files_unlocked_at"),
+    lastSupplierActionAt: timestamp("last_supplier_action_at"),
+    supplierLocked: boolean("supplier_locked").default(false).notNull(),
+    createdById: uuid("created_by_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("bridal_orders_supplier_id_idx").on(t.supplierId),
+    index("bridal_orders_status_idx").on(t.status),
+    index("bridal_orders_delivery_date_idx").on(t.deliveryDate),
+    index("bridal_orders_booking_date_idx").on(t.bookingDate),
+    index("bridal_orders_customer_id_idx").on(t.customerId),
+  ]
+);
 
 export const timelineEventTypeEnum = pgEnum("timeline_event_type", [
   "order_created",
@@ -157,26 +168,37 @@ export const bridalPayments = pgTable("bridal_payments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const customerMessages = pgTable("customer_messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orderId: uuid("order_id").notNull(),
-  senderType: text("sender_type").notNull(),
-  senderName: text("sender_name"),
-  message: text("message").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const customerMessages = pgTable(
+  "customer_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull(),
+    senderType: text("sender_type").notNull(),
+    senderName: text("sender_name"),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("customer_messages_order_id_idx").on(t.orderId)]
+);
 
-export const notifications = pgTable("notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id"),
-  orderId: uuid("order_id"),
-  threadId: uuid("thread_id"),
-  href: text("href"),
-  title: text("title").notNull(),
-  body: text("body"),
-  read: boolean("read").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id"),
+    orderId: uuid("order_id"),
+    threadId: uuid("thread_id"),
+    href: text("href"),
+    title: text("title").notNull(),
+    body: text("body"),
+    read: boolean("read").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("notifications_user_id_idx").on(t.userId),
+    index("notifications_created_at_idx").on(t.createdAt),
+  ]
+);
 
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),

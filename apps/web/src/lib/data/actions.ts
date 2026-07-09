@@ -73,6 +73,27 @@ async function syncOrderPatch(
     const { updateBridalOrderDb } = await import("@/lib/db/bridal-orders");
     await updateBridalOrderDb(orderId, patch);
   }
+
+  if (patch.status) {
+    const order = await resolveOrder(orderId);
+    if (order) {
+      import("@/lib/firebase/sync")
+        .then((m) =>
+          m.syncOrderLive(orderId, { status: patch.status!, deliveryDate: order.deliveryDate })
+        )
+        .catch(console.error);
+      import("@/lib/push/send")
+        .then((m) =>
+          m.sendPushToOrderCustomer(orderId, {
+            title: "Order update",
+            body: `${order.orderNumber}: status updated`,
+            href: `/my-order/${order.orderNumber}`,
+            orderId,
+          })
+        )
+        .catch(console.error);
+    }
+  }
 }
 
 function notify(title: string, body: string, orderId?: string, href?: string, threadId?: string) {
@@ -91,6 +112,16 @@ function notify(title: string, body: string, orderId?: string, href?: string, th
       .then((m) => m.createNotificationDb({ orderId, title, body, href, threadId }))
       .catch(console.error);
   }
+  import("@/lib/push/send")
+    .then((m) =>
+      m.sendPushToStaff({
+        title,
+        body,
+        href: href ?? (orderId ? `/admin/orders/${orderId}` : threadId ? `/admin/inbox/${threadId}` : undefined),
+        orderId,
+      })
+    )
+    .catch(console.error);
 }
 
 export async function createBridalOrder(input: {
@@ -522,7 +553,12 @@ export async function addCustomerMessage(orderId: string, message: string, sende
     return;
   }
   const { addMessageDb } = await import("@/lib/db/bridal-orders");
-  await addMessageDb(orderId, { senderType: "customer", senderName, message });
+  const saved = await addMessageDb(orderId, { senderType: "customer", senderName, message });
+  if (saved) {
+    import("@/lib/firebase/sync")
+      .then((m) => m.syncOrderMessage(orderId, saved))
+      .catch(console.error);
+  }
 
   const order = await resolveOrder(orderId);
   if (order) {
@@ -548,7 +584,26 @@ export async function addStaffMessage(orderId: string, message: string, senderNa
     return;
   }
   const { addMessageDb } = await import("@/lib/db/bridal-orders");
-  await addMessageDb(orderId, { senderType: "staff", senderName, message });
+  const saved = await addMessageDb(orderId, { senderType: "staff", senderName, message });
+  if (saved) {
+    import("@/lib/firebase/sync")
+      .then((m) => m.syncOrderMessage(orderId, saved))
+      .catch(console.error);
+  }
+
+  const order = await resolveOrder(orderId);
+  if (order) {
+    import("@/lib/push/send")
+      .then((m) =>
+        m.sendPushToOrderCustomer(orderId, {
+          title: "Message from ZARKARI",
+          body: message.slice(0, 120),
+          href: `/my-order/${order.orderNumber}`,
+          orderId,
+        })
+      )
+      .catch(console.error);
+  }
 }
 
 export async function addOrderFile(orderId: string, category: string, fileName: string, url: string) {

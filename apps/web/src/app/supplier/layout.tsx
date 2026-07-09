@@ -1,7 +1,7 @@
 import { BomsShell } from "@/components/boms/BomsShell";
 import { SupplierMobileNav } from "@/components/boms/MobileBottomNav";
 import { PwaInstallBanner } from "@/components/boms/PwaInstallBanner";
-import { PwaServiceWorkerRegister } from "@/components/boms/PwaServiceWorkerRegister";
+import { PushPermissionPrompt } from "@/components/boms/PushPermissionPrompt";
 import { getSession } from "@/lib/auth/session";
 import type { Metadata } from "next";
 
@@ -16,7 +16,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   return (
     <>
       <BomsShell role="supplier" userName={session?.name} userRole="supplier">
-        <PwaServiceWorkerRegister />
+        <PushPermissionPrompt variant="staff" />
         <PwaInstallBanner />
         {children}
       </BomsShell>

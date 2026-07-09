@@ -8,3 +8,4 @@ export * from "./schema/cash-ledger";
 export * from "./schema/supplier-ledger";
 export * from "./schema/upload-relay";
 export * from "./schema/cargo-boxes";
+export * from "./schema/device-tokens";

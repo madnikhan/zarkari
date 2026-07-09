@@ -8,6 +8,7 @@ import {
   boolean,
   primaryKey,
   jsonb,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const collections = pgTable("collections", {
@@ -72,17 +73,21 @@ export const retailOrders = pgTable("retail_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const retailOrderItems = pgTable("retail_order_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orderId: uuid("order_id").notNull(),
-  productId: uuid("product_id"),
-  variantId: uuid("variant_id"),
-  title: text("title").notNull(),
-  quantity: integer("quantity").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  measurements: jsonb("measurements").$type<{
-    mode: "standard" | "custom";
-    label: string;
-    measurements: Record<string, number>;
-  }>(),
-});
+export const retailOrderItems = pgTable(
+  "retail_order_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull(),
+    productId: uuid("product_id"),
+    variantId: uuid("variant_id"),
+    title: text("title").notNull(),
+    quantity: integer("quantity").notNull(),
+    price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+    measurements: jsonb("measurements").$type<{
+      mode: "standard" | "custom";
+      label: string;
+      measurements: Record<string, number>;
+    }>(),
+  },
+  (t) => [index("retail_order_items_order_id_idx").on(t.orderId)]
+);

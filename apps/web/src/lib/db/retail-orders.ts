@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import type { RetailOrder } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
 
@@ -125,25 +125,31 @@ export async function listRetailOrdersDb(): Promise<RetailOrder[]> {
   if (!db) return [];
 
   const orders = await db.select().from(schema.retailOrders).orderBy(desc(schema.retailOrders.createdAt));
+  if (!orders.length) return [];
 
-  const result: RetailOrder[] = [];
-  for (const order of orders) {
-    const items = await db
-      .select()
-      .from(schema.retailOrderItems)
-      .where(eq(schema.retailOrderItems.orderId, order.id));
-    result.push({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      customerEmail: order.customerEmail,
-      customerName: order.customerName ?? undefined,
-      status: order.status,
-      total: order.total,
-      items: items.map((i) => mapDbItem(i)),
-      createdAt: order.createdAt.toISOString(),
-    });
+  const orderIds = orders.map((o) => o.id);
+  const allItems = await db
+    .select()
+    .from(schema.retailOrderItems)
+    .where(inArray(schema.retailOrderItems.orderId, orderIds));
+
+  const itemsByOrder = new Map<string, typeof allItems>();
+  for (const item of allItems) {
+    const list = itemsByOrder.get(item.orderId) ?? [];
+    list.push(item);
+    itemsByOrder.set(item.orderId, list);
   }
-  return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return orders.map((order) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerEmail: order.customerEmail,
+    customerName: order.customerName ?? undefined,
+    status: order.status,
+    total: order.total,
+    items: (itemsByOrder.get(order.id) ?? []).map((i) => mapDbItem(i)),
+    createdAt: order.createdAt.toISOString(),
+  }));
 }
 
 export async function updateRetailOrderStatusDb(id: string, status: string): Promise<boolean> {

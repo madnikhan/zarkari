@@ -64,6 +64,28 @@ export async function listBridalOrdersDb(filters?: {
 
 const TERMINAL_STATUSES: BridalStatus[] = ["collected", "cancelled", "refunded"];
 
+export async function listActiveBridalOrdersForDeadlinesDb(): Promise<BridalOrder[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const weekAhead = new Date(now.getTime() + 7 * 86400000);
+
+  const rows = await db
+    .select()
+    .from(schema.bridalOrders)
+    .where(
+      and(
+        notInArray(schema.bridalOrders.status, TERMINAL_STATUSES),
+        lte(schema.bridalOrders.deliveryDate, weekAhead)
+      )
+    )
+    .orderBy(desc(schema.bridalOrders.deliveryDate))
+    .limit(200);
+
+  return rows.map(mapOrder);
+}
+
 export type BridalOrderWithRelations = BridalOrder & {
   customerName?: string;
   customerPhone?: string;
@@ -108,9 +130,29 @@ function mapOrderWithRelations(row: {
   };
 }
 
+export type SupplierTab = "new" | "in-progress" | "completed" | "cancelled";
+
+function supplierTabCondition(tab: SupplierTab) {
+  if (tab === "new") return eq(schema.bridalOrders.status, "sent_to_supplier");
+  if (tab === "completed") return eq(schema.bridalOrders.status, "collected");
+  if (tab === "cancelled") {
+    return inArray(schema.bridalOrders.status, ["cancelled", "refunded", "supplier_rejected"]);
+  }
+  return and(
+    notInArray(schema.bridalOrders.status, [
+      "collected",
+      "cancelled",
+      "refunded",
+      "sent_to_supplier",
+      "supplier_rejected",
+    ])
+  );
+}
+
 export async function listBridalOrdersWithRelationsDb(filters: {
   supplierId?: string;
   tab?: OrdersTab;
+  supplierTab?: SupplierTab;
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
@@ -120,7 +162,8 @@ export async function listBridalOrdersWithRelationsDb(filters: {
 
   const conditions = [];
   if (filters.supplierId) conditions.push(eq(schema.bridalOrders.supplierId, filters.supplierId));
-  if (filters.tab) conditions.push(ordersTabCondition(filters.tab));
+  if (filters.supplierTab) conditions.push(supplierTabCondition(filters.supplierTab));
+  else if (filters.tab) conditions.push(ordersTabCondition(filters.tab));
   else if (filters.activeOnly) conditions.push(notInArray(schema.bridalOrders.status, TERMINAL_STATUSES));
 
   const whereClause = conditions.length ? and(...conditions) : undefined;
@@ -148,6 +191,43 @@ export async function listBridalOrdersWithRelationsDb(filters: {
 
   const rows = await query;
   return { orders: rows.map(mapOrderWithRelations), total: Number(countRow?.count ?? 0) };
+}
+
+export async function getSupplierTabCountsDb(supplierId: string): Promise<{
+  new: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+}> {
+  const db = getDb();
+  if (!db) return { new: 0, inProgress: 0, completed: 0, cancelled: 0 };
+
+  const base = eq(schema.bridalOrders.supplierId, supplierId);
+  const [[newRow], [inProgressRow], [completedRow], [cancelledRow]] = await Promise.all([
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(base, supplierTabCondition("new"))),
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(base, supplierTabCondition("in-progress"))),
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(base, supplierTabCondition("completed"))),
+    db
+      .select({ c: count() })
+      .from(schema.bridalOrders)
+      .where(and(base, supplierTabCondition("cancelled"))),
+  ]);
+
+  return {
+    new: Number(newRow?.c ?? 0),
+    inProgress: Number(inProgressRow?.c ?? 0),
+    completed: Number(completedRow?.c ?? 0),
+    cancelled: Number(cancelledRow?.c ?? 0),
+  };
 }
 
 export async function getBridalDashboardStatsDb() {
@@ -998,15 +1078,34 @@ export async function getPaymentsDb(orderId: string) {
 export async function addMessageDb(
   orderId: string,
   input: { senderType: string; senderName?: string; message: string }
-): Promise<void> {
+): Promise<{
+  id: string;
+  orderId: string;
+  senderType: "customer" | "staff";
+  senderName?: string;
+  message: string;
+  createdAt: string;
+} | null> {
   const db = getDb();
-  if (!db) return;
-  await db.insert(schema.customerMessages).values({
-    orderId,
-    senderType: input.senderType,
-    senderName: input.senderName ?? null,
-    message: input.message,
-  });
+  if (!db) return null;
+  const [row] = await db
+    .insert(schema.customerMessages)
+    .values({
+      orderId,
+      senderType: input.senderType,
+      senderName: input.senderName ?? null,
+      message: input.message,
+    })
+    .returning();
+  if (!row) return null;
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    senderType: row.senderType as "customer" | "staff",
+    senderName: row.senderName ?? undefined,
+    message: row.message,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 export async function getMessagesDb(orderId: string) {

@@ -6,6 +6,7 @@
 |---------|---------|-----------|
 | Vercel | Next.js hosting | Hobby |
 | Neon | PostgreSQL | Free |
+| Firebase | Live sync + push (optional) | Spark + usage |
 | Cloudflare R2 | File storage | Free |
 | Stripe | Retail checkout | Pay per transaction |
 | Soro | SEO blog webhook | Paid |
@@ -16,7 +17,8 @@
 Set in Vercel project settings:
 
 ```env
-DATABASE_URL=postgresql://...@neon.tech/zarkari
+# Prefer Neon pooler URL for Vercel/serverless (hostname includes -pooler)
+DATABASE_URL=postgresql://...@ep-xxx-pooler.neon.tech/zarkari
 NEXT_PUBLIC_SITE_URL=https://zarkari.co.uk
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -27,7 +29,18 @@ R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=zarkari-files
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=
+FIREBASE_ADMIN_PROJECT_ID=
+FIREBASE_ADMIN_CLIENT_EMAIL=
+FIREBASE_ADMIN_PRIVATE_KEY=
 ```
+
+See [firebase-setup.md](./firebase-setup.md) for Firebase project configuration.
 
 ## Deploy Steps
 

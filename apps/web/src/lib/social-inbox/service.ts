@@ -26,6 +26,9 @@ function notifyInquiry(title: string, body: string, threadId: string) {
   if (isDbConfigured()) {
     createNotificationDb({ title, body, href, threadId }).catch(console.error);
   }
+  import("@/lib/push/send")
+    .then((m) => m.sendPushToStaff({ title, body, href }))
+    .catch(console.error);
 }
 
 function listDemoThreads(filters?: {

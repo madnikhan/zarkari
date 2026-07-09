@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { notificationHref } from "@/lib/notification-link";
+import { getClientFirestore } from "@/lib/firebase/client";
+import { isFirebaseClientConfigured } from "@/lib/firebase/config";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface NotificationItem {
   id: string;
@@ -16,9 +20,11 @@ interface NotificationItem {
 }
 
 export function NotificationBell() {
+  const { ready } = useFirebaseAuth();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [fetchError, setFetchError] = useState("");
+  const [liveUnread, setLiveUnread] = useState(0);
 
   async function load() {
     setFetchError("");
@@ -36,6 +42,31 @@ export function NotificationBell() {
     if (open) load();
   }, [open]);
 
+  useEffect(() => {
+    if (!ready || !isFirebaseClientConfigured()) {
+      const interval = window.setInterval(async () => {
+        try {
+          const r = await fetch("/api/notifications?countOnly=true");
+          if (!r.ok) return;
+          const d = await r.json();
+          setLiveUnread(d.unread ?? 0);
+        } catch {
+          /* ignore polling errors */
+        }
+      }, 60000);
+      return () => window.clearInterval(interval);
+    }
+
+    const db = getClientFirestore();
+    if (!db) return;
+
+    const unsubShared = onSnapshot(doc(db, "staff_inbox", "shared"), (snapshot) => {
+      setLiveUnread(snapshot.data()?.unreadCount ?? 0);
+    });
+
+    return () => unsubShared();
+  }, [ready]);
+
   async function markRead(id: string) {
     await fetch("/api/notifications", {
       method: "PATCH",
@@ -43,14 +74,17 @@ export function NotificationBell() {
       body: JSON.stringify({ id }),
     });
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setLiveUnread((c) => Math.max(0, c - 1));
   }
 
   async function markAllRead() {
     await fetch("/api/notifications", { method: "PATCH" });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setLiveUnread(0);
   }
 
-  const unread = notifications.filter((n) => !n.read).length;
+  const listUnread = notifications.filter((n) => !n.read).length;
+  const unread = open ? listUnread : liveUnread || listUnread;
 
   return (
     <div className="relative">
@@ -69,7 +103,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-sand rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
           <div className="p-3 border-b border-sand flex items-center justify-between">
             <p className="text-xs uppercase tracking-wide text-charcoal/50">Notifications</p>
-            {unread > 0 && (
+            {listUnread > 0 && (
               <button type="button" onClick={markAllRead} className="text-xs text-[#4C3BCF] hover:underline">
                 Mark all read
               </button>

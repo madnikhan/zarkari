@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface Props {
   orderId: string;
@@ -9,7 +8,6 @@ interface Props {
 }
 
 export function StaffMessageForm({ orderId }: Props) {
-  const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +31,6 @@ export function StaffMessageForm({ orderId }: Props) {
       }
       setMessage("");
       setSuccess(true);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send");
     } finally {

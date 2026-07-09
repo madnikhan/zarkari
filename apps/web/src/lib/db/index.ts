@@ -19,7 +19,12 @@ export function isUuid(value: string): boolean {
 export function getDb() {
   if (!isDbConfigured()) return null;
   if (!db) {
-    client = postgres(process.env.DATABASE_URL!, { max: 3 });
+    const url = process.env.DATABASE_URL!;
+    const usePooler = url.includes("-pooler") || url.includes("pooler");
+    client = postgres(url, {
+      max: process.env.VERCEL ? 1 : 3,
+      prepare: !usePooler,
+    });
     db = drizzle(client, { schema });
   }
   return db;

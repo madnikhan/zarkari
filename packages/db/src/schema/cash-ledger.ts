@@ -8,6 +8,7 @@ import {
   date,
   pgEnum,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const cashDirectionEnum = pgEnum("cash_direction", ["in", "out"]);
@@ -43,22 +44,26 @@ export const cashOpeningBalances = pgTable(
   (t) => [uniqueIndex("cash_opening_balances_date_idx").on(t.businessDate)]
 );
 
-export const cashTransactions = pgTable("cash_transactions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  direction: cashDirectionEnum("direction").notNull(),
-  type: cashTransactionTypeEnum("type").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  method: cashPaymentMethodEnum("method").notNull(),
-  reference: text("reference"),
-  description: text("description"),
-  expenseCategory: text("expense_category"),
-  businessDate: date("business_date").notNull(),
-  occurredAt: timestamp("occurred_at").notNull(),
-  orderId: uuid("order_id"),
-  retailOrderId: uuid("retail_order_id"),
-  supplierId: uuid("supplier_id"),
-  source: cashTransactionSourceEnum("source").default("manual").notNull(),
-  isSample: boolean("is_sample").default(false).notNull(),
-  createdByUserId: uuid("created_by_user_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const cashTransactions = pgTable(
+  "cash_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    direction: cashDirectionEnum("direction").notNull(),
+    type: cashTransactionTypeEnum("type").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    method: cashPaymentMethodEnum("method").notNull(),
+    reference: text("reference"),
+    description: text("description"),
+    expenseCategory: text("expense_category"),
+    businessDate: date("business_date").notNull(),
+    occurredAt: timestamp("occurred_at").notNull(),
+    orderId: uuid("order_id"),
+    retailOrderId: uuid("retail_order_id"),
+    supplierId: uuid("supplier_id"),
+    source: cashTransactionSourceEnum("source").default("manual").notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+    createdByUserId: uuid("created_by_user_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("cash_transactions_business_date_idx").on(t.businessDate)]
+);

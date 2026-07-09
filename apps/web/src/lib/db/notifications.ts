@@ -1,6 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { AppNotification } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
+import { incrementStaffUnread } from "@/lib/firebase/sync";
 
 export async function listNotificationsDb(userId?: string, limit = 50): Promise<AppNotification[]> {
   const db = getDb();
@@ -42,6 +43,7 @@ export async function createNotificationDb(input: {
     title: input.title,
     body: input.body ?? null,
   });
+  incrementStaffUnread(input.userId);
 }
 
 export async function markNotificationReadDb(id: string): Promise<void> {
@@ -53,9 +55,26 @@ export async function markNotificationReadDb(id: string): Promise<void> {
 export async function markAllNotificationsReadDb(userId?: string): Promise<void> {
   const db = getDb();
   if (!db) return;
-  const rows = await db.select().from(schema.notifications);
-  for (const row of rows) {
-    if (userId && row.userId && row.userId !== userId) continue;
-    await db.update(schema.notifications).set({ read: true }).where(eq(schema.notifications.id, row.id));
-  }
+  await db
+    .update(schema.notifications)
+    .set({ read: true })
+    .where(
+      userId
+        ? and(eq(schema.notifications.read, false), eq(schema.notifications.userId, userId))
+        : eq(schema.notifications.read, false)
+    );
+}
+
+export async function countUnreadNotificationsDb(userId?: string): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: schema.notifications.id })
+    .from(schema.notifications)
+    .where(
+      userId
+        ? and(eq(schema.notifications.read, false), eq(schema.notifications.userId, userId))
+        : eq(schema.notifications.read, false)
+    );
+  return rows.length;
 }
