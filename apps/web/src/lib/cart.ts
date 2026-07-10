@@ -3,6 +3,8 @@ import type { CartItem } from "@/lib/data/seed";
 import { demoProducts } from "@/lib/data/seed";
 import { sanitizeImageUrl } from "@/lib/image-url";
 import { buildLineId, formatSizeSummary, type SizeSelection } from "@/lib/sizing";
+import { getVariantByIdDb } from "@/lib/db/cms-products";
+import { isDbConfigured } from "@/lib/db";
 
 const CART_COOKIE = "zarkari-cart";
 
@@ -20,18 +22,16 @@ export async function getCart(): Promise<CartItem[]> {
     const cleaned: CartItem[] = [];
     for (const item of items) {
       if (!item.sizeSelection || !item.lineId) continue;
-      const product = demoProducts.find(
-        (p) => p.id === item.productId || p.handle === item.handle
-      );
-      if (!product) continue;
-      const variant = product.variants.find((v) => v.id === item.variantId) ?? product.variants[0];
-      if (!variant) continue;
+      const resolved = await resolveCartLine(item.variantId, item.sizeSelection as SizeSelection);
+      if (!resolved) continue;
       cleaned.push({
         ...item,
-        title: formatCartTitle(product.title, item.sizeSelection as SizeSelection),
-        handle: product.handle,
-        price: variant.price,
-        imageUrl: sanitizeImageUrl(product.featuredImageUrl),
+        title: formatCartTitle(resolved.product.title, item.sizeSelection as SizeSelection),
+        handle: resolved.product.handle,
+        productId: resolved.product.id,
+        variantId: resolved.variant.id,
+        price: resolved.variant.price,
+        imageUrl: sanitizeImageUrl(resolved.product.featuredImageUrl),
       });
     }
     return cleaned;
@@ -40,29 +40,50 @@ export async function getCart(): Promise<CartItem[]> {
   }
 }
 
-export function buildCartItem(
-  variantId: string,
-  quantity: number,
-  sizeSelection: SizeSelection
-): CartItem | null {
+async function resolveCartLine(variantId: string, _sizeSelection: SizeSelection) {
+  if (isDbConfigured()) {
+    const row = await getVariantByIdDb(variantId);
+    if (row) {
+      return { product: row.product, variant: row.variant };
+    }
+  }
   for (const product of demoProducts) {
     const variant = product.variants.find((v) => v.id === variantId);
     if (variant) {
-      const lineId = buildLineId(variantId, sizeSelection);
       return {
-        lineId,
-        variantId: variant.id,
-        productId: product.id,
-        title: formatCartTitle(product.title, sizeSelection),
-        handle: product.handle,
-        price: variant.price,
-        quantity,
-        imageUrl: sanitizeImageUrl(product.featuredImageUrl),
-        sizeSelection,
+        product,
+        variant: {
+          id: variant.id,
+          title: variant.title,
+          price: variant.price,
+          inventoryQty: variant.inventoryQty,
+        },
       };
     }
   }
   return null;
+}
+
+export async function buildCartItem(
+  variantId: string,
+  quantity: number,
+  sizeSelection: SizeSelection
+): Promise<CartItem | null> {
+  const resolved = await resolveCartLine(variantId, sizeSelection);
+  if (!resolved) return null;
+
+  const lineId = buildLineId(variantId, sizeSelection);
+  return {
+    lineId,
+    variantId: resolved.variant.id,
+    productId: resolved.product.id,
+    title: formatCartTitle(resolved.product.title, sizeSelection),
+    handle: resolved.product.handle,
+    price: resolved.variant.price,
+    quantity,
+    imageUrl: sanitizeImageUrl(resolved.product.featuredImageUrl),
+    sizeSelection,
+  };
 }
 
 export function mergeCartItems(cart: CartItem[], item: CartItem): CartItem[] {

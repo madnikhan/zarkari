@@ -9,3 +9,4 @@ export * from "./schema/supplier-ledger";
 export * from "./schema/upload-relay";
 export * from "./schema/cargo-boxes";
 export * from "./schema/device-tokens";
+export * from "./schema/stock";

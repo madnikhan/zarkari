@@ -9,6 +9,7 @@ import {
   updateCartQuantity,
 } from "@/lib/cart";
 import type { SizeSelection } from "@/lib/sizing";
+import { validateStockAvailability } from "@/lib/stock/service";
 
 const COOKIE_OPTS = { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 14 };
 
@@ -24,6 +25,25 @@ function isSizeSelection(value: unknown): value is SizeSelection {
     typeof v.label === "string" &&
     typeof v.measurements === "object" &&
     v.measurements !== null
+  );
+}
+
+async function validateCartStock(cart: Awaited<ReturnType<typeof getCart>>) {
+  const byVariant = new Map<string, { quantity: number; title: string }>();
+  for (const item of cart) {
+    const existing = byVariant.get(item.variantId);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      byVariant.set(item.variantId, { quantity: item.quantity, title: item.title });
+    }
+  }
+  return validateStockAvailability(
+    [...byVariant.entries()].map(([variantId, { quantity, title }]) => ({
+      variantId,
+      quantity,
+      title,
+    }))
   );
 }
 
@@ -57,10 +77,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "sizeSelection required" }, { status: 400 });
   }
 
-  const item = buildCartItem(variantId, quantity, sizeSelection);
+  const item = await buildCartItem(variantId, quantity, sizeSelection);
   if (!item) return NextResponse.json({ error: "Variant not found" }, { status: 404 });
 
   const cart = mergeCartItems(await getCart(), item);
+  const stockCheck = await validateCartStock(cart);
+  if (!stockCheck.ok) {
+    return NextResponse.json({ error: stockCheck.error }, { status: 400 });
+  }
+
   const res = NextResponse.json({ cart, ok: true });
   setCartCookie(res, cart);
   return res;
@@ -74,6 +99,13 @@ export async function PATCH(request: Request) {
   }
 
   const cart = updateCartQuantity(await getCart(), lineId, quantity);
+  if (quantity > 0) {
+    const stockCheck = await validateCartStock(cart);
+    if (!stockCheck.ok) {
+      return NextResponse.json({ error: stockCheck.error }, { status: 400 });
+    }
+  }
+
   const res = NextResponse.json({ cart, ok: true });
   setCartCookie(res, cart);
   return res;

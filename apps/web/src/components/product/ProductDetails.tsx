@@ -2,23 +2,40 @@
 
 import Image from "next/image";
 import { MessageCircle } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Product } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
-import type { SizeSelection } from "@/lib/sizing";
+import type { SizeSelection, StandardSizeKey } from "@/lib/sizing";
 import { formatSizeSummary } from "@/lib/sizing";
 import { AddToCartButton } from "./AddToCartButton";
 import { SizeGuide } from "./SizeGuide";
 import { SizeSelector } from "./SizeSelector";
+import { buildSizeStockMap, getVariantForSize, totalProductStock } from "@/lib/stock/sizes";
 
 export function ProductDetails({ product }: { product: Product }) {
-  const [selectedVariant, setSelectedVariant] = useState(product.variants[0]);
+  const sizeStock = useMemo(() => buildSizeStockMap(product.variants), [product.variants]);
+  const [selectedSize, setSelectedSize] = useState<StandardSizeKey | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [sizeSelection, setSizeSelection] = useState<SizeSelection | null>(null);
 
+  const selectedVariant = useMemo(() => {
+    if (selectedSize) return getVariantForSize(product, selectedSize);
+    if (sizeSelection?.mode === "standard") {
+      return getVariantForSize(product, sizeSelection.label as StandardSizeKey);
+    }
+    return product.variants.find((v) => v.inventoryQty > 0) ?? product.variants[0];
+  }, [product, selectedSize, sizeSelection]);
+
   const price = selectedVariant?.price ?? product.variants[0]?.price ?? "0";
   const comingSoon = product.tags.includes("coming-soon");
-  const available = !comingSoon && (selectedVariant?.inventoryQty ?? 0) > 0;
+  const totalStock = totalProductStock(product.variants);
+  const sizeAvailable =
+    sizeSelection?.mode === "standard"
+      ? (sizeStock[sizeSelection.label as StandardSizeKey] ?? 0) > 0
+      : sizeSelection?.mode === "custom"
+        ? totalStock > 0
+        : false;
+  const available = !comingSoon && (sizeSelection ? sizeAvailable : totalStock > 0);
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
   const images = product.images.length ? product.images : product.featuredImageUrl ? [product.featuredImageUrl] : [];
@@ -68,12 +85,21 @@ export function ProductDetails({ product }: { product: Product }) {
         )}
         <p className="text-charcoal/70 leading-relaxed mb-8">{product.description}</p>
 
-        {!comingSoon && (
-          <SizeSelector value={sizeSelection} onChange={setSizeSelection} />
+        {!comingSoon && totalStock <= 0 && (
+          <p className="text-sm text-red-600 mb-4 uppercase tracking-wider">Out of stock</p>
+        )}
+
+        {!comingSoon && totalStock > 0 && (
+          <SizeSelector
+            value={sizeSelection}
+            onChange={setSizeSelection}
+            stockBySize={sizeStock}
+            onSizeSelect={setSelectedSize}
+          />
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
-          {!comingSoon && (
+          {!comingSoon && totalStock > 0 && (
             <AddToCartButton
               variantId={selectedVariant?.id ?? product.variants[0].id}
               sizeSelection={sizeSelection}
@@ -98,7 +124,7 @@ export function ProductDetails({ product }: { product: Product }) {
           )}
         </div>
 
-        {!comingSoon && !sizeSelection && (
+        {!comingSoon && !sizeSelection && totalStock > 0 && (
           <p className="text-sm text-charcoal/50 mb-8 -mt-4">Select a size or enter custom measurements to add to bag.</p>
         )}
 

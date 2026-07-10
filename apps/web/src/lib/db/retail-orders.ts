@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray, or, ilike } from "drizzle-orm";
 import type { RetailOrder } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
 
@@ -15,17 +15,30 @@ type OrderItemInput = {
   };
 };
 
-function mapDbItem(item: {
-  title: string;
-  quantity: number;
-  price: string;
-  measurements?: OrderItemInput["sizeSelection"] | null;
-}) {
+function mapDbOrder(
+  order: typeof schema.retailOrders.$inferSelect,
+  items: (typeof schema.retailOrderItems.$inferSelect)[]
+): RetailOrder {
   return {
-    title: item.title,
-    quantity: item.quantity,
-    price: item.price,
-    ...(item.measurements ? { sizeSelection: item.measurements } : {}),
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerEmail: order.customerEmail ?? undefined,
+    customerName: order.customerName ?? undefined,
+    customerPhone: order.customerPhone ?? undefined,
+    source: (order.source as RetailOrder["source"]) ?? "online",
+    paymentMethod: (order.paymentMethod as RetailOrder["paymentMethod"]) ?? undefined,
+    status: order.status,
+    total: order.total,
+    subtotal: order.subtotal,
+    items: items.map((i) => ({
+      title: i.title,
+      quantity: i.quantity,
+      price: i.price,
+      productId: i.productId ?? undefined,
+      variantId: i.variantId ?? undefined,
+      ...(i.measurements ? { sizeSelection: i.measurements } : {}),
+    })),
+    createdAt: order.createdAt.toISOString(),
   };
 }
 
@@ -46,23 +59,33 @@ export async function findRetailOrderByStripeSession(sessionId: string): Promise
     .from(schema.retailOrderItems)
     .where(eq(schema.retailOrderItems.orderId, order.id));
 
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customerEmail: order.customerEmail,
-    customerName: order.customerName ?? undefined,
-    status: order.status,
-    total: order.total,
-    items: items.map((i) => mapDbItem(i)),
-    createdAt: order.createdAt.toISOString(),
-  };
+  return mapDbOrder(order, items);
+}
+
+export async function getRetailOrderByIdDb(id: string): Promise<RetailOrder | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const [order] = await db.select().from(schema.retailOrders).where(eq(schema.retailOrders.id, id)).limit(1);
+  if (!order) return null;
+
+  const items = await db
+    .select()
+    .from(schema.retailOrderItems)
+    .where(eq(schema.retailOrderItems.orderId, order.id));
+
+  return mapDbOrder(order, items);
 }
 
 export async function createRetailOrderDb(input: {
-  customerEmail: string;
+  customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
+  source?: "online" | "walk_in";
+  paymentMethod?: "stripe" | "cash" | "card";
   items: OrderItemInput[];
   stripeSessionId?: string;
+  status?: string;
 }): Promise<RetailOrder | null> {
   const db = getDb();
   if (!db) return null;
@@ -80,12 +103,15 @@ export async function createRetailOrderDb(input: {
     .insert(schema.retailOrders)
     .values({
       orderNumber,
-      customerEmail: input.customerEmail,
-      customerName: input.customerName,
-      status: "paid",
+      customerEmail: input.customerEmail ?? null,
+      customerName: input.customerName ?? null,
+      customerPhone: input.customerPhone ?? null,
+      source: input.source ?? "online",
+      paymentMethod: input.paymentMethod ?? (input.stripeSessionId ? "stripe" : null),
+      status: input.status ?? "paid",
       subtotal: total,
       total,
-      stripeSessionId: input.stripeSessionId,
+      stripeSessionId: input.stripeSessionId ?? null,
     })
     .returning();
 
@@ -103,28 +129,23 @@ export async function createRetailOrderDb(input: {
     );
   }
 
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customerEmail: order.customerEmail,
-    customerName: order.customerName ?? undefined,
-    status: order.status,
-    total: order.total,
-    items: input.items.map((i) => ({
-      title: i.title,
-      quantity: i.quantity,
-      price: i.price,
-      ...(i.sizeSelection ? { sizeSelection: i.sizeSelection } : {}),
-    })),
-    createdAt: order.createdAt.toISOString(),
-  };
+  return getRetailOrderByIdDb(order.id);
 }
 
-export async function listRetailOrdersDb(): Promise<RetailOrder[]> {
+export async function listRetailOrdersDb(filters?: {
+  source?: "online" | "walk_in";
+}): Promise<RetailOrder[]> {
   const db = getDb();
   if (!db) return [];
 
-  const orders = await db.select().from(schema.retailOrders).orderBy(desc(schema.retailOrders.createdAt));
+  const orders = filters?.source
+    ? await db
+        .select()
+        .from(schema.retailOrders)
+        .where(eq(schema.retailOrders.source, filters.source))
+        .orderBy(desc(schema.retailOrders.createdAt))
+    : await db.select().from(schema.retailOrders).orderBy(desc(schema.retailOrders.createdAt));
+
   if (!orders.length) return [];
 
   const orderIds = orders.map((o) => o.id);
@@ -140,16 +161,44 @@ export async function listRetailOrdersDb(): Promise<RetailOrder[]> {
     itemsByOrder.set(item.orderId, list);
   }
 
-  return orders.map((order) => ({
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customerEmail: order.customerEmail,
-    customerName: order.customerName ?? undefined,
-    status: order.status,
-    total: order.total,
-    items: (itemsByOrder.get(order.id) ?? []).map((i) => mapDbItem(i)),
-    createdAt: order.createdAt.toISOString(),
-  }));
+  return orders.map((order) => mapDbOrder(order, itemsByOrder.get(order.id) ?? []));
+}
+
+export async function searchRetailOrdersDb(query: string): Promise<RetailOrder[]> {
+  const db = getDb();
+  if (!db || !query.trim()) return [];
+
+  const q = `%${query.trim()}%`;
+  const orders = await db
+    .select()
+    .from(schema.retailOrders)
+    .where(
+      or(
+        ilike(schema.retailOrders.orderNumber, q),
+        ilike(schema.retailOrders.customerEmail, q),
+        ilike(schema.retailOrders.customerName, q),
+        ilike(schema.retailOrders.customerPhone, q)
+      )
+    )
+    .orderBy(desc(schema.retailOrders.createdAt))
+    .limit(20);
+
+  if (!orders.length) return [];
+
+  const orderIds = orders.map((o) => o.id);
+  const allItems = await db
+    .select()
+    .from(schema.retailOrderItems)
+    .where(inArray(schema.retailOrderItems.orderId, orderIds));
+
+  const itemsByOrder = new Map<string, typeof allItems>();
+  for (const item of allItems) {
+    const list = itemsByOrder.get(item.orderId) ?? [];
+    list.push(item);
+    itemsByOrder.set(item.orderId, list);
+  }
+
+  return orders.map((order) => mapDbOrder(order, itemsByOrder.get(order.id) ?? []));
 }
 
 export async function updateRetailOrderStatusDb(id: string, status: string): Promise<boolean> {
@@ -161,4 +210,15 @@ export async function updateRetailOrderStatusDb(id: string, status: string): Pro
     .where(eq(schema.retailOrders.id, id))
     .returning();
   return Boolean(row);
+}
+
+export async function getRetailOrderStatusDb(id: string): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select({ status: schema.retailOrders.status })
+    .from(schema.retailOrders)
+    .where(eq(schema.retailOrders.id, id))
+    .limit(1);
+  return row?.status ?? null;
 }

@@ -107,6 +107,17 @@ export async function POST(request: Request) {
           description: order.items.map((i) => i.title).join(", ") || "Online shop sale",
           retailOrderId: order.id,
         });
+
+        const { deductForRetailOrder } = await import("@/lib/stock/service");
+        await deductForRetailOrder(
+          order.id,
+          orderInput.items.map((i) => ({
+            variantId: i.variantId,
+            productId: i.productId,
+            quantity: i.quantity,
+            title: i.title,
+          }))
+        ).catch(console.error);
       }
 
       await sendOrderConfirmation(email, order.orderNumber, total);

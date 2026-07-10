@@ -50,6 +50,7 @@ export const productVariants = pgTable("product_variants", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   inventoryQty: integer("inventory_qty").default(0).notNull(),
+  lowStockThreshold: integer("low_stock_threshold"),
   options: jsonb("options").$type<{ name: string; value: string }[]>(),
 });
 
@@ -64,8 +65,11 @@ export const productImages = pgTable("product_images", {
 export const retailOrders = pgTable("retail_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderNumber: text("order_number").notNull().unique(),
-  customerEmail: text("customer_email").notNull(),
+  customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  customerPhone: text("customer_phone"),
+  source: text("source").default("online").notNull(), // online | walk_in
+  paymentMethod: text("payment_method"), // stripe | cash | card
   status: text("status").default("pending").notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),

@@ -609,8 +609,8 @@ export async function searchOrders(query: string): Promise<BridalOrder[]> {
 
 export async function searchOrdersWithCustomer(query: string) {
   if (isDbConfigured()) {
-    const { searchBridalOrdersWithCustomerDb } = await import("@/lib/db/bridal-orders");
-    return searchBridalOrdersWithCustomerDb(query);
+    const { searchUnifiedOrders } = await import("@/lib/db/unified-orders");
+    return searchUnifiedOrders(query);
   }
   const results = await searchOrders(query);
   return results.map((order) => ({
@@ -644,7 +644,10 @@ export async function getPayableOrders() {
 export async function getDashboardStats() {
   if (isDbConfigured()) {
     const { getBridalDashboardStatsDb } = await import("@/lib/db/bridal-orders");
-    return getBridalDashboardStatsDb();
+    const { countLowStockVariants } = await import("@/lib/stock/service");
+    const stats = await getBridalDashboardStatsDb();
+    const lowStockItems = await countLowStockVariants();
+    return { ...stats, lowStockItems };
   }
 
   const allOrders = await loadAllBridalOrders();
@@ -663,6 +666,7 @@ export async function getDashboardStats() {
     cancelled: allOrders.filter((o) => o.status === "cancelled").length,
     refunded: allOrders.filter((o) => o.status === "refunded").length,
     completed: allOrders.filter((o) => o.status === "collected").length,
+    lowStockItems: 0,
   };
 }
 

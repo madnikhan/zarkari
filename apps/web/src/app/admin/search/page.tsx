@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import type { BridalOrder } from "@/lib/data/seed";
+import type { UnifiedOrder } from "@/lib/db/unified-orders";
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const initialQ = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(initialQ);
-  const [results, setResults] = useState<(BridalOrder & { customerName?: string })[]>([]);
+  const [results, setResults] = useState<UnifiedOrder[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -70,13 +70,14 @@ function SearchContent() {
         <ul className="space-y-3">
           {results.length ? (
             results.map((o) => (
-              <li key={o.id}>
+              <li key={`${o.type}-${o.id}`}>
                 <Link
-                  href={`/admin/orders/${o.id}`}
+                  href={o.href}
                   className="block boms-card p-4 hover:border-[#4C3BCF]/30 transition-colors"
                 >
                   <span className="font-mono text-sm text-[#4C3BCF]">{o.orderNumber}</span>
-                  <span className="text-slate-600 text-sm ml-3">{o.customerName}</span>
+                  <span className="text-xs uppercase tracking-wide text-slate-400 ml-2">{o.type}</span>
+                  <span className="text-slate-600 text-sm ml-3">{o.customerLabel}</span>
                 </Link>
               </li>
             ))

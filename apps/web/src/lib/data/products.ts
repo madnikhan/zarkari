@@ -15,6 +15,7 @@ export async function createProduct(input: {
   featuredImageUrl?: string;
   images?: string[];
   inventoryQty?: number;
+  sizeStock?: Partial<Record<import("@/lib/sizing").StandardSizeKey, number>>;
   published?: boolean;
   tags?: string[];
 }): Promise<Product> {
@@ -29,6 +30,7 @@ export async function createProduct(input: {
       featuredImageUrl: input.featuredImageUrl,
       images: input.images,
       inventoryQty: input.inventoryQty,
+      sizeStock: input.sizeStock,
       published: input.published,
       tags: input.tags,
     });
@@ -72,7 +74,7 @@ export async function updateProduct(
   id: string,
   input: Partial<
     Pick<Product, "title" | "handle" | "description" | "fabric" | "featuredImageUrl" | "collectionHandles" | "tags">
-  > & { price?: string; inventoryQty?: number; images?: string[]; published?: boolean }
+  > & { price?: string; inventoryQty?: number; sizeStock?: Partial<Record<import("@/lib/sizing").StandardSizeKey, number>>; images?: string[]; published?: boolean }
 ): Promise<Product | null> {
   if (isDbConfigured()) {
     const dbProduct = await updateProductDb(id, input);

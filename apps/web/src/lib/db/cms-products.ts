@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Product } from "@/lib/data/seed";
+import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
 import { getDb, isUuid, schema } from "./index";
 
 async function loadProductRelations(
@@ -41,6 +42,7 @@ async function loadProductRelations(
       price: v.price,
       compareAtPrice: v.compareAtPrice ?? undefined,
       inventoryQty: v.inventoryQty,
+      lowStockThreshold: v.lowStockThreshold ?? undefined,
       options: v.options ?? [{ name: "Title", value: v.title }],
     });
   }
@@ -109,6 +111,73 @@ export async function getProductByHandleDb(handle: string): Promise<Product | nu
   return mapProduct(row, rel.get(row.id)!);
 }
 
+export async function getVariantByIdDb(variantId: string) {
+  const db = getDb();
+  if (!db || !isUuid(variantId)) return null;
+  const [row] = await db
+    .select()
+    .from(schema.productVariants)
+    .where(eq(schema.productVariants.id, variantId))
+    .limit(1);
+  if (!row) return null;
+  const product = await getProductByIdDb(row.productId);
+  if (!product) return null;
+  const variant = product.variants.find((v) => v.id === row.id);
+  if (!variant) return null;
+  return { variant, product };
+}
+
+async function upsertSizeVariants(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  productId: string,
+  price: string,
+  sizeStock: Partial<Record<StandardSizeKey, number>>,
+  lowStockThreshold = 2
+) {
+  const existing = await db
+    .select()
+    .from(schema.productVariants)
+    .where(eq(schema.productVariants.productId, productId));
+
+  for (const size of STANDARD_SIZES) {
+    const match = existing.find(
+      (v) => v.options?.some((o) => o.name === "Size" && o.value === size) || v.title === size
+    );
+    const qty = sizeStock[size] ?? 0;
+    if (match) {
+      await db
+        .update(schema.productVariants)
+        .set({
+          price,
+          inventoryQty: qty,
+          lowStockThreshold,
+          title: size,
+          options: [{ name: "Size", value: size }],
+        })
+        .where(eq(schema.productVariants.id, match.id));
+    } else {
+      await db.insert(schema.productVariants).values({
+        productId,
+        title: size,
+        price,
+        inventoryQty: qty,
+        lowStockThreshold,
+        options: [{ name: "Size", value: size }],
+      });
+    }
+  }
+
+  const stale = existing.filter(
+    (v) =>
+      !STANDARD_SIZES.some(
+        (s) => v.options?.some((o) => o.name === "Size" && o.value === s) || v.title === s
+      )
+  );
+  for (const v of stale) {
+    await db.delete(schema.productVariants).where(eq(schema.productVariants.id, v.id));
+  }
+}
+
 export async function createProductDb(input: {
   title: string;
   handle: string;
@@ -116,6 +185,7 @@ export async function createProductDb(input: {
   fabric?: string;
   price: string;
   inventoryQty?: number;
+  sizeStock?: Partial<Record<StandardSizeKey, number>>;
   featuredImageUrl?: string;
   images?: string[];
   collectionHandles?: string[];
@@ -138,13 +208,15 @@ export async function createProductDb(input: {
     })
     .returning();
 
-  await db.insert(schema.productVariants).values({
-    productId: product.id,
-    title: "Standard",
-    price: input.price,
-    inventoryQty: input.inventoryQty ?? 5,
-    options: [{ name: "Title", value: "Standard" }],
-  });
+  const defaultQty = input.inventoryQty ?? 5;
+  const sizeStock =
+    input.sizeStock ??
+    (Object.fromEntries(STANDARD_SIZES.map((s) => [s, s === "M" ? defaultQty : 0])) as Record<
+      StandardSizeKey,
+      number
+    >);
+
+  await upsertSizeVariants(db, product.id, input.price, sizeStock);
 
   const imageUrls = input.images?.length ? input.images : input.featuredImageUrl ? [input.featuredImageUrl] : [];
   for (let i = 0; i < imageUrls.length; i++) {
@@ -177,6 +249,7 @@ export async function updateProductDb(
     fabric: string;
     price: string;
     inventoryQty: number;
+    sizeStock: Partial<Record<StandardSizeKey, number>>;
     featuredImageUrl: string;
     images: string[];
     collectionHandles: string[];
@@ -200,20 +273,25 @@ export async function updateProductDb(
     })
     .where(eq(schema.products.id, id));
 
-  if (input.price !== undefined || input.inventoryQty !== undefined) {
+  if (input.price !== undefined || input.inventoryQty !== undefined || input.sizeStock !== undefined) {
     const variants = await db
       .select()
       .from(schema.productVariants)
-      .where(eq(schema.productVariants.productId, id))
-      .limit(1);
-    if (variants[0]) {
+      .where(eq(schema.productVariants.productId, id));
+    const price = input.price ?? variants[0]?.price ?? "0";
+
+    if (input.sizeStock) {
+      await upsertSizeVariants(db, id, price, input.sizeStock);
+    } else if (input.inventoryQty !== undefined) {
+      const sizeStock = Object.fromEntries(
+        STANDARD_SIZES.map((s) => [s, s === "M" ? input.inventoryQty! : 0])
+      ) as Record<StandardSizeKey, number>;
+      await upsertSizeVariants(db, id, price, sizeStock);
+    } else if (input.price !== undefined) {
       await db
         .update(schema.productVariants)
-        .set({
-          ...(input.price !== undefined ? { price: input.price } : {}),
-          ...(input.inventoryQty !== undefined ? { inventoryQty: input.inventoryQty } : {}),
-        })
-        .where(eq(schema.productVariants.id, variants[0].id));
+        .set({ price: input.price })
+        .where(eq(schema.productVariants.productId, id));
     }
   }
 
@@ -245,4 +323,78 @@ export async function countProductsDb(): Promise<number> {
   if (!db) return 0;
   const rows = await db.select().from(schema.products);
   return rows.length;
+}
+
+export type StockOverviewRow = {
+  id: string;
+  title: string;
+  handle: string;
+  featuredImageUrl?: string;
+  sizeStock: Record<StandardSizeKey, number>;
+  totalStock: number;
+  lowStock: boolean;
+  variants: { id: string; size: StandardSizeKey; inventoryQty: number; lowStockThreshold?: number }[];
+};
+
+export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const products = await db.select().from(schema.products).orderBy(asc(schema.products.title));
+  if (!products.length) return [];
+
+  const productIds = products.map((p) => p.id);
+  const variants = await db
+    .select()
+    .from(schema.productVariants)
+    .where(inArray(schema.productVariants.productId, productIds));
+
+  return products.map((p) => {
+    const pVariants = variants.filter((v) => v.productId === p.id);
+    const sizeStock = Object.fromEntries(STANDARD_SIZES.map((s) => [s, 0])) as Record<StandardSizeKey, number>;
+    const variantRows: StockOverviewRow["variants"] = [];
+
+    for (const v of pVariants) {
+      const sizeOpt = v.options?.find((o) => o.name === "Size");
+      const size = (sizeOpt?.value ?? v.title) as StandardSizeKey;
+      if (STANDARD_SIZES.includes(size)) {
+        sizeStock[size] = v.inventoryQty;
+        const threshold = v.lowStockThreshold ?? 2;
+        variantRows.push({
+          id: v.id,
+          size,
+          inventoryQty: v.inventoryQty,
+          lowStockThreshold: threshold,
+        });
+      }
+    }
+
+    const totalStock = Object.values(sizeStock).reduce((a, b) => a + b, 0);
+    const lowStock = variantRows.some(
+      (v) => v.inventoryQty > 0 && v.inventoryQty <= (v.lowStockThreshold ?? 2)
+    );
+
+    return {
+      id: p.id,
+      title: p.title,
+      handle: p.handle,
+      featuredImageUrl: p.featuredImageUrl ?? undefined,
+      sizeStock,
+      totalStock,
+      lowStock,
+      variants: variantRows,
+    };
+  });
+}
+
+export async function listStockMovementsDb(productId: string, limit = 50) {
+  const db = getDb();
+  if (!db || !isUuid(productId)) return [];
+
+  return db
+    .select()
+    .from(schema.stockMovements)
+    .where(eq(schema.stockMovements.productId, productId))
+    .orderBy(desc(schema.stockMovements.createdAt))
+    .limit(limit);
 }

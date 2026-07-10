@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart, XCircle } from "lucide-react";
+import { Package, Clock, AlertTriangle, CheckCircle, RotateCcw, ShoppingCart, XCircle, Boxes } from "lucide-react";
 import { getBridalOrdersWithRelations, getDashboardStats } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { StatCard } from "@/components/boms/StatCard";
@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8" data-tour="stat-cards">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8" data-tour="stat-cards">
         <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
         <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
         <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders?tab=due-week" icon={Clock} accent="warning" />
@@ -41,15 +41,16 @@ export default async function AdminDashboardPage() {
         <StatCard label="Completed" value={stats.completed} subtitle="Completed" href="/admin/orders?tab=completed" icon={CheckCircle} accent="success" />
         <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders?tab=refunded" icon={RotateCcw} />
         <StatCard label="Cancelled" value={stats.cancelled} subtitle="Total cancelled" href="/admin/orders?tab=cancelled" icon={XCircle} accent="danger" />
+        <StatCard label="Low Stock" value={stats.lowStockItems ?? 0} subtitle="Ready-made sizes" href="/admin/stock" icon={Boxes} accent="warning" />
       </div>
 
       <SocialInboxWidget />
 
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Recent Orders</h2>
-        <Link href="/admin/orders/retail" className="text-xs text-[#4C3BCF] hover:underline flex items-center gap-1">
+        <Link href="/admin/orders?type=online" className="text-xs text-[#4C3BCF] hover:underline flex items-center gap-1">
           <ShoppingCart className="h-3.5 w-3.5" />
-          Online shop orders
+          Shop orders
         </Link>
       </div>
       <div data-tour="recent-orders">

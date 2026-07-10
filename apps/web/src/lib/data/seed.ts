@@ -112,6 +112,7 @@ export interface ProductVariant {
   price: string;
   compareAtPrice?: string;
   inventoryQty: number;
+  lowStockThreshold?: number;
   options: { name: string; value: string }[];
 }
 
@@ -335,14 +336,20 @@ export interface BridalPayment {
 export interface RetailOrder {
   id: string;
   orderNumber: string;
-  customerEmail: string;
+  customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
+  source?: "online" | "walk_in";
+  paymentMethod?: "stripe" | "cash" | "card";
   status: string;
   total: string;
+  subtotal?: string;
   items: {
     title: string;
     quantity: number;
     price: string;
+    productId?: string;
+    variantId?: string;
     sizeSelection?: {
       mode: "standard" | "custom";
       label: string;

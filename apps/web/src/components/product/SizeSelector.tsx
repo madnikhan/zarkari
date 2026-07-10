@@ -21,9 +21,11 @@ import { MeasurementGuideDiagram } from "./MeasurementGuideDiagram";
 interface SizeSelectorProps {
   value: SizeSelection | null;
   onChange: (selection: SizeSelection | null) => void;
+  stockBySize?: Partial<Record<StandardSizeKey, number>>;
+  onSizeSelect?: (size: StandardSizeKey) => void;
 }
 
-export function SizeSelector({ value, onChange }: SizeSelectorProps) {
+export function SizeSelector({ value, onChange, stockBySize, onSizeSelect }: SizeSelectorProps) {
   const [mode, setMode] = useState<"standard" | "custom">(value?.mode ?? "standard");
   const [standardSize, setStandardSize] = useState<StandardSizeKey | null>(
     value?.mode === "standard" ? (value.label as StandardSizeKey) : null
@@ -35,10 +37,12 @@ export function SizeSelector({ value, onChange }: SizeSelectorProps) {
   const activeStandard = standardSize ? getStandardSize(standardSize) : null;
 
   function selectStandard(size: StandardSizeKey) {
+    if (stockBySize && (stockBySize[size] ?? 0) <= 0) return;
     setMode("standard");
     setStandardSize(size);
     setCustomConfirmed(false);
     setCustomErrors({});
+    onSizeSelect?.(size);
     onChange(buildStandardSelection(size));
   }
 
@@ -87,21 +91,26 @@ export function SizeSelector({ value, onChange }: SizeSelectorProps) {
       <p className="text-xs tracking-[0.2em] uppercase text-charcoal mb-3">Size</p>
 
       <div className="flex flex-wrap gap-2 mb-3">
-        {STANDARD_SIZES.map((size) => (
-          <button
-            key={size}
-            type="button"
-            onClick={() => selectStandard(size)}
-            className={cn(
-              "min-w-[3rem] px-4 py-3 text-sm border transition-colors",
-              mode === "standard" && standardSize === size
-                ? "border-charcoal bg-charcoal text-cream"
-                : "border-sand hover:border-charcoal"
-            )}
-          >
-            {size}
-          </button>
-        ))}
+        {STANDARD_SIZES.map((size) => {
+          const outOfStock = stockBySize !== undefined && (stockBySize[size] ?? 0) <= 0;
+          return (
+            <button
+              key={size}
+              type="button"
+              onClick={() => selectStandard(size)}
+              disabled={outOfStock}
+              className={cn(
+                "min-w-[3rem] px-4 py-3 text-sm border transition-colors relative",
+                outOfStock && "opacity-40 cursor-not-allowed line-through",
+                mode === "standard" && standardSize === size
+                  ? "border-charcoal bg-charcoal text-cream"
+                  : "border-sand hover:border-charcoal"
+              )}
+            >
+              {size}
+            </button>
+          );
+        })}
         <button
           type="button"
           onClick={openCustom}

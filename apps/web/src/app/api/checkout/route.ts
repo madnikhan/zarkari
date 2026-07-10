@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCart, CART_COOKIE_NAME } from "@/lib/cart";
 import { createRetailOrder } from "@/lib/data/products";
 import { randomUUID } from "crypto";
+import { validateStockAvailability } from "@/lib/stock/service";
 
 const FREE_SHIPPING_THRESHOLD = 75;
 const SHIPPING_FEE = 6.95;
@@ -22,6 +23,13 @@ export async function POST(request: Request) {
 
   if (!cart.length) {
     return NextResponse.redirect(new URL("/cart", origin));
+  }
+
+  const stockCheck = await validateStockAvailability(
+    cart.map((c) => ({ variantId: c.variantId, quantity: c.quantity, title: c.title }))
+  );
+  if (!stockCheck.ok) {
+    return NextResponse.redirect(new URL(`/cart?error=${encodeURIComponent(stockCheck.error)}`, origin));
   }
 
   const subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
