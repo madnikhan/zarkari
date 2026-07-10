@@ -1,15 +1,70 @@
+export interface HeroVideoClip {
+  url: string;
+  poster?: string;
+}
+
 export interface HeroVideo {
   id: string;
   src: string;
-  poster: string;
+  poster?: string;
   /** Approximate duration in seconds (used before metadata loads). */
   durationSec?: number;
 }
 
-export const heroVideos: HeroVideo[] = [
-  { id: "01", src: "/videos/hero/clip-01.mp4", poster: "/videos/hero/clip-01.jpg", durationSec: 21 },
-  { id: "02", src: "/videos/hero/clip-02.mp4", poster: "/videos/hero/clip-02.jpg", durationSec: 18 },
-  { id: "03", src: "/videos/hero/clip-03.mp4", poster: "/videos/hero/clip-03.jpg", durationSec: 15 },
-  { id: "04", src: "/videos/hero/clip-04.mp4", poster: "/videos/hero/clip-04.jpg", durationSec: 14 },
-  { id: "05", src: "/videos/hero/clip-05.mp4", poster: "/videos/hero/clip-05.jpg", durationSec: 12 },
-];
+function isValidMediaUrl(url: string): boolean {
+  return (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("/")
+  );
+}
+
+export function parseHeroVideos(raw: string | undefined): HeroVideo[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const out: HeroVideo[] = [];
+    for (let i = 0; i < parsed.length; i++) {
+      const item = parsed[i] as { url?: unknown; poster?: unknown };
+      const url = typeof item?.url === "string" ? item.url.trim() : "";
+      if (!url || !isValidMediaUrl(url)) continue;
+
+      const poster =
+        typeof item?.poster === "string" && item.poster.trim()
+          ? item.poster.trim()
+          : undefined;
+
+      out.push({
+        id: String(out.length + 1).padStart(2, "0"),
+        src: url,
+        poster,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export function serializeHeroVideos(clips: HeroVideoClip[]): string {
+  return JSON.stringify(
+    clips
+      .map((clip) => ({
+        url: clip.url.trim(),
+        ...(clip.poster?.trim() ? { poster: clip.poster.trim() } : {}),
+      }))
+      .filter((clip) => clip.url)
+  );
+}
+
+export function heroClipLabel(url: string): string {
+  try {
+    const path = new URL(url, "https://placeholder.local").pathname;
+    const name = path.split("/").pop();
+    return name || url;
+  } catch {
+    return url;
+  }
+}

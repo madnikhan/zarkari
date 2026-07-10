@@ -26,6 +26,7 @@ interface Props {
   emptyMessage?: string;
   refreshKey?: number;
   imagesOnly?: boolean;
+  videosOnly?: boolean;
   typeFilter?: MediaKind | "all";
   categoryFilter?: string;
 }
@@ -81,6 +82,7 @@ export function MediaAssetGrid({
   emptyMessage = "No uploads yet.",
   refreshKey = 0,
   imagesOnly = false,
+  videosOnly = false,
   typeFilter = "all",
   categoryFilter = "",
 }: Props) {
@@ -142,7 +144,9 @@ export function MediaAssetGrid({
   }
 
   function handleSelect(asset: MediaAsset) {
-    if (imagesOnly && getMediaKind(asset.fileName, asset.mimeType, asset.category) !== "image") return;
+    const kind = getMediaKind(asset.fileName, asset.mimeType, asset.category);
+    if (imagesOnly && kind !== "image") return;
+    if (videosOnly && kind !== "video") return;
     onSelect?.(asset.url);
   }
 
@@ -156,9 +160,12 @@ export function MediaAssetGrid({
     }
   }
 
-  const visibleAssets = imagesOnly
-    ? assets.filter((a) => getMediaKind(a.fileName, a.mimeType, a.category) === "image")
-    : assets;
+  const visibleAssets = assets.filter((asset) => {
+    const kind = getMediaKind(asset.fileName, asset.mimeType, asset.category);
+    if (imagesOnly) return kind === "image";
+    if (videosOnly) return kind === "video";
+    return true;
+  });
 
   if (loading) {
     return (

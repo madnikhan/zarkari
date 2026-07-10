@@ -7,6 +7,8 @@ import { MediaAssetGrid } from "@/components/admin/content/MediaAssetGrid";
 
 const CMS_ACCEPT = "image/*,video/*,.mov";
 const CMS_HINT = "Images up to 4 MB · Videos up to 10 min / 200 MB";
+const VIDEO_ACCEPT = "video/*,.mov,.mp4,.webm";
+const VIDEO_HINT = "Videos up to 10 min / 200 MB · H.264 MP4 recommended";
 
 interface Props {
   open: boolean;
@@ -16,6 +18,8 @@ interface Props {
   onSelectMultiple?: (urls: string[]) => void;
   title?: string;
   imagesOnly?: boolean;
+  videosOnly?: boolean;
+  uploadCategory?: string;
 }
 
 export function MediaPickerModal({
@@ -26,6 +30,8 @@ export function MediaPickerModal({
   onSelectMultiple,
   title = "Choose image",
   imagesOnly = false,
+  videosOnly = false,
+  uploadCategory = "cms",
 }: Props) {
   const [tab, setTab] = useState<"library" | "upload">("library");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,6 +81,20 @@ export function MediaPickerModal({
     }
   }
 
+  const uploadLabel = imagesOnly
+    ? "Upload images for products, collections, or blog"
+    : videosOnly
+      ? "Upload hero videos"
+      : "Upload images or videos for products, collections, or blog";
+
+  const uploadAccept = imagesOnly ? "image/*" : videosOnly ? VIDEO_ACCEPT : CMS_ACCEPT;
+  const uploadHint = imagesOnly ? "Images up to 4 MB" : videosOnly ? VIDEO_HINT : CMS_HINT;
+  const emptyMessage = imagesOnly
+    ? "No images yet. Switch to Upload to add one."
+    : videosOnly
+      ? "No videos yet. Switch to Upload to add one."
+      : "No media yet. Switch to Upload to add one.";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50"
@@ -109,14 +129,10 @@ export function MediaPickerModal({
         <div className="flex-1 overflow-y-auto p-4">
           {tab === "upload" ? (
             <MediaUploadZone
-              label={
-                imagesOnly
-                  ? "Upload images for products, collections, or blog"
-                  : "Upload images or videos for products, collections, or blog"
-              }
-              accept={imagesOnly ? "image/*" : CMS_ACCEPT}
-              category="cms"
-              sizeHint={imagesOnly ? "Images up to 4 MB" : CMS_HINT}
+              label={uploadLabel}
+              accept={uploadAccept}
+              category={uploadCategory}
+              sizeHint={uploadHint}
               onUploaded={handleUploaded}
               onSingleUploaded={handleSingleUploaded}
             />
@@ -128,11 +144,9 @@ export function MediaPickerModal({
               refreshKey={refreshKey}
               showCopy={false}
               imagesOnly={imagesOnly}
-              emptyMessage={
-                imagesOnly
-                  ? "No images yet. Switch to Upload to add one."
-                  : "No media yet. Switch to Upload to add one."
-              }
+              videosOnly={videosOnly}
+              typeFilter={videosOnly ? "video" : imagesOnly ? "image" : "all"}
+              emptyMessage={emptyMessage}
             />
           )}
         </div>

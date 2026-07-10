@@ -1,6 +1,7 @@
 import { CatalogueGrid } from "@/components/home/CatalogueGrid";
 import { VideoHeroCarousel } from "@/components/home/VideoHeroCarousel";
 import { getProducts, getShopSettings, getProductByHandle, getCollectionByHandle } from "@/lib/data";
+import { parseHeroVideos } from "@/lib/data/hero-videos";
 
 export default async function HomePage() {
   const settings = await getShopSettings();
@@ -24,10 +25,15 @@ export default async function HomePage() {
 
   const catalogueProducts =
     featuredProducts.length > 0 ? featuredProducts : featuredCollection?.products?.length ? featuredCollection.products : products;
+  const heroClips = parseHeroVideos(settings.heroVideos);
 
   return (
     <>
-      <VideoHeroCarousel tagline={settings.heroSubheadline} headline={settings.heroHeadline} />
+      <VideoHeroCarousel
+        videos={heroClips}
+        tagline={settings.heroSubheadline ?? ""}
+        headline={settings.heroHeadline}
+      />
       {featuredCollection && featuredProducts.length === 0 && (
         <section className="py-10 border-b border-sand/40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

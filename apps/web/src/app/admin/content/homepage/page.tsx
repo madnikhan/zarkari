@@ -15,7 +15,9 @@ export default async function ContentHomepagePage() {
         ← Content
       </Link>
       <h1 className="text-2xl font-semibold text-slate-900 mt-1 mb-2">Homepage</h1>
-      <p className="text-sm text-slate-500 mb-6">Announcement bar, hero text, and featured content.</p>
+      <p className="text-sm text-slate-500 mb-6">
+        Announcement bar, hero text, hero videos from the media library, and featured content.
+      </p>
       <CmsOwnerBanner isOwner={isOwner} />
       <HomepageEditor initial={settings} isOwner={isOwner} />
     </div>

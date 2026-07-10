@@ -4,33 +4,52 @@ import Link from "next/link";
 import { ChevronDown, MessageCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
-import { heroVideos } from "@/lib/data/hero-videos";
+import type { HeroVideo } from "@/lib/data/hero-videos";
 import { cn } from "@/lib/utils";
 
 const MIN_CLIP_MS = 10000;
 
 interface VideoHeroCarouselProps {
+  videos: HeroVideo[];
   tagline: string;
   headline?: string;
 }
 
-export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps) {
+export function VideoHeroCarousel({ videos, tagline, headline }: VideoHeroCarouselProps) {
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frontSlot, setFrontSlot] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [visible, setVisible] = useState(true);
   const [clipDurations, setClipDurations] = useState<number[]>(() =>
-    heroVideos.map((v) => v.durationSec ?? 15)
+    videos.map((v) => v.durationSec ?? 15)
   );
   const slotIndexes = useRef<[number, number]>([0, 0]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null]);
   const sectionRef = useRef<HTMLElement>(null);
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
+  const hasVideos = videos.length > 0;
+  const showCarouselDots = videos.length > 1;
+  const safeIndex = hasVideos ? activeIndex % videos.length : 0;
+  const current = hasVideos ? videos[safeIndex] : null;
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setClipDurations(videos.map((v) => v.durationSec ?? 15));
+    setActiveIndex(0);
+    setFrontSlot(0);
+    slotIndexes.current = [0, 0];
+  }, [videos]);
+
+  useEffect(() => {
+    if (activeIndex >= videos.length && videos.length > 0) {
+      setActiveIndex(0);
+    }
+  }, [activeIndex, videos.length]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -54,11 +73,12 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
   const playSlot = useCallback(
     async (slot: number, index: number) => {
       const video = videoRefs.current[slot];
-      if (!video || reducedMotion) return;
+      const clip = videos[index];
+      if (!video || !clip || reducedMotion) return;
       video.loop = true;
       video.muted = true;
       slotIndexes.current[slot] = index;
-      video.src = heroVideos[index].src;
+      video.src = clip.src;
       video.load();
       try {
         await video.play();
@@ -66,7 +86,20 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
         /* autoplay blocked */
       }
     },
-    [reducedMotion]
+    [reducedMotion, videos]
+  );
+
+  const advanceToNext = useCallback(
+    (fromIndex: number) => {
+      if (videos.length <= 1) return;
+      const nextIndex = (fromIndex + 1) % videos.length;
+      const backSlot = 1 - frontSlot;
+      playSlot(backSlot, nextIndex).then(() => {
+        setFrontSlot(backSlot);
+        setActiveIndex(nextIndex);
+      });
+    },
+    [frontSlot, playSlot, videos.length]
   );
 
   const registerDuration = useCallback((index: number, seconds: number) => {
@@ -80,28 +113,31 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
   }, []);
 
   useEffect(() => {
-    if (!mounted || reducedMotion) return;
-    playSlot(frontSlot, activeIndex);
-  }, [activeIndex, frontSlot, mounted, playSlot, reducedMotion]);
+    if (!mounted || reducedMotion || !hasVideos) return;
+    playSlot(frontSlot, safeIndex);
+  }, [safeIndex, frontSlot, mounted, playSlot, reducedMotion, hasVideos]);
 
   useEffect(() => {
-    if (!mounted || reducedMotion || !visible) return;
+    if (!mounted || reducedMotion || !visible || videos.length <= 1) return;
 
-    const holdMs = Math.max(clipDurations[activeIndex] * 1000, MIN_CLIP_MS);
+    const holdMs = Math.max((clipDurations[safeIndex] ?? 15) * 1000, MIN_CLIP_MS);
     const timer = setTimeout(() => {
-      const nextIndex = (activeIndex + 1) % heroVideos.length;
-      const backSlot = 1 - frontSlot;
-      playSlot(backSlot, nextIndex).then(() => {
-        setFrontSlot(backSlot);
-        setActiveIndex(nextIndex);
-      });
+      advanceToNext(safeIndex);
     }, holdMs);
 
     return () => clearTimeout(timer);
-  }, [activeIndex, frontSlot, clipDurations, mounted, playSlot, reducedMotion, visible]);
+  }, [
+    safeIndex,
+    clipDurations,
+    mounted,
+    advanceToNext,
+    reducedMotion,
+    visible,
+    videos.length,
+  ]);
 
   useEffect(() => {
-    if (!mounted || reducedMotion || !visible) {
+    if (!mounted || reducedMotion || !visible || !hasVideos) {
       videoRefs.current.forEach((v) => v?.pause());
       return;
     }
@@ -110,10 +146,9 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
       front.loop = true;
       front.play().catch(() => {});
     }
-  }, [visible, frontSlot, mounted, reducedMotion]);
+  }, [visible, frontSlot, mounted, reducedMotion, hasVideos]);
 
-  const current = heroVideos[activeIndex];
-  const showVideo = mounted && !reducedMotion;
+  const showVideo = mounted && !reducedMotion && hasVideos;
 
   return (
     <section
@@ -121,12 +156,14 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
       aria-label="ZARKARI collection showcase"
       className="relative min-h-[90vh] w-full overflow-hidden bg-charcoal"
     >
-      <div
-        className="absolute inset-0 bg-cover bg-center hero-ken-burns"
-        style={{ backgroundImage: `url(${current.poster})` }}
-        role="img"
-        aria-label="ZARKARI collection"
-      />
+      {current?.poster && (
+        <div
+          className="absolute inset-0 bg-cover bg-center hero-ken-burns"
+          style={{ backgroundImage: `url(${current.poster})` }}
+          role="img"
+          aria-label="ZARKARI collection"
+        />
+      )}
 
       {showVideo && (
         <>
@@ -145,7 +182,7 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
               playsInline
               autoPlay={slot === frontSlot}
               preload={slot === frontSlot ? "auto" : "metadata"}
-              poster={current.poster}
+              poster={current?.poster}
               aria-hidden
               suppressHydrationWarning
               onLoadedMetadata={(e) => {
@@ -154,6 +191,11 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
               onCanPlay={(e) => {
                 if (slot === frontSlot && visible) {
                   e.currentTarget.play().catch(() => {});
+                }
+              }}
+              onError={() => {
+                if (slot === frontSlot) {
+                  advanceToNext(slotIndexes.current[slot]);
                 }
               }}
             />
@@ -193,27 +235,29 @@ export function VideoHeroCarousel({ tagline, headline }: VideoHeroCarouselProps)
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-        {heroVideos.map((clip, i) => (
-          <button
-            key={clip.id}
-            type="button"
-            aria-label={`Show clip ${i + 1}`}
-            onClick={() => {
-              if (i === activeIndex) return;
-              const backSlot = 1 - frontSlot;
-              playSlot(backSlot, i).then(() => {
-                setFrontSlot(backSlot);
-                setActiveIndex(i);
-              });
-            }}
-            className={cn(
-              "h-1 rounded-full transition-all duration-500",
-              i === activeIndex ? "w-8 bg-gold" : "w-4 bg-cream/30 hover:bg-cream/50"
-            )}
-          />
-        ))}
-      </div>
+      {showCarouselDots && (
+        <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+          {videos.map((clip, i) => (
+            <button
+              key={clip.id}
+              type="button"
+              aria-label={`Show clip ${i + 1}`}
+              onClick={() => {
+                if (i === safeIndex) return;
+                const backSlot = 1 - frontSlot;
+                playSlot(backSlot, i).then(() => {
+                  setFrontSlot(backSlot);
+                  setActiveIndex(i);
+                });
+              }}
+              className={cn(
+                "h-1 rounded-full transition-all duration-500",
+                i === safeIndex ? "w-8 bg-gold" : "w-4 bg-cream/30 hover:bg-cream/50"
+              )}
+            />
+          ))}
+        </div>
+      )}
 
       <a
         href="#catalogue"
