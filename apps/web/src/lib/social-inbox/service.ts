@@ -12,7 +12,7 @@ import type {
 } from "./types";
 import { SOCIAL_PLATFORM_LABELS } from "./types";
 
-function notifyInquiry(title: string, body: string, threadId: string) {
+async function notifyInquiry(title: string, body: string, threadId: string) {
   const href = `/admin/inbox/${threadId}`;
   demoNotifications.unshift({
     id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -24,11 +24,10 @@ function notifyInquiry(title: string, body: string, threadId: string) {
     threadId,
   });
   if (isDbConfigured()) {
-    createNotificationDb({ title, body, href, threadId }).catch(console.error);
+    await createNotificationDb({ title, body, href, threadId }).catch(console.error);
   }
-  import("@/lib/push/send")
-    .then((m) => m.sendPushToStaff({ title, body, href }))
-    .catch(console.error);
+  const { sendPushToStaff } = await import("@/lib/push/send");
+  await sendPushToStaff({ title, body, href }).catch(console.error);
 }
 
 function listDemoThreads(filters?: {

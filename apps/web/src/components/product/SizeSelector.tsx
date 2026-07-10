@@ -92,23 +92,29 @@ export function SizeSelector({ value, onChange, stockBySize, onSizeSelect }: Siz
 
       <div className="flex flex-wrap gap-2 mb-3">
         {STANDARD_SIZES.map((size) => {
-          const outOfStock = stockBySize !== undefined && (stockBySize[size] ?? 0) <= 0;
+          const qty = stockBySize?.[size] ?? 0;
+          const outOfStock = stockBySize !== undefined && qty <= 0;
+          const lowStock = qty > 0 && qty < 3;
           return (
-            <button
-              key={size}
-              type="button"
-              onClick={() => selectStandard(size)}
-              disabled={outOfStock}
-              className={cn(
-                "min-w-[3rem] px-4 py-3 text-sm border transition-colors relative",
-                outOfStock && "opacity-40 cursor-not-allowed line-through",
-                mode === "standard" && standardSize === size
-                  ? "border-charcoal bg-charcoal text-cream"
-                  : "border-sand hover:border-charcoal"
+            <div key={size} className="flex flex-col items-center">
+              <button
+                type="button"
+                onClick={() => selectStandard(size)}
+                disabled={outOfStock}
+                className={cn(
+                  "min-w-[3rem] px-4 py-3 text-sm border transition-colors relative",
+                  outOfStock && "opacity-40 cursor-not-allowed line-through",
+                  mode === "standard" && standardSize === size
+                    ? "border-charcoal bg-charcoal text-cream"
+                    : "border-sand hover:border-charcoal"
+                )}
+              >
+                {size}
+              </button>
+              {lowStock && (
+                <span className="text-[10px] text-amber-700 mt-1">Only {qty} left</span>
               )}
-            >
-              {size}
-            </button>
+            </div>
           );
         })}
         <button

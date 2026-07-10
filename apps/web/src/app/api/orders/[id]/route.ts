@@ -38,6 +38,17 @@ export async function GET(_request: Request, { params }: Props) {
         }
       : order;
 
+  if (session.role === "supplier") {
+    import("@/lib/firebase/sync")
+      .then(async (m) => {
+        await m.syncOrderLive(order.id, { status: order.status, deliveryDate: order.deliveryDate });
+        for (const msg of supplierMessages) {
+          await m.syncSupplierOrderMessage(order.id, msg);
+        }
+      })
+      .catch(console.error);
+  }
+
   return NextResponse.json({
     order: safeOrder,
     customerName: customer?.name,

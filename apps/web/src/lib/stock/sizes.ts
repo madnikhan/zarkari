@@ -30,8 +30,16 @@ export function totalProductStock(variants: ProductVariant[]): number {
 }
 
 export function isLowStock(variant: ProductVariant): boolean {
-  const threshold = variant.lowStockThreshold ?? 2;
-  return variant.inventoryQty > 0 && variant.inventoryQty <= threshold;
+  const threshold = variant.lowStockThreshold ?? 3;
+  return variant.inventoryQty > 0 && variant.inventoryQty < threshold;
+}
+
+export function getStorefrontStockLabel(variants: ProductVariant[]): "sold_out" | "low_stock" | "available" {
+  const total = totalProductStock(variants);
+  if (total <= 0) return "sold_out";
+  if (variants.some((v) => isLowStock(v))) return "low_stock";
+  if (total < 3) return "low_stock";
+  return "available";
 }
 
 export function productHasLowStock(variants: ProductVariant[]): boolean {

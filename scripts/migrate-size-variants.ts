@@ -3,7 +3,18 @@
  * Existing inventory_qty is assigned to size M; other sizes start at 0.
  *
  * Run: npx tsx scripts/migrate-size-variants.ts
+ * Loads DATABASE_URL from .env or apps/web/.env.local
  */
+import { config } from "dotenv";
+import { existsSync } from "fs";
+import { resolve } from "path";
+
+const root = resolve(__dirname, "..");
+for (const file of [".env", ".env.local", "apps/web/.env.local", "apps/web/.env"]) {
+  const path = resolve(root, file);
+  if (existsSync(path)) config({ path, override: false });
+}
+
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";

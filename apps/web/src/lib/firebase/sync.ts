@@ -15,26 +15,15 @@ export interface LiveOrderMessage {
   readAt?: string;
 }
 
-export function syncOrderLive(
-  orderId: string,
-  input: { status: BridalStatus | string; deliveryDate?: string }
-): void {
-  if (!isFirebaseConfigured()) return;
-  const db = getAdminFirestore();
-  if (!db) return;
-
-  db.collection("live_orders")
-    .doc(orderId)
-    .set(
-      {
-        status: input.status,
-        statusLabel: getCustomerStatusLabel(input.status as BridalStatus),
-        deliveryDate: input.deliveryDate ?? null,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    )
-    .catch(console.error);
+export interface LivePendingUpdate {
+  id: string;
+  senderType: "customer" | "staff" | "supplier";
+  senderName?: string;
+  message: string;
+  createdAt: string;
+  attachmentUrl?: string;
+  attachmentKind?: string;
+  reviewStatus?: string;
 }
 
 function messagePayload(message: LiveOrderMessage) {
@@ -49,30 +38,103 @@ function messagePayload(message: LiveOrderMessage) {
   };
 }
 
-export function syncOrderMessage(orderId: string, message: LiveOrderMessage): void {
+function pendingPayload(update: LivePendingUpdate) {
+  return {
+    senderType: update.senderType,
+    senderName: update.senderName ?? null,
+    message: update.message,
+    createdAt: update.createdAt,
+    attachmentUrl: update.attachmentUrl ?? null,
+    attachmentKind: update.attachmentKind ?? null,
+    reviewStatus: update.reviewStatus ?? "pending",
+  };
+}
+
+export async function syncOrderLive(
+  orderId: string,
+  input: { status: BridalStatus | string; deliveryDate?: string }
+): Promise<void> {
   if (!isFirebaseConfigured()) return;
   const db = getAdminFirestore();
   if (!db) return;
 
-  db.collection("live_orders")
+  await db
+    .collection("live_orders")
+    .doc(orderId)
+    .set(
+      {
+        status: input.status,
+        statusLabel: getCustomerStatusLabel(input.status as BridalStatus),
+        deliveryDate: input.deliveryDate ?? null,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+}
+
+export async function syncOrderMessage(orderId: string, message: LiveOrderMessage): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  await db
+    .collection("live_orders")
     .doc(orderId)
     .collection("messages")
     .doc(message.id)
-    .set(messagePayload(message))
-    .catch(console.error);
+    .set(messagePayload(message));
 }
 
-export function syncSupplierOrderMessage(orderId: string, message: LiveOrderMessage): void {
+export async function syncSupplierOrderMessage(orderId: string, message: LiveOrderMessage): Promise<void> {
   if (!isFirebaseConfigured()) return;
   const db = getAdminFirestore();
   if (!db) return;
 
-  db.collection("live_orders")
+  await db
+    .collection("live_orders")
     .doc(orderId)
     .collection("supplier_messages")
     .doc(message.id)
-    .set(messagePayload(message))
-    .catch(console.error);
+    .set(messagePayload(message));
+}
+
+export async function syncMessageReadAt(
+  orderId: string,
+  messageId: string,
+  readAt: string,
+  collection: "messages" | "supplier_messages" = "supplier_messages"
+): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  await db
+    .collection("live_orders")
+    .doc(orderId)
+    .collection(collection)
+    .doc(messageId)
+    .set({ readAt }, { merge: true });
+}
+
+export async function syncPendingUpdate(orderId: string, update: LivePendingUpdate): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  await db
+    .collection("live_orders")
+    .doc(orderId)
+    .collection("pending_updates")
+    .doc(update.id)
+    .set(pendingPayload(update));
+}
+
+export async function removePendingUpdate(orderId: string, updateId: string): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  await db.collection("live_orders").doc(orderId).collection("pending_updates").doc(updateId).delete();
 }
 
 export function incrementStaffUnread(userId?: string): void {

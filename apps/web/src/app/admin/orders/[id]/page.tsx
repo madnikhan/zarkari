@@ -19,7 +19,7 @@ import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { OrderDetailTabs } from "@/components/orders/OrderDetailTabs";
 import { OrderActionButtons } from "@/components/boms/OrderActionButtons";
 import { OrderMessagesLive } from "@/components/admin/OrderMessagesLive";
-import { StatusBadge } from "@/components/boms/StatusBadge";
+import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
 import { CustomerCard } from "@/components/boms/CustomerCard";
 import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
@@ -49,6 +49,24 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       getPendingSupplierUpdates(order.id),
     ]);
 
+  if (pendingUpdates.length) {
+    void import("@/lib/firebase/sync").then(async (m) => {
+      for (const update of pendingUpdates) {
+        if (update.reviewStatus && update.reviewStatus !== "pending") continue;
+        await m.syncPendingUpdate(order.id, {
+          id: update.id,
+          senderType: update.senderType,
+          senderName: update.senderName,
+          message: update.message,
+          createdAt: update.createdAt,
+          attachmentUrl: update.attachmentUrl,
+          attachmentKind: update.attachmentKind,
+          reviewStatus: update.reviewStatus ?? "pending",
+        });
+      }
+    });
+  }
+
   const summaryRows = [
     { label: "Booking Date", value: formatOrderDate(order.bookingDate) },
     { label: "Delivery Date", value: formatOrderDate(order.deliveryDate) },
@@ -72,7 +90,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
           <div>
             <h1 className="text-xl font-semibold font-mono text-slate-900">{order.orderNumber}</h1>
             <div className="mt-2">
-              <StatusBadge status={order.status} />
+              <OrderStatusLive orderId={order.id} initialStatus={order.status} />
             </div>
           </div>
           <CountdownBadge deliveryDate={order.deliveryDate} />

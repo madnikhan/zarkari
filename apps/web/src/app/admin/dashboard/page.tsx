@@ -4,6 +4,7 @@ import { getBridalOrdersWithRelations, getDashboardStats } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { StatCard } from "@/components/boms/StatCard";
 import { OrdersTable } from "@/components/boms/OrdersTable";
+import { BrowserNotificationsCard } from "@/components/admin/BrowserNotificationsCard";
 import { SocialInboxWidget } from "@/components/admin/inbox/SocialInboxWidget";
 
 export default async function AdminDashboardPage() {
@@ -32,6 +33,8 @@ export default async function AdminDashboardPage() {
           New Order
         </Link>
       </div>
+
+      <BrowserNotificationsCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8" data-tour="stat-cards">
         <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />

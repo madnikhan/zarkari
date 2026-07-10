@@ -249,7 +249,7 @@ async function main() {
   } else fail("New Order", "POST create order", `status ${createOrder.status}`);
 
   const newOrderHtml = await pageHtml("/admin/orders/new", ownerCookie);
-  if (newOrderHtml.includes("Voice Notes") || newOrderHtml.includes("New Bridal Order")) {
+  if (newOrderHtml.includes("Voice Notes") || newOrderHtml.includes("New Order")) {
     pass("New Order", "Form page includes voice note section or title");
   } else partial("New Order", "Form page includes voice note section or title", "Voice UI may be client-only");
 

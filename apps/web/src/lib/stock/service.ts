@@ -145,7 +145,7 @@ export async function countLowStockVariants(): Promise<number> {
     .select({ id: schema.productVariants.id })
     .from(schema.productVariants)
     .where(
-      sql`${schema.productVariants.inventoryQty} > 0 AND ${schema.productVariants.inventoryQty} <= COALESCE(${schema.productVariants.lowStockThreshold}, 2)`
+      sql`${schema.productVariants.inventoryQty} > 0 AND ${schema.productVariants.inventoryQty} < COALESCE(${schema.productVariants.lowStockThreshold}, 3)`
     );
   return rows.length;
 }

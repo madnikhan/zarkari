@@ -10,7 +10,7 @@ import { formatSizeSummary } from "@/lib/sizing";
 import { AddToCartButton } from "./AddToCartButton";
 import { SizeGuide } from "./SizeGuide";
 import { SizeSelector } from "./SizeSelector";
-import { buildSizeStockMap, getVariantForSize, totalProductStock } from "@/lib/stock/sizes";
+import { buildSizeStockMap, getVariantForSize, totalProductStock, getStorefrontStockLabel } from "@/lib/stock/sizes";
 
 export function ProductDetails({ product }: { product: Product }) {
   const sizeStock = useMemo(() => buildSizeStockMap(product.variants), [product.variants]);
@@ -29,6 +29,7 @@ export function ProductDetails({ product }: { product: Product }) {
   const price = selectedVariant?.price ?? product.variants[0]?.price ?? "0";
   const comingSoon = product.tags.includes("coming-soon");
   const totalStock = totalProductStock(product.variants);
+  const stockLabel = getStorefrontStockLabel(product.variants);
   const sizeAvailable =
     sizeSelection?.mode === "standard"
       ? (sizeStock[sizeSelection.label as StandardSizeKey] ?? 0) > 0
@@ -85,8 +86,14 @@ export function ProductDetails({ product }: { product: Product }) {
         )}
         <p className="text-charcoal/70 leading-relaxed mb-8">{product.description}</p>
 
-        {!comingSoon && totalStock <= 0 && (
+        {!comingSoon && stockLabel === "sold_out" && (
           <p className="text-sm text-red-600 mb-4 uppercase tracking-wider">Out of stock</p>
+        )}
+
+        {!comingSoon && stockLabel === "low_stock" && totalStock > 0 && (
+          <p className="text-sm text-amber-700 mb-4">
+            Almost sold out — only {totalStock} left
+          </p>
         )}
 
         {!comingSoon && totalStock > 0 && (

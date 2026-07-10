@@ -43,6 +43,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
+      silent: false,
       icon: "/icons/boms-192.png",
       badge: "/icons/boms-180.png",
       tag,

@@ -132,7 +132,7 @@ async function upsertSizeVariants(
   productId: string,
   price: string,
   sizeStock: Partial<Record<StandardSizeKey, number>>,
-  lowStockThreshold = 2
+  lowStockThreshold = 3
 ) {
   const existing = await db
     .select()
@@ -359,7 +359,7 @@ export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
       const size = (sizeOpt?.value ?? v.title) as StandardSizeKey;
       if (STANDARD_SIZES.includes(size)) {
         sizeStock[size] = v.inventoryQty;
-        const threshold = v.lowStockThreshold ?? 2;
+        const threshold = v.lowStockThreshold ?? 3;
         variantRows.push({
           id: v.id,
           size,
@@ -371,7 +371,7 @@ export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
 
     const totalStock = Object.values(sizeStock).reduce((a, b) => a + b, 0);
     const lowStock = variantRows.some(
-      (v) => v.inventoryQty > 0 && v.inventoryQty <= (v.lowStockThreshold ?? 2)
+      (v) => v.inventoryQty > 0 && v.inventoryQty < (v.lowStockThreshold ?? 3)
     );
 
     return {

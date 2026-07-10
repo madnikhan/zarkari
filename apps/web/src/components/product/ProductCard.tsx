@@ -2,11 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Product } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
+import { getStorefrontStockLabel } from "@/lib/stock/sizes";
 
 export function ProductCard({ product }: { product: Product }) {
   const variant = product.variants[0];
   const price = variant?.price ?? "0";
   const comingSoon = product.tags.includes("coming-soon");
+  const stockLabel = comingSoon ? null : getStorefrontStockLabel(product.variants);
 
   return (
     <Link href={`/products/${product.handle}`} className="group block">
@@ -25,6 +27,16 @@ export function ProductCard({ product }: { product: Product }) {
         {comingSoon && (
           <span className="absolute top-3 left-3 bg-charcoal/90 text-cream text-[10px] tracking-widest uppercase px-2 py-1">
             Coming Soon
+          </span>
+        )}
+        {!comingSoon && stockLabel === "sold_out" && (
+          <span className="absolute top-3 left-3 bg-charcoal/90 text-cream text-[10px] tracking-widest uppercase px-2 py-1">
+            Sold out
+          </span>
+        )}
+        {!comingSoon && stockLabel === "low_stock" && (
+          <span className="absolute top-3 left-3 bg-amber-500/95 text-white text-[10px] tracking-widest uppercase px-2 py-1">
+            Low stock
           </span>
         )}
       </div>

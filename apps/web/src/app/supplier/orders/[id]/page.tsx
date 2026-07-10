@@ -3,16 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PRODUCTION_STAGES } from "@/lib/orders/status-machine";
-import type { BridalOrder, OrderFile, TimelineEvent } from "@/lib/data/seed";
-import { getStatusLabel } from "@/lib/orders/status-machine";
+import type { BridalOrder, BridalStatus, OrderFile, TimelineEvent } from "@/lib/data/seed";
 import { OrderTimeline } from "@/components/orders/OrderTimeline";
-import { StatusBadge } from "@/components/boms/StatusBadge";
+import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
+import { ProductionStageStepper } from "@/components/supplier/ProductionStageStepper";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
 import { SupplierMessagesPanel } from "@/components/supplier/SupplierMessagesPanel";
 import type { CustomerMessage } from "@/lib/data/seed";
 import { CheckCircle } from "lucide-react";
 import { CustomerOrderProgressTracker } from "@/components/customer/OrderProgressTracker";
+import { doc, onSnapshot } from "firebase/firestore";
+import { getClientFirestore } from "@/lib/firebase/client";
+import { isFirebaseClientConfigured } from "@/lib/firebase/config";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 type CargoCompany = { id: string; name: string };
 
@@ -22,6 +26,7 @@ interface Props {
 
 export default function SupplierOrderPage({ params }: Props) {
   const router = useRouter();
+  const { ready } = useFirebaseAuth();
   const [orderId, setOrderId] = useState<string | null>(null);
   const [order, setOrder] = useState<BridalOrder | null>(null);
   const [customerName, setCustomerName] = useState("");
@@ -29,6 +34,7 @@ export default function SupplierOrderPage({ params }: Props) {
   const [supplierMessages, setSupplierMessages] = useState<CustomerMessage[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [stageLoading, setStageLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -73,25 +79,55 @@ export default function SupplierOrderPage({ params }: Props) {
       .catch(() => setCargoCompanies([]));
   }, []);
 
+  useEffect(() => {
+    if (!orderId || !ready || !isFirebaseClientConfigured()) return;
+    const db = getClientFirestore();
+    if (!db) return;
+
+    const unsub = onSnapshot(doc(db, "live_orders", orderId), (snapshot) => {
+      const data = snapshot.data();
+      if (data?.status) {
+        setOrder((prev) => (prev ? { ...prev, status: data.status as BridalStatus } : prev));
+      }
+    });
+
+    return () => unsub();
+  }, [orderId, ready]);
+
   async function action(type: string, body: Record<string, string> = {}) {
     if (!orderId) return;
-    setLoading(true);
+    const isAdvance = type === "advance";
+    if (isAdvance) setStageLoading(true);
+    else setLoading(true);
+
+    const prevOrder = order;
+    if (isAdvance && body.stage && order) {
+      setOrder({ ...order, status: body.stage as BridalStatus });
+    }
+
     try {
       const res = await fetch(`/api/orders/${orderId}/supplier/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) router.refresh();
       const data = await res.json();
+      if (!res.ok) {
+        if (isAdvance && prevOrder) setOrder(prevOrder);
+        return;
+      }
+      if (!isAdvance) router.refresh();
       if (data.order) setOrder(data.order);
       if (data.timeline) setTimeline(data.timeline);
       if (data.files) setFiles(data.files);
       if (type === "accept") setAccepted(true);
       if (type === "complete") setShowComplete(false);
       if (type === "reject") setShowReject(false);
+    } catch {
+      if (isAdvance && prevOrder) setOrder(prevOrder);
     } finally {
-      setLoading(false);
+      if (isAdvance) setStageLoading(false);
+      else setLoading(false);
     }
   }
 
@@ -133,10 +169,6 @@ export default function SupplierOrderPage({ params }: Props) {
   const filesUnlocked = !!order.filesUnlockedAt;
   const canAccept = order.status === "sent_to_supplier";
   const currentStageIdx = PRODUCTION_STAGES.indexOf(order.status as (typeof PRODUCTION_STAGES)[number]);
-  const nextStage =
-    currentStageIdx >= 0 && currentStageIdx < PRODUCTION_STAGES.length - 1
-      ? PRODUCTION_STAGES[currentStageIdx + 1]
-      : null;
   const canComplete = order.status === "delivered_to_shop" || order.status === "shipping";
   const canUndo =
     !!order.lastSupplierActionAt &&
@@ -160,7 +192,7 @@ export default function SupplierOrderPage({ params }: Props) {
     <div className="p-4 lg:p-8 max-w-2xl mx-auto">
       <p className="font-mono text-xs text-[#4C3BCF] mb-1">{order.orderNumber}</p>
       <h1 className="text-xl font-semibold text-slate-900 mb-2">{customerName}</h1>
-      <StatusBadge status={order.status} className="mb-6" />
+      <OrderStatusLive orderId={order.id} initialStatus={order.status} className="mb-6" />
 
       <div className="boms-card p-5 mb-6">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Order Journey</h2>
@@ -269,39 +301,13 @@ export default function SupplierOrderPage({ params }: Props) {
       )}
 
       {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
-        <section className="mb-6">
+        <section className="boms-card p-4 mb-6">
           <h2 className="text-sm font-semibold text-slate-900 mb-3">Production Stages</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {PRODUCTION_STAGES.map((stage, idx) => {
-              const currentIdx = PRODUCTION_STAGES.indexOf(
-                order.status as (typeof PRODUCTION_STAGES)[number]
-              );
-              const isDone = currentIdx > idx;
-              const isCurrent = order.status === stage;
-              const isNext = currentIdx >= 0 && idx === currentIdx + 1;
-              const canClick = isNext && nextStage === stage;
-
-              return (
-                <button
-                  key={stage}
-                  type="button"
-                  disabled={loading || !canClick}
-                  onClick={() => canClick && action("advance", { stage })}
-                  className={`py-2.5 px-2 rounded-lg text-xs font-medium transition-colors ${
-                    isDone
-                      ? "bg-green-50 text-green-800 border border-green-200"
-                      : isCurrent
-                        ? "bg-[#4C3BCF] text-white"
-                        : canClick
-                          ? "boms-btn-primary"
-                          : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  {getStatusLabel(stage)}
-                </button>
-              );
-            })}
-          </div>
+          <ProductionStageStepper
+            status={order.status}
+            loading={stageLoading}
+            onAdvance={(stage) => action("advance", { stage })}
+          />
         </section>
       )}
 

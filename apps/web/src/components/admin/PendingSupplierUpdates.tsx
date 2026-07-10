@@ -1,20 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import type { CustomerMessage } from "@/lib/data/seed";
 import { MessageAttachment } from "@/components/orders/MessageAttachment";
+import { getClientFirestore } from "@/lib/firebase/client";
+import { isFirebaseClientConfigured } from "@/lib/firebase/config";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface Props {
   orderId: string;
   pending: CustomerMessage[];
 }
 
+function mapPending(orderId: string, doc: { id: string; data: () => Record<string, unknown> }): CustomerMessage {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    orderId,
+    senderType: data.senderType as CustomerMessage["senderType"],
+    senderName: (data.senderName as string) ?? undefined,
+    message: data.message as string,
+    createdAt: data.createdAt as string,
+    attachmentUrl: (data.attachmentUrl as string) ?? undefined,
+    attachmentKind: (data.attachmentKind as string) ?? undefined,
+    audience: "internal",
+    reviewStatus: (data.reviewStatus as CustomerMessage["reviewStatus"]) ?? "pending",
+  };
+}
+
 export function PendingSupplierUpdates({ orderId, pending: initial }: Props) {
   const router = useRouter();
+  const { ready } = useFirebaseAuth();
   const [items, setItems] = useState(initial);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItems(initial.filter((m) => m.reviewStatus === "pending" || !m.reviewStatus));
+  }, [initial]);
+
+  useEffect(() => {
+    if (!ready || !isFirebaseClientConfigured()) return;
+    const db = getClientFirestore();
+    if (!db) return;
+
+    const q = query(
+      collection(db, "live_orders", orderId, "pending_updates"),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const live = snapshot.docs
+        .map((doc) => mapPending(orderId, doc))
+        .filter((m) => m.reviewStatus === "pending" || !m.reviewStatus);
+      if (live.length) setItems(live);
+    });
+
+    return () => unsub();
+  }, [orderId, ready]);
 
   if (!items.length) return null;
 

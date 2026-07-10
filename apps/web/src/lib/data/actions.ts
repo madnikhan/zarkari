@@ -77,26 +77,20 @@ async function syncOrderPatch(
   if (patch.status) {
     const order = await resolveOrder(orderId);
     if (order) {
-      import("@/lib/firebase/sync")
-        .then((m) =>
-          m.syncOrderLive(orderId, { status: patch.status!, deliveryDate: order.deliveryDate })
-        )
-        .catch(console.error);
-      import("@/lib/push/send")
-        .then((m) =>
-          m.sendPushToOrderCustomer(orderId, {
-            title: "Order update",
-            body: `${order.orderNumber}: status updated`,
-            href: `/my-order/${order.orderNumber}`,
-            orderId,
-          })
-        )
-        .catch(console.error);
+      const { syncOrderLive } = await import("@/lib/firebase/sync");
+      await syncOrderLive(orderId, { status: patch.status, deliveryDate: order.deliveryDate }).catch(console.error);
+      const { sendPushToOrderCustomer } = await import("@/lib/push/send");
+      await sendPushToOrderCustomer(orderId, {
+        title: "Order update",
+        body: `${order.orderNumber}: status updated`,
+        href: `/my-order/${order.orderNumber}`,
+        orderId,
+      }).catch(console.error);
     }
   }
 }
 
-function notify(title: string, body: string, orderId?: string, href?: string, threadId?: string) {
+async function notify(title: string, body: string, orderId?: string, href?: string, threadId?: string) {
   demoNotifications.unshift({
     id: `n-${Date.now()}`,
     orderId,
@@ -108,21 +102,17 @@ function notify(title: string, body: string, orderId?: string, href?: string, th
     createdAt: new Date().toISOString(),
   });
   if (isDbConfigured()) {
-    import("@/lib/db/notifications")
-      .then((m) => m.createNotificationDb({ orderId, title, body, href, threadId }))
-      .catch(console.error);
+    const { createNotificationDb } = await import("@/lib/db/notifications");
+    await createNotificationDb({ orderId, title, body, href, threadId }).catch(console.error);
   }
-  import("@/lib/push/send")
-    .then((m) =>
-      m.sendPushToStaff({
-        title,
-        body,
-        href: href ?? (orderId ? `/admin/orders/${orderId}` : threadId ? `/admin/inbox/${threadId}` : undefined),
-        orderId,
-        urgent: true,
-      })
-    )
-    .catch(console.error);
+  const { sendPushToStaff } = await import("@/lib/push/send");
+  await sendPushToStaff({
+    title,
+    body,
+    href: href ?? (orderId ? `/admin/orders/${orderId}` : threadId ? `/admin/inbox/${threadId}` : undefined),
+    orderId,
+    urgent: true,
+  }).catch(console.error);
 }
 
 export async function createBridalOrder(input: {
@@ -343,6 +333,13 @@ export async function advanceProductionStage(orderId: string, stage: BridalStatu
     performedByName: supplierName,
     performedByRole: "supplier",
   });
+  const { getStatusLabel } = await import("@/lib/orders/status-machine");
+  await notify(
+    "Supplier updated stage",
+    `${order.orderNumber} → ${getStatusLabel(stage)}`,
+    orderId,
+    `/admin/orders/${orderId}`
+  );
   return order;
 }
 
@@ -584,7 +581,7 @@ async function persistMessage(
   return saved ?? demoEntry;
 }
 
-function syncMessageToFirestore(
+async function syncMessageToFirestore(
   orderId: string,
   message: {
     id: string;
@@ -596,6 +593,7 @@ function syncMessageToFirestore(
     attachmentUrl?: string;
     attachmentKind?: string;
     readAt?: string;
+    reviewStatus?: string;
   }
 ) {
   const payload = {
@@ -609,13 +607,17 @@ function syncMessageToFirestore(
     readAt: message.readAt,
   };
 
-  import("@/lib/firebase/sync").then((m) => {
-    if (message.audience === "supplier") {
-      m.syncSupplierOrderMessage(orderId, payload);
-    } else if (message.audience === "customer" || !message.audience) {
-      m.syncOrderMessage(orderId, payload);
-    }
-  }).catch(console.error);
+  const { syncOrderMessage, syncSupplierOrderMessage, syncPendingUpdate } = await import("@/lib/firebase/sync");
+  if (message.audience === "supplier") {
+    await syncSupplierOrderMessage(orderId, payload).catch(console.error);
+  } else if (message.audience === "internal") {
+    await syncPendingUpdate(orderId, {
+      ...payload,
+      reviewStatus: message.reviewStatus ?? "pending",
+    }).catch(console.error);
+  } else if (message.audience === "customer" || !message.audience) {
+    await syncOrderMessage(orderId, payload).catch(console.error);
+  }
 }
 
 export async function addCustomerMessage(orderId: string, message: string, senderName?: string) {
@@ -625,11 +627,11 @@ export async function addCustomerMessage(orderId: string, message: string, sende
     message,
     audience: "customer",
   });
-  syncMessageToFirestore(orderId, saved);
+  await syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
   if (order) {
-    notify(
+    await notify(
       "Customer message",
       `${order.orderNumber}: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
       orderId,
@@ -653,42 +655,35 @@ export async function addStaffMessage(
     attachmentUrl: extras?.attachmentUrl,
     attachmentKind: extras?.attachmentKind,
   });
-  syncMessageToFirestore(orderId, saved);
+  await syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
   if (!order) return;
 
   if (audience === "customer") {
-    import("@/lib/push/send")
-      .then((m) =>
-        m.sendPushToOrderCustomer(orderId, {
-          title: "Message from ZARKARI",
-          body: message.slice(0, 120),
-          href: `/my-order/${order.orderNumber}`,
-          orderId,
-          urgent: true,
-        })
-      )
-      .catch(console.error);
+    const { sendPushToOrderCustomer } = await import("@/lib/push/send");
+    await sendPushToOrderCustomer(orderId, {
+      title: "Message from ZARKARI",
+      body: message.slice(0, 120),
+      href: `/my-order/${order.orderNumber}`,
+      orderId,
+      urgent: true,
+    }).catch(console.error);
     return;
   }
 
-  import("@/lib/push/send")
-    .then((m) =>
-      m.sendPushToSuppliers({
-        title: "Message from ZARKARI",
-        body: `${order.orderNumber}: ${message.slice(0, 100)}`,
-        href: `/supplier/orders/${orderId}`,
-        orderId,
-        urgent: true,
-      })
-    )
-    .catch(console.error);
+  const { sendPushToSuppliers } = await import("@/lib/push/send");
+  await sendPushToSuppliers({
+    title: "Message from ZARKARI",
+    body: `${order.orderNumber}: ${message.slice(0, 100)}`,
+    href: `/supplier/orders/${orderId}`,
+    orderId,
+    urgent: true,
+  }).catch(console.error);
 
   if (order.supplierId) {
-    import("@/lib/firebase/sync")
-      .then((m) => m.incrementSupplierUnread(order.supplierId!))
-      .catch(console.error);
+    const { incrementSupplierUnread } = await import("@/lib/firebase/sync");
+    incrementSupplierUnread(order.supplierId);
   }
 }
 
@@ -699,11 +694,11 @@ export async function addSupplierMessage(orderId: string, message: string, sende
     message,
     audience: "supplier",
   });
-  syncMessageToFirestore(orderId, saved);
+  await syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
   if (order) {
-    notify(
+    await notify(
       "Supplier message",
       `${order.orderNumber}: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
       orderId,
@@ -728,10 +723,11 @@ export async function addSupplierProgressUpdate(
     attachmentKind: input.attachmentKind,
     reviewStatus: "pending",
   });
+  await syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
   if (order) {
-    notify(
+    await notify(
       "Supplier progress update",
       `${order.orderNumber}: ${note.slice(0, 80)}`,
       orderId,
@@ -773,34 +769,52 @@ export async function forwardSupplierUpdate(
     const idx = demoMessages.findIndex((m) => m.id === internalMessageId);
     if (idx >= 0) demoMessages[idx].reviewStatus = "forwarded";
   }
+
+  const { removePendingUpdate } = await import("@/lib/firebase/sync");
+  await removePendingUpdate(orderId, internalMessageId).catch(console.error);
 }
 
 export async function dismissSupplierUpdate(orderId: string, internalMessageId: string) {
   if (isDbConfigured()) {
     const { updateMessageDb } = await import("@/lib/db/bridal-orders");
     await updateMessageDb(internalMessageId, { reviewStatus: "dismissed" });
-    return;
+  } else {
+    const idx = demoMessages.findIndex((m) => m.id === internalMessageId && m.orderId === orderId);
+    if (idx >= 0) demoMessages[idx].reviewStatus = "dismissed";
   }
-  const idx = demoMessages.findIndex((m) => m.id === internalMessageId && m.orderId === orderId);
-  if (idx >= 0) demoMessages[idx].reviewStatus = "dismissed";
+
+  const { removePendingUpdate } = await import("@/lib/firebase/sync");
+  await removePendingUpdate(orderId, internalMessageId).catch(console.error);
 }
 
 export async function markSupplierMessagesRead(orderId: string) {
+  const nowIso = new Date().toISOString();
+  const readIds: string[] = [];
+
   if (!isDbConfigured()) {
     demoMessages.forEach((m) => {
       if (m.orderId === orderId && m.audience === "supplier" && m.senderType === "staff" && !m.readAt) {
-        m.readAt = new Date().toISOString();
+        m.readAt = nowIso;
+        readIds.push(m.id);
       }
     });
-    return;
-  }
-  const { getMessagesDb, updateMessageDb } = await import("@/lib/db/bridal-orders");
-  const messages = await getMessagesDb(orderId, "supplier");
-  const now = new Date();
-  for (const m of messages) {
-    if (m.senderType === "staff" && !m.readAt) {
-      await updateMessageDb(m.id, { readAt: now });
+  } else {
+    const { getMessagesDb, updateMessageDb } = await import("@/lib/db/bridal-orders");
+    const messages = await getMessagesDb(orderId, "supplier");
+    const now = new Date();
+    for (const m of messages) {
+      if (m.senderType === "staff" && !m.readAt) {
+        await updateMessageDb(m.id, { readAt: now });
+        readIds.push(m.id);
+      }
     }
+  }
+
+  if (readIds.length) {
+    const { syncMessageReadAt } = await import("@/lib/firebase/sync");
+    await Promise.all(
+      readIds.map((id) => syncMessageReadAt(orderId, id, nowIso, "supplier_messages").catch(console.error))
+    );
   }
 }
 
@@ -812,14 +826,13 @@ export async function addOrderFile(orderId: string, category: string, fileName: 
   }
 }
 
-export function markAllNotificationsRead(userId?: string) {
+export async function markAllNotificationsRead(staffUserId?: string) {
   demoNotifications.forEach((n) => {
-    if (!userId || n.userId === userId) n.read = true;
+    if (!n.userId || n.userId === staffUserId) n.read = true;
   });
   if (isDbConfigured()) {
-    import("@/lib/db/notifications")
-      .then((m) => m.markAllNotificationsReadDb(userId))
-      .catch(console.error);
+    const { markAllStaffNotificationsReadDb } = await import("@/lib/db/notifications");
+    await markAllStaffNotificationsReadDb(staffUserId).catch(console.error);
   }
 }
 

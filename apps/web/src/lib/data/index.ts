@@ -509,13 +509,14 @@ export async function getRetailOrders() {
 
 export async function getNotifications(unreadOnly = false, userId?: string) {
   if (isDbConfigured()) {
-    const { listNotificationsDb } = await import("@/lib/db/notifications");
-    let list = await listNotificationsDb(userId);
+    const { listStaffNotificationsDb } = await import("@/lib/db/notifications");
+    let list = await listStaffNotificationsDb(userId);
     if (unreadOnly) list = list.filter((n) => !n.read);
     return list;
   }
   let list = [...demoNotifications];
   if (unreadOnly) list = list.filter((n) => !n.read);
+  if (userId) list = list.filter((n) => !n.userId || n.userId === userId);
   return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 

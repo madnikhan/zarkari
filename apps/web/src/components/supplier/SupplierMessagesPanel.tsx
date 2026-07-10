@@ -1,46 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import type { CustomerMessage } from "@/lib/data/seed";
 import { MessageAttachment, MessageStatusBadge } from "@/components/orders/MessageAttachment";
+import { getClientFirestore } from "@/lib/firebase/client";
+import { isFirebaseClientConfigured } from "@/lib/firebase/config";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface Props {
   orderId: string;
   initialMessages?: CustomerMessage[];
 }
 
+function mapDoc(orderId: string, doc: { id: string; data: () => Record<string, unknown> }): CustomerMessage {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    orderId,
+    senderType: data.senderType as CustomerMessage["senderType"],
+    senderName: (data.senderName as string) ?? undefined,
+    message: data.message as string,
+    createdAt: data.createdAt as string,
+    attachmentUrl: (data.attachmentUrl as string) ?? undefined,
+    attachmentKind: (data.attachmentKind as string) ?? undefined,
+    readAt: (data.readAt as string) ?? undefined,
+    audience: "supplier",
+  };
+}
+
 export function SupplierMessagesPanel({ orderId, initialMessages = [] }: Props) {
+  const { ready } = useFirebaseAuth();
   const [messages, setMessages] = useState(initialMessages);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (!seededRef.current) {
+      setMessages(initialMessages);
+      seededRef.current = true;
+    }
+  }, [initialMessages]);
+
+  useEffect(() => {
+    if (!ready || !isFirebaseClientConfigured()) return;
+    const db = getClientFirestore();
+    if (!db) return;
+
+    const q = query(
+      collection(db, "live_orders", orderId, "supplier_messages"),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const remote = snapshot.docs.map((doc) => mapDoc(orderId, doc));
+      setMessages((prev) => {
+        const remoteIds = new Set(remote.map((m) => m.id));
+        const optimistic = prev.filter((m) => m.id.startsWith("local-") && !remoteIds.has(m.id));
+        return [...remote, ...optimistic].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
+    });
+
+    return () => unsub();
+  }, [orderId, ready]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!message.trim()) return;
     setLoading(true);
     setError("");
+    const trimmed = message.trim();
+    const localId = `local-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: localId,
+        orderId,
+        senderType: "supplier",
+        message: trimmed,
+        audience: "supplier",
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setMessage("");
     try {
       const res = await fetch(`/api/orders/${orderId}/supplier/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message.trim() }),
+        body: JSON.stringify({ message: trimmed }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Failed to send");
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `local-${Date.now()}`,
-          orderId,
-          senderType: "supplier",
-          message: message.trim(),
-          audience: "supplier",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      setMessage("");
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== localId));
+      setMessage(trimmed);
       setError(err instanceof Error ? err.message : "Failed to send");
     } finally {
       setLoading(false);

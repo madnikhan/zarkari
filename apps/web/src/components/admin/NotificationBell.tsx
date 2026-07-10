@@ -39,33 +39,46 @@ export function NotificationBell() {
     }
   }
 
+  async function pollCount() {
+    try {
+      const r = await fetch("/api/notifications?countOnly=true");
+      if (!r.ok) return;
+      const d = await r.json();
+      setLiveUnread(d.unread ?? 0);
+    } catch {
+      /* ignore polling errors */
+    }
+  }
+
   useEffect(() => {
-    if (open) load();
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (open) void load();
   }, [open]);
 
   useEffect(() => {
-    if (!ready || !isFirebaseClientConfigured()) {
-      const poll = async () => {
-        try {
-          const r = await fetch("/api/notifications?countOnly=true");
-          if (!r.ok) return;
-          const d = await r.json();
-          setLiveUnread(d.unread ?? 0);
-        } catch {
-          /* ignore polling errors */
-        }
-      };
-      void poll();
-      const interval = window.setInterval(poll, 15000);
-      return () => window.clearInterval(interval);
-    }
+    void pollCount();
+    const interval = window.setInterval(pollCount, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
 
+  useEffect(() => {
+    if (!ready || !isFirebaseClientConfigured()) return;
     const db = getClientFirestore();
     if (!db) return;
 
-    const unsubShared = onSnapshot(doc(db, "staff_inbox", "shared"), (snapshot) => {
-      setLiveUnread(snapshot.data()?.unreadCount ?? 0);
-    });
+    const unsubShared = onSnapshot(
+      doc(db, "staff_inbox", "shared"),
+      (snapshot) => {
+        setLiveUnread(snapshot.data()?.unreadCount ?? 0);
+        void load();
+      },
+      (err) => {
+        console.error("staff_inbox listener error", err);
+      }
+    );
 
     return () => unsubShared();
   }, [ready]);
