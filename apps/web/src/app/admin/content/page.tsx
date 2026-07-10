@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { FileText, Image, Layout, Package, PenLine, Sparkles } from "lucide-react";
+import { FileText, Image, Layout, Package, PenLine, Sparkles, Video } from "lucide-react";
 
 const modules = [
   { href: "/admin/content/products", label: "Products", description: "Catalogue items, prices, images", icon: Package },
   { href: "/admin/content/collections", label: "Collections", description: "Group products for storefront", icon: Layout },
-  { href: "/admin/content/homepage", label: "Homepage", description: "Hero text and announcements", icon: Sparkles },
+  { href: "/admin/content/homepage", label: "Homepage", description: "Hero text, announcements, and featured content", icon: Sparkles },
+  { href: "/admin/content/hero", label: "Hero Media", description: "Homepage video clips (R2 uploads/hero/)", icon: Video },
   { href: "/admin/content/media", label: "Media Library", description: "Upload once, pick in any content form", icon: Image },
   { href: "/admin/content/blog", label: "Blog", description: "Articles and Soro posts", icon: PenLine },
 ];

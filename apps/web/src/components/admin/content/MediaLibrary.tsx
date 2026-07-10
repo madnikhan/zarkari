@@ -15,7 +15,7 @@ const TYPE_TABS: { id: MediaKind | "all"; label: string }[] = [
   { id: "audio", label: "Audio" },
 ];
 
-const DEFAULT_CATEGORIES = ["cms", "order-voice", "general", "supplier-completion", "audit"];
+const DEFAULT_CATEGORIES = ["cms", "hero", "order-voice", "general", "supplier-completion", "audit"];
 
 export function MediaLibrary() {
   const [refreshKey, setRefreshKey] = useState(0);

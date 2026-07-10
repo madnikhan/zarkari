@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 import { MediaAssetGrid } from "@/components/admin/content/MediaAssetGrid";
+import { HERO_MEDIA_CATEGORY } from "@/lib/upload/constants";
 
 const CMS_ACCEPT = "image/*,video/*,.mov";
 const CMS_HINT = "Images up to 4 MB · Videos up to 10 min / 200 MB";
@@ -20,6 +21,7 @@ interface Props {
   imagesOnly?: boolean;
   videosOnly?: boolean;
   uploadCategory?: string;
+  categoryFilter?: string;
 }
 
 export function MediaPickerModal({
@@ -32,6 +34,7 @@ export function MediaPickerModal({
   imagesOnly = false,
   videosOnly = false,
   uploadCategory = "cms",
+  categoryFilter,
 }: Props) {
   const [tab, setTab] = useState<"library" | "upload">("library");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -89,10 +92,11 @@ export function MediaPickerModal({
 
   const uploadAccept = imagesOnly ? "image/*" : videosOnly ? VIDEO_ACCEPT : CMS_ACCEPT;
   const uploadHint = imagesOnly ? "Images up to 4 MB" : videosOnly ? VIDEO_HINT : CMS_HINT;
+  const resolvedCategoryFilter = categoryFilter ?? (videosOnly ? HERO_MEDIA_CATEGORY : undefined);
   const emptyMessage = imagesOnly
     ? "No images yet. Switch to Upload to add one."
     : videosOnly
-      ? "No videos yet. Switch to Upload to add one."
+      ? "No hero videos yet — upload one in the Upload tab or Hero Media page."
       : "No media yet. Switch to Upload to add one.";
 
   return (
@@ -146,6 +150,7 @@ export function MediaPickerModal({
               imagesOnly={imagesOnly}
               videosOnly={videosOnly}
               typeFilter={videosOnly ? "video" : imagesOnly ? "image" : "all"}
+              categoryFilter={resolvedCategoryFilter}
               emptyMessage={emptyMessage}
             />
           )}

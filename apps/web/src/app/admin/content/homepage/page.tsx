@@ -16,7 +16,11 @@ export default async function ContentHomepagePage() {
       </Link>
       <h1 className="text-2xl font-semibold text-slate-900 mt-1 mb-2">Homepage</h1>
       <p className="text-sm text-slate-500 mb-6">
-        Announcement bar, hero text, hero videos from the media library, and featured content.
+        Announcement bar, hero text, and featured content. Hero videos come from{" "}
+        <Link href="/admin/content/hero" className="text-[#4C3BCF] hover:underline">
+          Hero Media
+        </Link>{" "}
+        (<code className="text-xs">uploads/hero/</code>) — pick which clips play here.
       </p>
       <CmsOwnerBanner isOwner={isOwner} />
       <HomepageEditor initial={settings} isOwner={isOwner} />

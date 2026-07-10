@@ -1,3 +1,6 @@
+/** R2 folder + media_assets category for homepage hero clips */
+export const HERO_MEDIA_CATEGORY = "hero";
+
 export const MAX_SERVER_UPLOAD_BYTES = 4 * 1024 * 1024;
 /** Client-side cap; server may read MAX_DIRECT_UPLOAD_BYTES env for presign validation */
 export const MAX_DIRECT_UPLOAD_BYTES = 200 * 1024 * 1024;

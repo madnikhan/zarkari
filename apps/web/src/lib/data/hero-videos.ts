@@ -11,12 +11,31 @@ export interface HeroVideo {
   durationSec?: number;
 }
 
+const HERO_R2_PREFIX = "uploads/hero/";
+
 function isValidMediaUrl(url: string): boolean {
   return (
     url.startsWith("http://") ||
     url.startsWith("https://") ||
     url.startsWith("/")
   );
+}
+
+/** True when URL points at an object under uploads/hero/ in R2 (or local /videos/hero/). */
+export function isHeroMediaUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("/videos/hero/")) return true;
+  try {
+    const path = new URL(trimmed, "https://placeholder.local").pathname.replace(/^\//, "");
+    return path.startsWith(HERO_R2_PREFIX);
+  } catch {
+    return false;
+  }
+}
+
+export function filterHeroMediaClips(clips: HeroVideoClip[]): HeroVideoClip[] {
+  return clips.filter((clip) => isHeroMediaUrl(clip.url));
 }
 
 export function parseHeroVideos(raw: string | undefined): HeroVideo[] {
@@ -29,7 +48,7 @@ export function parseHeroVideos(raw: string | undefined): HeroVideo[] {
     for (let i = 0; i < parsed.length; i++) {
       const item = parsed[i] as { url?: unknown; poster?: unknown };
       const url = typeof item?.url === "string" ? item.url.trim() : "";
-      if (!url || !isValidMediaUrl(url)) continue;
+      if (!url || !isValidMediaUrl(url) || !isHeroMediaUrl(url)) continue;
 
       const poster =
         typeof item?.poster === "string" && item.poster.trim()
@@ -50,7 +69,7 @@ export function parseHeroVideos(raw: string | undefined): HeroVideo[] {
 
 export function serializeHeroVideos(clips: HeroVideoClip[]): string {
   return JSON.stringify(
-    clips
+    filterHeroMediaClips(clips)
       .map((clip) => ({
         url: clip.url.trim(),
         ...(clip.poster?.trim() ? { poster: clip.poster.trim() } : {}),

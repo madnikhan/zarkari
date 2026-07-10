@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Trash2, Video } from "lucide-react";
 import { MediaPickerModal } from "@/components/admin/content/MediaPickerModal";
 import {
   heroClipLabel,
+  isHeroMediaUrl,
   parseHeroVideos,
   serializeHeroVideos,
   type HeroVideoClip,
 } from "@/lib/data/hero-videos";
+import { HERO_MEDIA_CATEGORY } from "@/lib/upload/constants";
 
 interface Settings {
   announcement?: string;
@@ -48,7 +51,8 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
           heroVideos: serializeHeroVideos(heroClips),
         }),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to save");
       setSaved(true);
       router.refresh();
     } catch (err) {
@@ -73,9 +77,10 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
   }
 
   function addClips(urls: string[]) {
+    const heroOnly = urls.filter((url) => isHeroMediaUrl(url));
     setHeroClips((prev) => {
       const existing = new Set(prev.map((clip) => clip.url));
-      const additions = urls
+      const additions = heroOnly
         .filter((url) => !existing.has(url))
         .map((url) => ({ url }));
       return [...prev, ...additions];
@@ -108,8 +113,12 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
         <div className="pt-2 border-t border-slate-100">
           <label className="text-xs text-slate-500 uppercase">Hero videos</label>
           <p className="text-xs text-slate-400 mt-1 mb-3">
-            Pick videos from your R2 media library. They autoplay muted and rotate on the homepage hero.
-            H.264 MP4 works best on all devices.
+            Pick clips from the{" "}
+            <Link href="/admin/content/hero" className="text-[#4C3BCF] hover:underline">
+              Hero Media
+            </Link>{" "}
+            folder only (<code className="text-[10px]">uploads/hero/</code>). They autoplay muted and
+            rotate on the homepage. H.264 MP4 works best on all devices.
           </p>
 
           {heroClips.length > 0 ? (
@@ -122,6 +131,9 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
                   <Video className="h-4 w-4 shrink-0 text-[#4C3BCF]" />
                   <span className="flex-1 text-sm text-slate-700 truncate" title={clip.url}>
                     {heroClipLabel(clip.url)}
+                    {!isHeroMediaUrl(clip.url) && (
+                      <span className="ml-2 text-xs text-amber-600">(not in hero folder)</span>
+                    )}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
@@ -165,7 +177,7 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
             onClick={() => setPickerOpen(true)}
             className="text-sm font-medium text-[#4C3BCF] hover:underline disabled:opacity-50"
           >
-            Add from media library
+            Add from hero library
           </button>
         </div>
 
@@ -183,7 +195,8 @@ export function HomepageEditor({ initial, isOwner = true }: { initial: Settings;
         onSelectMultiple={addClips}
         multiple
         videosOnly
-        uploadCategory="hero"
+        uploadCategory={HERO_MEDIA_CATEGORY}
+        categoryFilter={HERO_MEDIA_CATEGORY}
         title="Choose hero videos"
       />
     </>
