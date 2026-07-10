@@ -9,7 +9,9 @@ import {
   getCancellations,
   getRefunds,
   getPayments,
-  getMessages,
+  getCustomerMessages,
+  getSupplierMessages,
+  getPendingSupplierUpdates,
 } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
@@ -32,7 +34,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   const order = await getBridalOrderById(id);
   if (!order) notFound();
 
-  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments, messages] =
+  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments, customerMessages, supplierMessages, pendingUpdates] =
     await Promise.all([
       getCustomer(order.customerId),
       order.supplierId ? getSupplier(order.supplierId) : null,
@@ -42,7 +44,9 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       getCancellations(order.id),
       getRefunds(order.id),
       getPayments(order.id),
-      getMessages(order.id),
+      getCustomerMessages(order.id),
+      getSupplierMessages(order.id),
+      getPendingSupplierUpdates(order.id),
     ]);
 
   const summaryRows = [
@@ -104,7 +108,12 @@ export default async function AdminOrderDetailPage({ params }: Props) {
 
       <div className="boms-card p-5">
         <OrderDetailTabs data={{ order, timeline, files, redesigns, cancellations, refunds, payments }} />
-        <OrderMessagesLive orderId={order.id} initialMessages={messages} />
+        <OrderMessagesLive
+          orderId={order.id}
+          initialCustomerMessages={customerMessages}
+          initialSupplierMessages={supplierMessages}
+          initialPendingUpdates={pendingUpdates}
+        />
       </div>
     </div>
   );

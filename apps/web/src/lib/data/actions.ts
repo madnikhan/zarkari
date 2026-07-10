@@ -119,6 +119,7 @@ function notify(title: string, body: string, orderId?: string, href?: string, th
         body,
         href: href ?? (orderId ? `/admin/orders/${orderId}` : threadId ? `/admin/inbox/${threadId}` : undefined),
         orderId,
+        urgent: true,
       })
     )
     .catch(console.error);
@@ -242,6 +243,17 @@ export async function sendToSupplier(orderId: string, byName?: string) {
   await syncOrderPatch(orderId, { status: "sent_to_supplier" });
   await syncTimeline(orderId, "sent_to_supplier", { performedByName: byName, performedByRole: "staff" });
   notify("New order assigned", order.orderNumber, orderId);
+  import("@/lib/push/send")
+    .then((m) =>
+      m.sendPushToSuppliers({
+        title: "New order assigned",
+        body: order.orderNumber,
+        href: `/supplier/orders/${orderId}`,
+        orderId,
+        urgent: true,
+      })
+    )
+    .catch(console.error);
   return order;
 }
 
@@ -540,25 +552,80 @@ export async function supplierComplete(
   return order;
 }
 
-export async function addCustomerMessage(orderId: string, message: string, senderName?: string) {
+async function persistMessage(
+  orderId: string,
+  input: {
+    senderType: "customer" | "staff" | "supplier";
+    senderName?: string;
+    message: string;
+    audience?: "customer" | "supplier" | "internal";
+    attachmentUrl?: string;
+    attachmentKind?: string;
+    reviewStatus?: "pending" | "forwarded" | "dismissed";
+    forwardedFromId?: string;
+  }
+) {
+  const createdAt = new Date().toISOString();
+  const demoEntry = {
+    id: `msg-${Date.now()}`,
+    orderId,
+    ...input,
+    audience: input.audience ?? "customer",
+    createdAt,
+  };
+
   if (!isDbConfigured()) {
-    demoMessages.push({
-      id: `msg-${Date.now()}`,
-      orderId,
-      senderType: "customer",
-      senderName,
-      message,
-      createdAt: new Date().toISOString(),
-    });
-    return;
+    demoMessages.push(demoEntry);
+    return demoEntry;
   }
+
   const { addMessageDb } = await import("@/lib/db/bridal-orders");
-  const saved = await addMessageDb(orderId, { senderType: "customer", senderName, message });
-  if (saved) {
-    import("@/lib/firebase/sync")
-      .then((m) => m.syncOrderMessage(orderId, saved))
-      .catch(console.error);
+  const saved = await addMessageDb(orderId, input);
+  return saved ?? demoEntry;
+}
+
+function syncMessageToFirestore(
+  orderId: string,
+  message: {
+    id: string;
+    senderType: "customer" | "staff" | "supplier";
+    senderName?: string;
+    message: string;
+    createdAt: string;
+    audience?: string;
+    attachmentUrl?: string;
+    attachmentKind?: string;
+    readAt?: string;
   }
+) {
+  const payload = {
+    id: message.id,
+    senderType: message.senderType,
+    senderName: message.senderName,
+    message: message.message,
+    createdAt: message.createdAt,
+    attachmentUrl: message.attachmentUrl,
+    attachmentKind: message.attachmentKind,
+    readAt: message.readAt,
+  };
+
+  import("@/lib/firebase/sync").then((m) => {
+    if (message.audience === "supplier") {
+      m.syncSupplierOrderMessage(orderId, payload);
+    } else if (message.audience === "customer" || !message.audience) {
+      m.syncOrderMessage(orderId, payload);
+    }
+  }).catch(console.error);
+}
+
+export async function addCustomerMessage(orderId: string, message: string, senderName?: string) {
+  const saved = await persistMessage(orderId, {
+    senderType: "customer",
+    senderName,
+    message,
+    audience: "customer",
+  });
+  syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
   if (order) {
@@ -571,28 +638,27 @@ export async function addCustomerMessage(orderId: string, message: string, sende
   }
 }
 
-export async function addStaffMessage(orderId: string, message: string, senderName?: string) {
-  if (!isDbConfigured()) {
-    demoMessages.push({
-      id: `msg-${Date.now()}`,
-      orderId,
-      senderType: "staff",
-      senderName,
-      message,
-      createdAt: new Date().toISOString(),
-    });
-    return;
-  }
-  const { addMessageDb } = await import("@/lib/db/bridal-orders");
-  const saved = await addMessageDb(orderId, { senderType: "staff", senderName, message });
-  if (saved) {
-    import("@/lib/firebase/sync")
-      .then((m) => m.syncOrderMessage(orderId, saved))
-      .catch(console.error);
-  }
+export async function addStaffMessage(
+  orderId: string,
+  message: string,
+  senderName?: string,
+  audience: "customer" | "supplier" = "customer",
+  extras?: { attachmentUrl?: string; attachmentKind?: string }
+) {
+  const saved = await persistMessage(orderId, {
+    senderType: "staff",
+    senderName,
+    message,
+    audience,
+    attachmentUrl: extras?.attachmentUrl,
+    attachmentKind: extras?.attachmentKind,
+  });
+  syncMessageToFirestore(orderId, saved);
 
   const order = await resolveOrder(orderId);
-  if (order) {
+  if (!order) return;
+
+  if (audience === "customer") {
     import("@/lib/push/send")
       .then((m) =>
         m.sendPushToOrderCustomer(orderId, {
@@ -600,9 +666,141 @@ export async function addStaffMessage(orderId: string, message: string, senderNa
           body: message.slice(0, 120),
           href: `/my-order/${order.orderNumber}`,
           orderId,
+          urgent: true,
         })
       )
       .catch(console.error);
+    return;
+  }
+
+  import("@/lib/push/send")
+    .then((m) =>
+      m.sendPushToSuppliers({
+        title: "Message from ZARKARI",
+        body: `${order.orderNumber}: ${message.slice(0, 100)}`,
+        href: `/supplier/orders/${orderId}`,
+        orderId,
+        urgent: true,
+      })
+    )
+    .catch(console.error);
+
+  if (order.supplierId) {
+    import("@/lib/firebase/sync")
+      .then((m) => m.incrementSupplierUnread(order.supplierId!))
+      .catch(console.error);
+  }
+}
+
+export async function addSupplierMessage(orderId: string, message: string, senderName?: string) {
+  const saved = await persistMessage(orderId, {
+    senderType: "supplier",
+    senderName,
+    message,
+    audience: "supplier",
+  });
+  syncMessageToFirestore(orderId, saved);
+
+  const order = await resolveOrder(orderId);
+  if (order) {
+    notify(
+      "Supplier message",
+      `${order.orderNumber}: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
+      orderId,
+      `/admin/orders/${orderId}`
+    );
+  }
+}
+
+export async function addSupplierProgressUpdate(
+  orderId: string,
+  input: { message?: string; fileUrl: string; fileName: string; attachmentKind: string; senderName?: string }
+) {
+  await addOrderFile(orderId, "supplier_progress", input.fileName, input.fileUrl);
+
+  const note = input.message?.trim() || "Progress photo/video uploaded";
+  const saved = await persistMessage(orderId, {
+    senderType: "supplier",
+    senderName: input.senderName,
+    message: note,
+    audience: "internal",
+    attachmentUrl: input.fileUrl,
+    attachmentKind: input.attachmentKind,
+    reviewStatus: "pending",
+  });
+
+  const order = await resolveOrder(orderId);
+  if (order) {
+    notify(
+      "Supplier progress update",
+      `${order.orderNumber}: ${note.slice(0, 80)}`,
+      orderId,
+      `/admin/orders/${orderId}`
+    );
+  }
+
+  return saved;
+}
+
+export async function forwardSupplierUpdate(
+  orderId: string,
+  internalMessageId: string,
+  staffName?: string,
+  customerNote?: string
+) {
+  const { getMessageDb, updateMessageDb } = await import("@/lib/db/bridal-orders");
+  const internal = isDbConfigured()
+    ? await getMessageDb(internalMessageId)
+    : demoMessages.find((m) => m.id === internalMessageId);
+
+  if (!internal || internal.audience !== "internal" || internal.reviewStatus !== "pending") {
+    throw new Error("Update not found or already handled");
+  }
+
+  const body =
+    customerNote?.trim() ||
+    internal.message ||
+    "Your order is progressing well — here is a new update from our team.";
+
+  await addStaffMessage(orderId, body, staffName, "customer", {
+    attachmentUrl: internal.attachmentUrl,
+    attachmentKind: internal.attachmentKind,
+  });
+
+  if (isDbConfigured()) {
+    await updateMessageDb(internalMessageId, { reviewStatus: "forwarded" });
+  } else {
+    const idx = demoMessages.findIndex((m) => m.id === internalMessageId);
+    if (idx >= 0) demoMessages[idx].reviewStatus = "forwarded";
+  }
+}
+
+export async function dismissSupplierUpdate(orderId: string, internalMessageId: string) {
+  if (isDbConfigured()) {
+    const { updateMessageDb } = await import("@/lib/db/bridal-orders");
+    await updateMessageDb(internalMessageId, { reviewStatus: "dismissed" });
+    return;
+  }
+  const idx = demoMessages.findIndex((m) => m.id === internalMessageId && m.orderId === orderId);
+  if (idx >= 0) demoMessages[idx].reviewStatus = "dismissed";
+}
+
+export async function markSupplierMessagesRead(orderId: string) {
+  if (!isDbConfigured()) {
+    demoMessages.forEach((m) => {
+      if (m.orderId === orderId && m.audience === "supplier" && m.senderType === "staff" && !m.readAt) {
+        m.readAt = new Date().toISOString();
+      }
+    });
+    return;
+  }
+  const { getMessagesDb, updateMessageDb } = await import("@/lib/db/bridal-orders");
+  const messages = await getMessagesDb(orderId, "supplier");
+  const now = new Date();
+  for (const m of messages) {
+    if (m.senderType === "staff" && !m.readAt) {
+      await updateMessageDb(m.id, { readAt: now });
+    }
   }
 }
 

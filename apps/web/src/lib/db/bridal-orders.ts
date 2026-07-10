@@ -703,6 +703,7 @@ export async function getOrderFilesDb(orderId: string): Promise<OrderFile[]> {
     category: row.category,
     fileName: row.fileName,
     url: row.url,
+    mimeType: row.mimeType ?? undefined,
   }));
 }
 
@@ -1075,17 +1076,36 @@ export async function getPaymentsDb(orderId: string) {
   }));
 }
 
+function mapMessageRow(row: typeof schema.customerMessages.$inferSelect) {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    senderType: row.senderType as "customer" | "staff" | "supplier",
+    senderName: row.senderName ?? undefined,
+    message: row.message,
+    createdAt: row.createdAt.toISOString(),
+    audience: (row.audience ?? "customer") as "customer" | "supplier" | "internal",
+    attachmentUrl: row.attachmentUrl ?? undefined,
+    attachmentKind: row.attachmentKind ?? undefined,
+    readAt: row.readAt?.toISOString(),
+    forwardedFromId: row.forwardedFromId ?? undefined,
+    reviewStatus: row.reviewStatus as "pending" | "forwarded" | "dismissed" | undefined,
+  };
+}
+
 export async function addMessageDb(
   orderId: string,
-  input: { senderType: string; senderName?: string; message: string }
-): Promise<{
-  id: string;
-  orderId: string;
-  senderType: "customer" | "staff";
-  senderName?: string;
-  message: string;
-  createdAt: string;
-} | null> {
+  input: {
+    senderType: string;
+    senderName?: string;
+    message: string;
+    audience?: "customer" | "supplier" | "internal";
+    attachmentUrl?: string;
+    attachmentKind?: string;
+    reviewStatus?: "pending" | "forwarded" | "dismissed";
+    forwardedFromId?: string;
+  }
+) {
   const db = getDb();
   if (!db) return null;
   const [row] = await db
@@ -1095,20 +1115,18 @@ export async function addMessageDb(
       senderType: input.senderType,
       senderName: input.senderName ?? null,
       message: input.message,
+      audience: input.audience ?? "customer",
+      attachmentUrl: input.attachmentUrl ?? null,
+      attachmentKind: input.attachmentKind ?? null,
+      reviewStatus: input.reviewStatus ?? null,
+      forwardedFromId: input.forwardedFromId ?? null,
     })
     .returning();
   if (!row) return null;
-  return {
-    id: row.id,
-    orderId: row.orderId,
-    senderType: row.senderType as "customer" | "staff",
-    senderName: row.senderName ?? undefined,
-    message: row.message,
-    createdAt: row.createdAt.toISOString(),
-  };
+  return mapMessageRow(row);
 }
 
-export async function getMessagesDb(orderId: string) {
+export async function getMessagesDb(orderId: string, audience?: "customer" | "supplier" | "internal") {
   const db = getDb();
   if (!db) return [];
   const rows = await db
@@ -1116,12 +1134,43 @@ export async function getMessagesDb(orderId: string) {
     .from(schema.customerMessages)
     .where(eq(schema.customerMessages.orderId, orderId))
     .orderBy(schema.customerMessages.createdAt);
-  return rows.map((row) => ({
-    id: row.id,
-    orderId: row.orderId,
-    senderType: row.senderType as "customer" | "staff",
-    senderName: row.senderName ?? undefined,
-    message: row.message,
-    createdAt: row.createdAt.toISOString(),
-  }));
+  const mapped = rows.map(mapMessageRow);
+  if (!audience) return mapped;
+  return mapped.filter((m) => m.audience === audience);
+}
+
+export async function getPendingInternalMessagesDb(orderId: string) {
+  const messages = await getMessagesDb(orderId, "internal");
+  return messages.filter((m) => m.reviewStatus === "pending");
+}
+
+export async function updateMessageDb(
+  messageId: string,
+  patch: {
+    reviewStatus?: "pending" | "forwarded" | "dismissed";
+    readAt?: Date;
+  }
+) {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .update(schema.customerMessages)
+    .set({
+      ...(patch.reviewStatus !== undefined ? { reviewStatus: patch.reviewStatus } : {}),
+      ...(patch.readAt !== undefined ? { readAt: patch.readAt } : {}),
+    })
+    .where(eq(schema.customerMessages.id, messageId))
+    .returning();
+  return row ? mapMessageRow(row) : null;
+}
+
+export async function getMessageDb(messageId: string) {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(schema.customerMessages)
+    .where(eq(schema.customerMessages.id, messageId))
+    .limit(1);
+  return row ? mapMessageRow(row) : null;
 }

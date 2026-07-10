@@ -66,11 +66,24 @@ export async function listDeviceTokensByOrderId(orderId: string): Promise<string
   return rows.map((r) => r.token);
 }
 
+export async function listSupplierDeviceTokens(): Promise<string[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ token: schema.deviceTokens.fcmToken })
+    .from(schema.deviceTokens)
+    .where(eq(schema.deviceTokens.role, "supplier"));
+  return rows.map((r) => r.token);
+}
+
 export async function listStaffDeviceTokens(): Promise<string[]> {
   const db = getDb();
   if (!db) return [];
-  const rows = await db.select({ token: schema.deviceTokens.fcmToken }).from(schema.deviceTokens);
-  return rows.filter((r) => r.token).map((r) => r.token);
+  const rows = await db
+    .select({ token: schema.deviceTokens.fcmToken })
+    .from(schema.deviceTokens)
+    .where(eq(schema.deviceTokens.role, "admin"));
+  return rows.map((r) => r.token);
 }
 
 export async function listAdminDeviceTokens(): Promise<string[]> {

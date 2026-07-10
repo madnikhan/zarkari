@@ -7,6 +7,7 @@ import { notificationHref } from "@/lib/notification-link";
 import { getClientFirestore } from "@/lib/firebase/client";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { stopNotificationAlert, useNotificationAlert } from "@/hooks/useNotificationAlert";
 
 interface NotificationItem {
   id: string;
@@ -44,7 +45,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!ready || !isFirebaseClientConfigured()) {
-      const interval = window.setInterval(async () => {
+      const poll = async () => {
         try {
           const r = await fetch("/api/notifications?countOnly=true");
           if (!r.ok) return;
@@ -53,7 +54,9 @@ export function NotificationBell() {
         } catch {
           /* ignore polling errors */
         }
-      }, 60000);
+      };
+      void poll();
+      const interval = window.setInterval(poll, 15000);
       return () => window.clearInterval(interval);
     }
 
@@ -66,6 +69,10 @@ export function NotificationBell() {
 
     return () => unsubShared();
   }, [ready]);
+
+  const listUnread = notifications.filter((n) => !n.read).length;
+  const unread = open ? listUnread : liveUnread || listUnread;
+  useNotificationAlert(unread, !open);
 
   async function markRead(id: string) {
     await fetch("/api/notifications", {
@@ -81,23 +88,28 @@ export function NotificationBell() {
     await fetch("/api/notifications", { method: "PATCH" });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setLiveUnread(0);
+    stopNotificationAlert();
   }
-
-  const listUnread = notifications.filter((n) => !n.read).length;
-  const unread = open ? listUnread : liveUnread || listUnread;
 
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) stopNotificationAlert();
+        }}
         className="relative p-2 text-charcoal/70 hover:text-charcoal"
         aria-label="Notifications"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        {unread > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
+        {unread > 0 && (
+          <span className="absolute top-1 right-1 min-w-[8px] h-2 px-0.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-sand rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
@@ -129,6 +141,7 @@ export function NotificationBell() {
                     onClick={() => {
                       if (!n.read) markRead(n.id);
                       setOpen(false);
+                      stopNotificationAlert();
                     }}
                     className={className}
                   >
@@ -140,7 +153,10 @@ export function NotificationBell() {
                 <div
                   key={n.id}
                   className={className}
-                  onClick={() => !n.read && markRead(n.id)}
+                  onClick={() => {
+                    if (!n.read) markRead(n.id);
+                    stopNotificationAlert();
+                  }}
                   onKeyDown={() => {}}
                   role="button"
                   tabIndex={0}

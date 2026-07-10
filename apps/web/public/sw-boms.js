@@ -1,5 +1,5 @@
 /* Minimal BOMS service worker — enables install prompt + push */
-const CACHE = "zarkari-boms-v3";
+const CACHE = "zarkari-boms-v4";
 const PRECACHE = [
   "/manifest-boms.json",
   "/icons/boms-180.png",
@@ -37,12 +37,17 @@ self.addEventListener("push", (event) => {
   const title = payload.notification?.title ?? payload.data?.title ?? "ZARKARI";
   const body = payload.notification?.body ?? payload.data?.body ?? "";
   const href = payload.data?.href ?? (payload.data?.orderId ? `/admin/orders/${payload.data.orderId}` : "/");
+  const urgent = payload.data?.urgent === "1" || payload.data?.urgent === true;
+  const tag = payload.data?.orderId ? `order-${payload.data.orderId}` : "zarkari-alert";
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
       icon: "/icons/boms-192.png",
       badge: "/icons/boms-180.png",
+      tag,
+      renotify: true,
+      requireInteraction: urgent,
       data: { href },
     })
   );

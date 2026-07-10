@@ -7,6 +7,14 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'supplier'];
     }
 
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    function isSupplier() {
+      return request.auth != null && request.auth.token.role == 'supplier';
+    }
+
     function isCustomerForOrder(orderId) {
       return request.auth != null &&
         request.auth.token.role == 'customer' &&
@@ -18,13 +26,23 @@ service cloud.firestore {
       allow write: if false;
 
       match /messages/{messageId} {
-        allow read: if isStaff() || isCustomerForOrder(orderId);
+        allow read: if isAdmin() || isCustomerForOrder(orderId);
+        allow write: if false;
+      }
+
+      match /supplier_messages/{messageId} {
+        allow read: if isAdmin() || isSupplier();
         allow write: if false;
       }
     }
 
     match /staff_inbox/{docId} {
-      allow read: if isStaff();
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /supplier_inbox/{supplierId} {
+      allow read: if isSupplier() && request.auth.token.supplierId == supplierId;
       allow write: if false;
     }
   }

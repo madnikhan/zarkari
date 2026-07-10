@@ -8,6 +8,9 @@ import { getStatusLabel } from "@/lib/orders/status-machine";
 import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { StatusBadge } from "@/components/boms/StatusBadge";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
+import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
+import { SupplierMessagesPanel } from "@/components/supplier/SupplierMessagesPanel";
+import type { CustomerMessage } from "@/lib/data/seed";
 import { CheckCircle } from "lucide-react";
 import { CustomerOrderProgressTracker } from "@/components/customer/OrderProgressTracker";
 
@@ -23,6 +26,7 @@ export default function SupplierOrderPage({ params }: Props) {
   const [order, setOrder] = useState<BridalOrder | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [files, setFiles] = useState<OrderFile[]>([]);
+  const [supplierMessages, setSupplierMessages] = useState<CustomerMessage[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -40,6 +44,10 @@ export default function SupplierOrderPage({ params }: Props) {
     photoUrl: "",
   });
   const [uploadedPhotos, setUploadedPhotos] = useState<{ name: string; url: string }[]>([]);
+  const [progressNote, setProgressNote] = useState("");
+  const [progressUploading, setProgressUploading] = useState(false);
+  const [progressError, setProgressError] = useState("");
+  const [progressSuccess, setProgressSuccess] = useState(false);
   const [cargoCompanies, setCargoCompanies] = useState<CargoCompany[]>([]);
 
   useEffect(() => {
@@ -51,8 +59,10 @@ export default function SupplierOrderPage({ params }: Props) {
           setOrder(data.order);
           setCustomerName(data.customerName);
           setFiles(data.files ?? []);
+          setSupplierMessages(data.supplierMessages ?? []);
           setTimeline(data.timeline ?? []);
         });
+      void fetch(`/api/orders/${id}/supplier/message`).catch(() => {});
     });
   }, [params]);
 
@@ -82,6 +92,39 @@ export default function SupplierOrderPage({ params }: Props) {
       if (type === "reject") setShowReject(false);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitProgress(file: { url: string; name: string; mediaType?: string }) {
+    if (!orderId) return;
+    setProgressUploading(true);
+    setProgressError("");
+    setProgressSuccess(false);
+    try {
+      const mimeType =
+        file.mediaType === "video"
+          ? "video/mp4"
+          : file.mediaType === "audio"
+            ? "audio/mp4"
+            : "image/jpeg";
+      const res = await fetch(`/api/orders/${orderId}/supplier/progress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl: file.url,
+          fileName: file.name,
+          mimeType,
+          message: progressNote.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      setProgressNote("");
+      setProgressSuccess(true);
+    } catch (err) {
+      setProgressError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setProgressUploading(false);
     }
   }
 
@@ -187,16 +230,42 @@ export default function SupplierOrderPage({ params }: Props) {
       {filesUnlocked ? (
         <section className="boms-card p-4 mb-6">
           <h2 className="text-sm font-semibold mb-3">Order Files</h2>
-          <ul className="text-sm space-y-1">
-            {files.map((f) => (
-              <li key={f.id}>
-                <a href={f.url} className="text-[#4C3BCF] hover:underline">{f.fileName}</a>
-              </li>
-            ))}
-          </ul>
+          <p className="text-xs text-slate-500 mb-3">Tap a thumbnail to view the full image or video.</p>
+          <OrderFileGallery files={files} columns={2} />
         </section>
       ) : canAccept ? null : (
         <p className="text-sm text-slate-500 boms-card p-4 mb-6">Files unlock after you accept this order.</p>
+      )}
+
+      {filesUnlocked && (
+        <SupplierMessagesPanel orderId={order.id} initialMessages={supplierMessages} />
+      )}
+
+      {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+        <section className="boms-card p-4 mb-6">
+          <h2 className="text-sm font-semibold mb-1">Send progress update</h2>
+          <p className="text-xs text-slate-500 mb-3">
+            Upload a photo or video so ZARKARI can share progress with the customer.
+          </p>
+          <textarea
+            value={progressNote}
+            onChange={(e) => setProgressNote(e.target.value)}
+            rows={2}
+            placeholder="Optional note about this update…"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 resize-none"
+          />
+          <MediaUploadZone
+            label="Upload progress photo or video"
+            category="supplier-progress"
+            accept="image/*,video/*,.mov,.mp4"
+            onSingleUploaded={(file) => void submitProgress(file)}
+          />
+          {progressUploading && <p className="text-xs text-slate-500 mt-2">Sending to ZARKARI…</p>}
+          {progressError && <p className="text-xs text-red-600 mt-2">{progressError}</p>}
+          {progressSuccess && (
+            <p className="text-xs text-emerald-600 mt-2">Update sent — ZARKARI will review before sharing with customer.</p>
+          )}
+        </section>
       )}
 
       {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (

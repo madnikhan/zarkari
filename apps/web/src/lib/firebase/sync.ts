@@ -6,10 +6,13 @@ import type { BridalStatus } from "@/lib/data/seed";
 
 export interface LiveOrderMessage {
   id: string;
-  senderType: "customer" | "staff";
+  senderType: "customer" | "staff" | "supplier";
   senderName?: string;
   message: string;
   createdAt: string;
+  attachmentUrl?: string;
+  attachmentKind?: string;
+  readAt?: string;
 }
 
 export function syncOrderLive(
@@ -34,6 +37,18 @@ export function syncOrderLive(
     .catch(console.error);
 }
 
+function messagePayload(message: LiveOrderMessage) {
+  return {
+    senderType: message.senderType,
+    senderName: message.senderName ?? null,
+    message: message.message,
+    createdAt: message.createdAt,
+    attachmentUrl: message.attachmentUrl ?? null,
+    attachmentKind: message.attachmentKind ?? null,
+    readAt: message.readAt ?? null,
+  };
+}
+
 export function syncOrderMessage(orderId: string, message: LiveOrderMessage): void {
   if (!isFirebaseConfigured()) return;
   const db = getAdminFirestore();
@@ -43,12 +58,20 @@ export function syncOrderMessage(orderId: string, message: LiveOrderMessage): vo
     .doc(orderId)
     .collection("messages")
     .doc(message.id)
-    .set({
-      senderType: message.senderType,
-      senderName: message.senderName ?? null,
-      message: message.message,
-      createdAt: message.createdAt,
-    })
+    .set(messagePayload(message))
+    .catch(console.error);
+}
+
+export function syncSupplierOrderMessage(orderId: string, message: LiveOrderMessage): void {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  db.collection("live_orders")
+    .doc(orderId)
+    .collection("supplier_messages")
+    .doc(message.id)
+    .set(messagePayload(message))
     .catch(console.error);
 }
 
@@ -97,5 +120,33 @@ export function decrementStaffUnread(userId?: string): void {
       },
       { merge: true }
     )
+    .catch(console.error);
+}
+
+export function incrementSupplierUnread(supplierId: string): void {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  db.collection("supplier_inbox")
+    .doc(supplierId)
+    .set(
+      {
+        unreadCount: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
+    .catch(console.error);
+}
+
+export function resetSupplierUnread(supplierId: string): void {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  db.collection("supplier_inbox")
+    .doc(supplierId)
+    .set({ unreadCount: 0, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
     .catch(console.error);
 }

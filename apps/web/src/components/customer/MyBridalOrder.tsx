@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import type { BridalOrder, CustomerMessage, OrderFile } from "@/lib/data/seed";
+import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
+import { MessageAttachment } from "@/components/orders/MessageAttachment";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { CustomerOrderProgressTracker } from "./OrderProgressTracker";
 import { getCustomerStatusLabel } from "@/lib/orders/status-machine";
@@ -27,6 +28,9 @@ export function MyBridalOrder({
 }: MyBridalOrderProps) {
   const designFiles = files.filter((f) => f.category === "design");
   const measurementFiles = files.filter((f) => f.category === "measurements");
+  const progressFiles = files.filter(
+    (f) => f.category === "supplier_progress" || f.category === "completion"
+  );
   const staffMessages = messages.filter((m) => m.senderType === "staff");
 
   return (
@@ -79,6 +83,7 @@ export function MyBridalOrder({
                   {m.senderName ? `ZARKARI · ${m.senderName}` : "ZARKARI"}
                 </p>
                 <p className="text-sm text-slate-800">{m.message}</p>
+                <MessageAttachment message={m} />
                 <p className="text-[10px] text-slate-400 mt-1">
                   {new Date(m.createdAt).toLocaleString("en-GB", {
                     day: "numeric",
@@ -97,6 +102,7 @@ export function MyBridalOrder({
         order={order}
         designFiles={designFiles}
         measurementFiles={measurementFiles}
+        progressFiles={progressFiles}
         messages={messages}
         onSendMessage={onSendMessage}
         messageError={messageError}
@@ -110,6 +116,7 @@ function CustomerActionButtons({
   order,
   designFiles,
   measurementFiles,
+  progressFiles,
   messages,
   onSendMessage,
   messageError,
@@ -118,12 +125,13 @@ function CustomerActionButtons({
   order: BridalOrder;
   designFiles: OrderFile[];
   measurementFiles: OrderFile[];
+  progressFiles: OrderFile[];
   messages: CustomerMessage[];
   onSendMessage: (message: string) => Promise<boolean>;
   messageError?: string;
   sending?: boolean;
 }) {
-  const [view, setView] = useState<"design" | "measurements" | "notes" | "message" | null>(null);
+  const [view, setView] = useState<"design" | "measurements" | "progress" | "notes" | "message" | null>(null);
   const [message, setMessage] = useState("");
 
   return (
@@ -133,6 +141,7 @@ function CustomerActionButtons({
           [
             ["design", "View Uploaded Design"],
             ["measurements", "View Measurements"],
+            ["progress", "Order Progress"],
             ["notes", "View Customisation Notes"],
             ["message", "Message Shop"],
           ] as const
@@ -178,32 +187,23 @@ function CustomerActionButtons({
           <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl">
             <h3 className="font-display text-lg mb-4 capitalize">{view.replace("_", " ")}</h3>
             {view === "design" && (
-              <div className="grid grid-cols-2 gap-2">
-                {designFiles.length ? (
-                  designFiles.map((f) => (
-                    <div key={f.id} className="relative aspect-square">
-                      <Image src={f.url} alt={f.fileName} fill sizes="150px" className="object-cover rounded" />
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-charcoal/50">No design files yet.</p>
-                )}
-              </div>
+              <OrderFileGallery files={designFiles} groupByCategory={false} columns={2} emptyMessage="No design files yet." />
             )}
             {view === "measurements" && (
-              <ul className="text-sm space-y-2">
-                {measurementFiles.length ? (
-                  measurementFiles.map((f) => (
-                    <li key={f.id}>
-                      <a href={f.url} className="text-gold hover:underline">
-                        {f.fileName}
-                      </a>
-                    </li>
-                  ))
-                ) : (
-                  <p className="text-charcoal/50">No measurement files yet.</p>
-                )}
-              </ul>
+              <OrderFileGallery
+                files={measurementFiles}
+                groupByCategory={false}
+                columns={2}
+                emptyMessage="No measurement files yet."
+              />
+            )}
+            {view === "progress" && (
+              <OrderFileGallery
+                files={progressFiles}
+                groupByCategory={false}
+                columns={2}
+                emptyMessage="No progress photos yet — we will share updates here."
+              />
             )}
             {view === "notes" && (
               <p className="text-sm text-charcoal/70">{order.customisationNotes ?? "No customisation notes on file."}</p>
@@ -223,6 +223,7 @@ function CustomerActionButtons({
                         {m.senderType === "customer" ? "You" : m.senderName ? `ZARKARI · ${m.senderName}` : "ZARKARI"}
                       </p>
                       {m.message}
+                      <MessageAttachment message={m} />
                     </li>
                   ))}
                 </ul>

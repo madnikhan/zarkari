@@ -1,5 +1,6 @@
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 import { PushPermissionPrompt } from "@/components/boms/PushPermissionPrompt";
+import { PwaInstallBanner } from "@/components/boms/PwaInstallBanner";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
         <p className="text-[10px] text-white/50 mt-2 uppercase tracking-widest">My Bridal Order</p>
       </header>
       <main className="max-w-lg mx-auto px-4 py-8">{children}</main>
+      <PwaInstallBanner />
       <PushPermissionPrompt variant="customer" />
     </div>
   );

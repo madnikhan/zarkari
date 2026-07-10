@@ -4,7 +4,7 @@ import {
   getBridalOrderById,
   getBridalOrderByNumber,
   getOrderFiles,
-  getMessages,
+  getCustomerMessages,
 } from "@/lib/data";
 
 export async function GET(request: Request) {
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
   const [files, messages] = await Promise.all([
     getOrderFiles(order.id, true),
-    getMessages(order.id),
+    getCustomerMessages(order.id),
   ]);
 
   import("@/lib/firebase/sync")

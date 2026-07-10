@@ -6,62 +6,121 @@ import type { CustomerMessage } from "@/lib/data/seed";
 import { getClientFirestore } from "@/lib/firebase/client";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { StaffMessageForm } from "@/components/boms/StaffMessageForm";
+import { OrderMessageThread } from "@/components/boms/StaffMessageForm";
+import { PendingSupplierUpdates } from "@/components/admin/PendingSupplierUpdates";
 
 interface Props {
   orderId: string;
-  initialMessages: CustomerMessage[];
+  initialCustomerMessages: CustomerMessage[];
+  initialSupplierMessages: CustomerMessage[];
+  initialPendingUpdates: CustomerMessage[];
 }
 
-export function OrderMessagesLive({ orderId, initialMessages }: Props) {
+function mapDoc(orderId: string, doc: { id: string; data: () => Record<string, unknown> }): CustomerMessage {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    orderId,
+    senderType: data.senderType as CustomerMessage["senderType"],
+    senderName: (data.senderName as string) ?? undefined,
+    message: data.message as string,
+    createdAt: data.createdAt as string,
+    attachmentUrl: (data.attachmentUrl as string) ?? undefined,
+    attachmentKind: (data.attachmentKind as string) ?? undefined,
+    readAt: (data.readAt as string) ?? undefined,
+    audience: "customer",
+  };
+}
+
+export function OrderMessagesLive({
+  orderId,
+  initialCustomerMessages,
+  initialSupplierMessages,
+  initialPendingUpdates,
+}: Props) {
   const { ready } = useFirebaseAuth();
-  const [messages, setMessages] = useState(initialMessages);
+  const [customerMessages, setCustomerMessages] = useState(initialCustomerMessages);
+  const [supplierMessages, setSupplierMessages] = useState(initialSupplierMessages);
+  const [pendingUpdates, setPendingUpdates] = useState(initialPendingUpdates);
 
   useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
+    setCustomerMessages(initialCustomerMessages);
+    setSupplierMessages(initialSupplierMessages);
+    setPendingUpdates(initialPendingUpdates);
+  }, [initialCustomerMessages, initialSupplierMessages, initialPendingUpdates]);
 
   useEffect(() => {
     if (!ready || !isFirebaseClientConfigured()) return;
     const db = getClientFirestore();
     if (!db) return;
 
-    const q = query(
+    const customerQ = query(
       collection(db, "live_orders", orderId, "messages"),
       orderBy("createdAt", "asc")
     );
+    const supplierQ = query(
+      collection(db, "live_orders", orderId, "supplier_messages"),
+      orderBy("createdAt", "asc")
+    );
 
-    return onSnapshot(q, (snapshot) => {
+    const unsubCustomer = onSnapshot(customerQ, (snapshot) => {
       if (snapshot.empty) return;
-      setMessages(
-        snapshot.docs.map((doc) => ({
-          id: doc.id,
-          orderId,
-          senderType: doc.data().senderType as "customer" | "staff",
-          senderName: doc.data().senderName ?? undefined,
-          message: doc.data().message as string,
-          createdAt: doc.data().createdAt as string,
-        }))
+      setCustomerMessages(snapshot.docs.map((doc) => mapDoc(orderId, doc)));
+    });
+
+    const unsubSupplier = onSnapshot(supplierQ, (snapshot) => {
+      if (snapshot.empty) return;
+      setSupplierMessages(
+        snapshot.docs.map((doc) => ({ ...mapDoc(orderId, doc), audience: "supplier" as const }))
       );
     });
+
+    return () => {
+      unsubCustomer();
+      unsubSupplier();
+    };
   }, [orderId, ready]);
+
+  const customerThread = customerMessages.filter(
+    (m) => !m.audience || m.audience === "customer"
+  );
 
   return (
     <>
-      {messages.length > 0 && (
+      {customerThread.length > 0 && (
         <div className="mt-6 pt-4 border-t border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">Notes</h3>
-          <ul className="space-y-2 text-sm">
-            {messages.map((m) => (
-              <li key={m.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                <span className="text-xs text-slate-400 capitalize">{m.senderType}</span>
-                <p>{m.message}</p>
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">Customer thread</h3>
+          <ul className="space-y-2 text-sm max-h-40 overflow-y-auto">
+            {customerThread.map((m) => (
+              <li key={m.id} className="bg-slate-50 rounded-lg px-3 py-2 capitalize text-xs text-slate-500">
+                {m.senderType}: <span className="text-slate-800 normal-case">{m.message}</span>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <StaffMessageForm orderId={orderId} />
+
+      <PendingSupplierUpdates orderId={orderId} pending={pendingUpdates} />
+
+      <OrderMessageThread
+        orderId={orderId}
+        audience="customer"
+        title="Message customer"
+        placeholder="Note for customer (visible on my-order portal)"
+        successHint="Delivered to customer portal — they will be notified."
+        messages={customerThread.filter((m) => m.senderType !== "customer")}
+        showStatus={false}
+      />
+
+      <OrderMessageThread
+        orderId={orderId}
+        audience="supplier"
+        title="Message supplier"
+        placeholder="Instructions for supplier (visible on supplier portal)"
+        successHint="Delivered to supplier — they will be notified."
+        messages={supplierMessages}
+        showStatus
+      />
     </>
   );
 }

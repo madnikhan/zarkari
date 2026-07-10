@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getBridalOrderById, getCustomer, getOrderFiles, getTimeline } from "@/lib/data";
+import { revalidatePath } from "next/cache";
+import { getBridalOrderById, getCustomer, getOrderFiles, getPendingSupplierUpdates, getSupplierMessages, getTimeline } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 
 interface Props {
@@ -20,9 +21,11 @@ export async function GET(_request: Request, { params }: Props) {
 
   const customer = await getCustomer(order.customerId);
   const filesUnlocked = session.role === "supplier" ? !!order.filesUnlockedAt : true;
-  const [timeline, files] = await Promise.all([
+  const [timeline, files, supplierMessages, pendingUpdates] = await Promise.all([
     getTimeline(order.id),
     getOrderFiles(order.id, filesUnlocked),
+    getSupplierMessages(order.id),
+    session.role !== "supplier" ? getPendingSupplierUpdates(order.id) : Promise.resolve([]),
   ]);
 
   const safeOrder =
@@ -40,5 +43,7 @@ export async function GET(_request: Request, { params }: Props) {
     customerName: customer?.name,
     timeline,
     files,
+    supplierMessages,
+    pendingUpdates,
   });
 }

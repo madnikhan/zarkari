@@ -250,6 +250,35 @@ export async function getMessages(orderId: string): Promise<CustomerMessage[]> {
   return demoMessages.filter((m) => m.orderId === orderId);
 }
 
+export async function getCustomerMessages(orderId: string): Promise<CustomerMessage[]> {
+  if (canQueryDbId(orderId)) {
+    const { getMessagesDb } = await import("@/lib/db/bridal-orders");
+    return getMessagesDb(orderId, "customer");
+  }
+  if (!useDemoData()) return [];
+  return demoMessages.filter((m) => m.orderId === orderId && (!m.audience || m.audience === "customer"));
+}
+
+export async function getSupplierMessages(orderId: string): Promise<CustomerMessage[]> {
+  if (canQueryDbId(orderId)) {
+    const { getMessagesDb } = await import("@/lib/db/bridal-orders");
+    return getMessagesDb(orderId, "supplier");
+  }
+  if (!useDemoData()) return [];
+  return demoMessages.filter((m) => m.orderId === orderId && m.audience === "supplier");
+}
+
+export async function getPendingSupplierUpdates(orderId: string): Promise<CustomerMessage[]> {
+  if (canQueryDbId(orderId)) {
+    const { getPendingInternalMessagesDb } = await import("@/lib/db/bridal-orders");
+    return getPendingInternalMessagesDb(orderId);
+  }
+  if (!useDemoData()) return [];
+  return demoMessages.filter(
+    (m) => m.orderId === orderId && m.audience === "internal" && m.reviewStatus === "pending"
+  );
+}
+
 export async function getProductById(id: string): Promise<Product | null> {
   if (isDbConfigured()) {
     const { getProductByIdDb } = await import("@/lib/db/cms-products");

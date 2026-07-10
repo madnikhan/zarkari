@@ -4,6 +4,7 @@ import {
   listAdminDeviceTokens,
   listDeviceTokensByOrderId,
   listDeviceTokensByUserId,
+  listSupplierDeviceTokens,
 } from "@/lib/db/device-tokens";
 
 export interface PushPayload {
@@ -11,6 +12,7 @@ export interface PushPayload {
   body?: string;
   href?: string;
   orderId?: string;
+  urgent?: boolean;
 }
 
 async function sendToTokens(tokens: string[], payload: PushPayload): Promise<void> {
@@ -25,6 +27,7 @@ async function sendToTokens(tokens: string[], payload: PushPayload): Promise<voi
     ...(payload.body ? { body: payload.body } : {}),
     ...(payload.href ? { href: payload.href } : {}),
     ...(payload.orderId ? { orderId: payload.orderId } : {}),
+    ...(payload.urgent ? { urgent: "1" } : {}),
   };
 
   await Promise.all(
@@ -60,4 +63,9 @@ export async function sendPushToOrderCustomer(orderId: string, payload: PushPayl
 export async function sendPushToStaff(payload: PushPayload): Promise<void> {
   const tokens = await listAdminDeviceTokens();
   await sendToTokens(tokens, payload);
+}
+
+export async function sendPushToSuppliers(payload: PushPayload): Promise<void> {
+  const tokens = await listSupplierDeviceTokens();
+  await sendToTokens(tokens, { ...payload, urgent: true });
 }

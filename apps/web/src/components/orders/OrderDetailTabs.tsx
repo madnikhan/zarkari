@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AudioPlayer } from "@/components/boms/AudioPlayer";
+import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
 import { OrderTimeline } from "./OrderTimeline";
 import type { TimelineEvent, OrderFile, BridalOrder } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
@@ -41,31 +41,7 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
       {tab === "Timeline" && <OrderTimeline events={data.timeline} />}
 
       {tab === "Files" && (
-        <ul className="space-y-3 text-sm">
-          {data.files.length === 0 && <li className="text-slate-400">No files yet.</li>}
-          {data.files.map((f) => {
-            const isVoice =
-              f.category === "voice" || /\.(webm|m4a|mp3|ogg|wav)$/i.test(f.fileName);
-            return (
-              <li key={f.id} className="space-y-1">
-                <p className="text-xs text-slate-500 capitalize">
-                  {f.fileName} ({f.category})
-                </p>
-                {isVoice ? (
-                  <AudioPlayer
-                    src={f.url}
-                    mimeType={/\.m4a$/i.test(f.fileName) ? "audio/mp4" : undefined}
-                    className="w-full h-9"
-                  />
-                ) : (
-                  <a href={f.url} target="_blank" rel="noreferrer" className="text-gold hover:underline">
-                    Open file
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <OrderFileGallery files={data.files} emptyMessage="No files yet." />
       )}
 
       {tab === "Payments" && (

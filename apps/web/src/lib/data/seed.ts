@@ -89,6 +89,7 @@ export interface OrderFile {
   category: string;
   fileName: string;
   url: string;
+  mimeType?: string;
 }
 
 export interface Product {
@@ -136,10 +137,16 @@ export interface BlogPost {
 export interface CustomerMessage {
   id: string;
   orderId: string;
-  senderType: "customer" | "staff";
+  senderType: "customer" | "staff" | "supplier";
   senderName?: string;
   message: string;
   createdAt: string;
+  audience?: "customer" | "supplier" | "internal";
+  attachmentUrl?: string;
+  attachmentKind?: string;
+  readAt?: string;
+  forwardedFromId?: string;
+  reviewStatus?: "pending" | "forwarded" | "dismissed";
 }
 
 export interface CartItem {

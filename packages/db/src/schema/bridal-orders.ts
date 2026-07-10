@@ -176,6 +176,12 @@ export const customerMessages = pgTable(
     senderType: text("sender_type").notNull(),
     senderName: text("sender_name"),
     message: text("message").notNull(),
+    audience: text("audience").default("customer").notNull(),
+    attachmentUrl: text("attachment_url"),
+    attachmentKind: text("attachment_kind"),
+    readAt: timestamp("read_at"),
+    forwardedFromId: uuid("forwarded_from_id"),
+    reviewStatus: text("review_status"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("customer_messages_order_id_idx").on(t.orderId)]
