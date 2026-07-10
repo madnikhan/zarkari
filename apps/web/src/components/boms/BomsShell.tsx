@@ -38,25 +38,63 @@ type NavItem = {
   dataTour?: string;
 };
 
-const adminNav: NavItem[] = [
-  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Daily Cash", href: "/admin/cash", icon: Banknote },
-  { label: "Orders", href: "/admin/orders", icon: ShoppingBag },
-  { label: "Stock", href: "/admin/stock", icon: Package },
-  { label: "Inbox", href: "/admin/inbox", icon: Inbox },
-  { label: "Content", href: "/admin/content", icon: FileText },
-  { label: "New Order", href: "/admin/orders/new", icon: PlusCircle },
-  { label: "Customers", href: "/admin/customers", icon: Users },
-  { label: "Suppliers", href: "/admin/suppliers", icon: Truck },
-  { label: "Cargo & Boxes", href: "/admin/cargo", icon: Package, dataTour: "nav-cargo" },
-  { label: "Supplier Payments", href: "/admin/suppliers/payments", icon: Wallet },
-  { label: "Calendar", href: "/admin/calendar", icon: Calendar },
-  { label: "Payments", href: "/admin/payments", icon: CreditCard },
-  { label: "Reports", href: "/admin/reports", icon: BarChart3 },
-  { label: "Training", href: "/admin/training", icon: GraduationCap },
-  { label: "Notifications", href: "/admin/notifications", icon: Bell },
-  { label: "Settings", href: "/admin/settings", icon: Settings },
-  { label: "Users", href: "/admin/users", icon: UserCog, ownerOnly: true },
+type NavSection = {
+  title?: string;
+  items: NavItem[];
+};
+
+const adminNavSections: NavSection[] = [
+  {
+    items: [{ label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: "Orders & stock",
+    items: [
+      { label: "Orders", href: "/admin/orders", icon: ShoppingBag },
+      { label: "New Order", href: "/admin/orders/new", icon: PlusCircle },
+      { label: "Stock", href: "/admin/stock", icon: Package },
+      { label: "Inbox", href: "/admin/inbox", icon: Inbox },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { label: "Daily Cash", href: "/admin/cash", icon: Banknote },
+      { label: "Payments", href: "/admin/payments", icon: CreditCard },
+    ],
+  },
+  {
+    title: "People",
+    items: [{ label: "Customers", href: "/admin/customers", icon: Users }],
+  },
+  {
+    title: "Suppliers",
+    items: [
+      { label: "Suppliers", href: "/admin/suppliers", icon: Truck },
+      { label: "Cargo & Boxes", href: "/admin/cargo", icon: Package, dataTour: "nav-cargo" },
+      { label: "Supplier Payments", href: "/admin/suppliers/payments", icon: Wallet },
+    ],
+  },
+  {
+    title: "Storefront",
+    items: [{ label: "Content", href: "/admin/content", icon: FileText }],
+  },
+  {
+    title: "Planning",
+    items: [
+      { label: "Calendar", href: "/admin/calendar", icon: Calendar },
+      { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+      { label: "Training", href: "/admin/training", icon: GraduationCap },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { label: "Notifications", href: "/admin/notifications", icon: Bell },
+      { label: "Settings", href: "/admin/settings", icon: Settings },
+      { label: "Users", href: "/admin/users", icon: UserCog, ownerOnly: true },
+    ],
+  },
 ];
 
 interface BomsShellProps {
@@ -64,20 +102,30 @@ interface BomsShellProps {
   role?: "admin" | "supplier";
   userName?: string;
   userRole?: string;
+  supplierId?: string;
 }
 
-export function BomsShell({ children, role = "admin", userName, userRole }: BomsShellProps) {
+function isNavActive(pathname: string, href: string) {
+  if (pathname === href) return true;
+  if (href === "/admin/dashboard" || href === "/admin/orders" || href === "/supplier") return false;
+  return pathname.startsWith(href);
+}
+
+export function BomsShell({
+  children,
+  role = "admin",
+  userName,
+  userRole,
+  supplierId,
+}: BomsShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isOwner = userRole === "owner";
 
-  const nav: NavItem[] =
-    role === "supplier"
-      ? [
-          { label: "Dashboard", href: "/supplier", icon: LayoutDashboard },
-          { label: "Orders", href: "/supplier", icon: ShoppingBag },
-        ]
-      : adminNav.filter((item) => !item.ownerOnly || isOwner);
+  const supplierNav: NavItem[] = [
+    { label: "Order history", href: "/supplier", icon: LayoutDashboard },
+    { label: "Orders", href: "/supplier", icon: ShoppingBag },
+  ];
 
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "short",
@@ -85,6 +133,27 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
     month: "short",
     year: "numeric",
   });
+
+  function renderNavItem(item: NavItem) {
+    if (item.ownerOnly && !isOwner) return null;
+    const active = isNavActive(pathname, item.href);
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href + item.label}
+        href={item.href}
+        onClick={() => setSidebarOpen(false)}
+        data-tour={item.dataTour ?? `nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+          active ? "bg-[#4C3BCF] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+        )}
+      >
+        <Icon className="h-4 w-4 flex-shrink-0" />
+        {item.label}
+      </Link>
+    );
+  }
 
   return (
     <div className="boms-theme flex min-h-screen">
@@ -107,36 +176,34 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
           </Link>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {nav.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/admin/dashboard" &&
-                item.href !== "/admin/orders" &&
-                pathname.startsWith(item.href) &&
-                item.href !== "/supplier");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                data-tour={item.dataTour ?? `nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                  active ? "bg-[#4C3BCF] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+        <nav className="flex-1 p-4 overflow-y-auto">
+          {role === "supplier" ? (
+            <div className="space-y-1">{supplierNav.map(renderNavItem)}</div>
+          ) : (
+            adminNavSections.map((section, idx) => (
+              <div key={section.title ?? `section-${idx}`}>
+                {section.title && (
+                  <p
+                    className={cn(
+                      "px-3 pb-1 text-[10px] uppercase tracking-widest text-white/40",
+                      idx === 0 ? "pt-0" : "pt-4"
+                    )}
+                  >
+                    {section.title}
+                  </p>
                 )}
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
+                <div className="space-y-1">{section.items.map(renderNavItem)}</div>
+              </div>
+            ))
+          )}
         </nav>
 
         <div className="p-4 border-t border-white/10">
           <form action="/api/auth/logout" method="POST">
-            <button type="submit" className="flex items-center gap-3 px-3 py-2.5 w-full text-sm text-white/60 hover:text-white rounded-lg hover:bg-white/10">
+            <button
+              type="submit"
+              className="flex items-center gap-3 px-3 py-2.5 w-full text-sm text-white/60 hover:text-white rounded-lg hover:bg-white/10"
+            >
               <LogOut className="h-4 w-4" />
               Logout
             </button>
@@ -146,11 +213,21 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-slate-200 px-4 lg:px-8 py-4 flex items-center gap-4 sticky top-0 z-30">
-          <button type="button" className="lg:hidden p-2 -ml-2" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+          <button
+            type="button"
+            className="lg:hidden p-2 -ml-2"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
             <Menu className="h-5 w-5" />
           </button>
           {sidebarOpen && (
-            <button type="button" className="lg:hidden p-2" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
+            <button
+              type="button"
+              className="lg:hidden p-2"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
               <X className="h-5 w-5" />
             </button>
           )}
@@ -180,7 +257,7 @@ export function BomsShell({ children, role = "admin", userName, userRole }: Boms
               <HelpCircle className="h-5 w-5" />
             </Link>
           )}
-          <NotificationBell />
+          <NotificationBell role={role} supplierId={supplierId} />
           {userName && (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
               <div className="h-8 w-8 rounded-full bg-[#4C3BCF] text-white text-xs flex items-center justify-center font-medium">

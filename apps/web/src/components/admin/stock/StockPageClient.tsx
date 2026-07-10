@@ -7,6 +7,7 @@ import { AlertTriangle, History } from "lucide-react";
 import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
 import type { StockOverviewRow } from "@/lib/db/cms-products";
 import { StockAdjustModal } from "./StockAdjustModal";
+import { AdminTableShell } from "@/components/admin/AdminTableShell";
 
 const MOVEMENT_LABELS: Record<string, string> = {
   receive: "Received",
@@ -64,10 +65,10 @@ export function StockPageClient({ products: initial }: Props) {
         </div>
       )}
 
-      <div className="boms-card overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80">
+      <AdminTableShell>
+        <table className="w-full text-sm min-w-[800px]">
+          <thead className="sticky top-0 bg-slate-50/95 z-10">
+            <tr className="border-b border-slate-100">
               <th className="text-left px-4 py-3 font-medium text-slate-500">Product</th>
               {STANDARD_SIZES.map((s) => (
                 <th key={s} className="text-center px-2 py-3 font-medium text-slate-500">
@@ -139,7 +140,7 @@ export function StockPageClient({ products: initial }: Props) {
         {!products.length && (
           <p className="text-center text-slate-400 py-12 text-sm">No products yet.</p>
         )}
-      </div>
+      </AdminTableShell>
 
       {adjustProduct && (
         <StockAdjustModal

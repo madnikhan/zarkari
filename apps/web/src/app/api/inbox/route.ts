@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const unreadOnly = url.searchParams.get("unread") === "1";
   const status = url.searchParams.get("status") as SocialThreadStatus | null;
 
-  const threads = await listSocialThreads({
+  const { threads } = await listSocialThreads({
     platform: platform ?? undefined,
     unreadOnly,
     status: status ?? undefined,

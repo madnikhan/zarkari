@@ -1,30 +1,34 @@
-import Link from "next/link";
 import { getCustomersWithOrders } from "@/lib/data";
+import { CustomersPageClient } from "@/components/admin/CustomersPageClient";
 
-export default async function AdminCustomersPage() {
-  const customers = await getCustomersWithOrders();
+const PAGE_SIZE = 20;
+
+interface Props {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}
+
+export default async function AdminCustomersPage({ searchParams }: Props) {
+  const { page: pageStr = "1", q = "" } = await searchParams;
+  const page = Math.max(1, parseInt(pageStr, 10) || 1);
+
+  const { customers, total } = await getCustomersWithOrders({
+    q: q.trim() || undefined,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-6 lg:p-10">
-      <h1 className="font-display text-3xl text-charcoal mb-8">Customers</h1>
-      <div className="space-y-4">
-        {customers.map((c) => (
-          <div key={c.id} className="bg-white rounded-lg border border-sand p-5">
-            <p className="font-medium text-charcoal">{c.name}</p>
-            <p className="text-sm text-charcoal/60">{c.phone} · {c.email}</p>
-            <p className="text-xs text-charcoal/50 mt-2">{c.orders.length} bridal order(s)</p>
-            <ul className="mt-3 space-y-1">
-              {c.orders.map((o) => (
-                <li key={o.id}>
-                  <Link href={`/admin/orders/${o.id}`} className="text-sm text-gold hover:underline font-mono">
-                    {o.orderNumber}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+    <div className="p-4 lg:p-8">
+      <h1 className="text-2xl font-semibold text-slate-900 mb-6">Customers</h1>
+      <CustomersPageClient
+        customers={customers}
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        q={q.trim()}
+      />
     </div>
   );
 }

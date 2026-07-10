@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import type { SocialPlatform, SocialThread } from "@/lib/social-inbox/types";
 import { InboxThreadList } from "@/components/admin/inbox/InboxThreadList";
 import { ManualInquiryForm } from "@/components/admin/inbox/ManualInquiryForm";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { AdminTableSearch } from "@/components/admin/AdminTableSearch";
+import { AdminTableShell } from "@/components/admin/AdminTableShell";
 import { cn } from "@/lib/utils";
 
 const FILTERS: Array<{ key: string; label: string; platform?: SocialPlatform; unread?: boolean }> = [
@@ -21,10 +24,34 @@ const FILTERS: Array<{ key: string; label: string; platform?: SocialPlatform; un
 interface InboxPageClientProps {
   threads: SocialThread[];
   activeFilter: string;
+  page: number;
+  totalPages: number;
+  total: number;
+  q: string;
 }
 
-export function InboxPageClient({ threads, activeFilter }: InboxPageClientProps) {
+export function InboxPageClient({
+  threads,
+  activeFilter,
+  page,
+  totalPages,
+  total,
+  q,
+}: InboxPageClientProps) {
   const [showManual, setShowManual] = useState(false);
+
+  function buildHref(p: number) {
+    const params = new URLSearchParams();
+    if (activeFilter === "unread") params.set("unread", "1");
+    else if (activeFilter !== "all") {
+      const f = FILTERS.find((x) => x.key === activeFilter);
+      if (f?.platform) params.set("platform", f.platform);
+    }
+    if (q) params.set("q", q);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `/admin/inbox?${qs}` : "/admin/inbox";
+  }
 
   return (
     <>
@@ -71,7 +98,23 @@ export function InboxPageClient({ threads, activeFilter }: InboxPageClientProps)
         })}
       </div>
 
-      <InboxThreadList threads={threads} />
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminTableSearch placeholder="Search contact or message…" defaultValue={q} />
+        </Suspense>
+      </div>
+
+      <AdminTableShell>
+        <InboxThreadList threads={threads} />
+      </AdminTableShell>
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        pageSize={20}
+        buildHref={buildHref}
+      />
       <ManualInquiryForm open={showManual} onClose={() => setShowManual(false)} />
     </>
   );

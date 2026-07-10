@@ -34,14 +34,28 @@ function listDemoThreads(filters?: {
   platform?: SocialPlatform;
   unreadOnly?: boolean;
   status?: SocialThreadStatus;
-}): SocialThread[] {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): { threads: SocialThread[]; total: number } {
   let list = [...demoSocialThreads];
   if (filters?.platform) list = list.filter((t) => t.platform === filters.platform);
   if (filters?.unreadOnly) list = list.filter((t) => t.unreadCount > 0);
   if (filters?.status) list = list.filter((t) => t.status === filters.status);
-  return list.sort(
-    (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-  );
+  if (filters?.q?.trim()) {
+    const q = filters.q.trim().toLowerCase();
+    list = list.filter(
+      (t) =>
+        t.contactName?.toLowerCase().includes(q) ||
+        t.lastMessagePreview?.toLowerCase().includes(q) ||
+        t.contactHandle?.toLowerCase().includes(q)
+    );
+  }
+  list.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+  const total = list.length;
+  const offset = filters?.offset ?? 0;
+  const limit = filters?.limit ?? total;
+  return { threads: list.slice(offset, offset + limit), total };
 }
 
 function getDemoStats(): SocialInboxStats {
@@ -67,10 +81,13 @@ export async function listSocialThreads(filters?: {
   platform?: SocialPlatform;
   unreadOnly?: boolean;
   status?: SocialThreadStatus;
-}): Promise<SocialThread[]> {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ threads: SocialThread[]; total: number }> {
   if (isDbConfigured()) {
-    const rows = await dbLayer.listSocialThreadsDb(filters);
-    if (rows.length || filters) return rows;
+    const result = await dbLayer.listSocialThreadsDb(filters);
+    if (result.threads.length || filters) return result;
   }
   return listDemoThreads(filters);
 }

@@ -356,6 +356,7 @@ export async function getBridalOrdersWithRelations(filters: {
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
+  q?: string;
 }): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
   if (isDbConfigured()) {
     const { listBridalOrdersWithRelationsDb } = await import("@/lib/db/bridal-orders");
@@ -365,6 +366,16 @@ export async function getBridalOrdersWithRelations(filters: {
   const weekEnd = new Date(now.getTime() + 7 * 86400000);
   let orders = [...demoBridalOrders];
   if (filters.supplierId) orders = orders.filter((o) => o.supplierId === filters.supplierId);
+  if (filters.q?.trim()) {
+    const q = filters.q.trim().toLowerCase();
+    orders = orders.filter((o) => {
+      const customer = demoCustomers.find((c) => c.id === o.customerId);
+      return (
+        o.orderNumber.toLowerCase().includes(q) ||
+        (customer?.name?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }
   if (filters.supplierTab === "new") orders = orders.filter((o) => o.status === "sent_to_supplier");
   else if (filters.supplierTab === "completed") orders = orders.filter((o) => o.status === "collected");
   else if (filters.supplierTab === "cancelled") {
@@ -480,22 +491,48 @@ export async function getAllSupplierPerformance() {
   });
 }
 
-export async function getCustomersWithOrders() {
+export async function getCustomersWithOrders(params?: {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  customers: (Customer & { orders: { id: string; orderNumber: string }[] })[];
+  total: number;
+}> {
   if (isDbConfigured()) {
-    const { listCustomersDb, listCustomerOrderLinksDb } = await import("@/lib/db/bridal-orders");
-    const [customers, links] = await Promise.all([listCustomersDb(), listCustomerOrderLinksDb()]);
+    const { listCustomersPagedDb, listCustomerOrderLinksForCustomersDb } = await import("@/lib/db/bridal-orders");
+    const { customers, total } = await listCustomersPagedDb(params);
+    const links = await listCustomerOrderLinksForCustomersDb(customers.map((c) => c.id));
     const byCustomer = new Map<string, { id: string; orderNumber: string }[]>();
     for (const link of links) {
       const list = byCustomer.get(link.customerId) ?? [];
       list.push({ id: link.orderId, orderNumber: link.orderNumber });
       byCustomer.set(link.customerId, list);
     }
-    return customers.map((c) => ({ ...c, orders: byCustomer.get(c.id) ?? [] }));
+    return {
+      customers: customers.map((c) => ({ ...c, orders: byCustomer.get(c.id) ?? [] })),
+      total,
+    };
   }
-  return demoCustomers.map((c) => ({
+  let customers = demoCustomers.map((c) => ({
     ...c,
-    orders: demoBridalOrders.filter((o) => o.customerId === c.id).map((o) => ({ id: o.id, orderNumber: o.orderNumber })),
+    orders: demoBridalOrders
+      .filter((o) => o.customerId === c.id)
+      .map((o) => ({ id: o.id, orderNumber: o.orderNumber })),
   }));
+  if (params?.q?.trim()) {
+    const q = params.q.trim().toLowerCase();
+    customers = customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.email?.toLowerCase().includes(q) ?? false)
+    );
+  }
+  const total = customers.length;
+  const offset = params?.offset ?? 0;
+  const limit = params?.limit ?? total;
+  return { customers: customers.slice(offset, offset + limit), total };
 }
 
 export async function getRetailOrders() {

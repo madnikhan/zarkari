@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/utils";
 import { CASH_TYPE_LABELS, formatBusinessDate } from "@/lib/cash/labels";
 import type { CashTransaction } from "@/lib/db/cash-ledger";
 import { CashTransactionDetailModal } from "./CashTransactionDetailModal";
+import { AdminTableShell } from "@/components/admin/AdminTableShell";
 
 interface Props {
   title: string;
@@ -12,6 +13,7 @@ interface Props {
   transactions: CashTransaction[];
   total: number;
   groupByDay?: boolean;
+  scrollable?: boolean;
 }
 
 function groupTransactions(transactions: CashTransaction[]) {
@@ -24,7 +26,14 @@ function groupTransactions(transactions: CashTransaction[]) {
   return Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
 }
 
-export function CashTransactionTable({ title, accent, transactions, total, groupByDay = false }: Props) {
+export function CashTransactionTable({
+  title,
+  accent,
+  transactions,
+  total,
+  groupByDay = false,
+  scrollable = false,
+}: Props) {
   const [selected, setSelected] = useState<CashTransaction | null>(null);
   const headerClass =
     accent === "in"
@@ -45,15 +54,10 @@ export function CashTransactionTable({ title, accent, transactions, total, group
         onClick={() => setSelected(tx)}
       >
         <td className="px-3 py-2 whitespace-nowrap">
-          {groupByDay
-            ? new Date(tx.occurredAt).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : new Date(tx.occurredAt).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+          {new Date(tx.occurredAt).toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </td>
         <td className="px-3 py-2">{typeLabel}</td>
         <td className="px-3 py-2 hidden sm:table-cell text-slate-600">{tx.reference ?? "—"}</td>
@@ -70,46 +74,53 @@ export function CashTransactionTable({ title, accent, transactions, total, group
     );
   }
 
+  const table = (
+    <table className="w-full text-sm">
+      <thead className={scrollable ? "sticky top-0 bg-slate-50/95 z-10" : undefined}>
+        <tr className="border-b border-slate-100 bg-slate-50/80 text-slate-500">
+          <th className="text-left px-3 py-2 font-medium">Time</th>
+          <th className="text-left px-3 py-2 font-medium">Type</th>
+          <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Ref</th>
+          <th className="text-left px-3 py-2 font-medium">Description</th>
+          <th className="text-left px-3 py-2 font-medium">Method</th>
+          <th className="text-right px-3 py-2 font-medium">Amount</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {transactions.length === 0 ? (
+          <tr>
+            <td colSpan={6} className="px-3 py-8 text-center text-slate-400">
+              No transactions yet
+            </td>
+          </tr>
+        ) : grouped ? (
+          grouped.map(([day, dayTxs]) => (
+            <Fragment key={day}>
+              <tr className="bg-slate-50">
+                <td
+                  colSpan={6}
+                  className="px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide"
+                >
+                  {formatBusinessDate(day)}
+                </td>
+              </tr>
+              {dayTxs.map((tx) => renderRow(tx))}
+            </Fragment>
+          ))
+        ) : (
+          transactions.map((tx) => renderRow(tx))
+        )}
+      </tbody>
+    </table>
+  );
+
   return (
     <>
       <div className="boms-card overflow-hidden flex flex-col min-h-[320px]">
         <div className={`px-4 py-3 border-b font-semibold text-sm ${headerClass}`}>{title}</div>
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80 text-slate-500">
-                <th className="text-left px-3 py-2 font-medium">{groupByDay ? "Time" : "Time"}</th>
-                <th className="text-left px-3 py-2 font-medium">Type</th>
-                <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Ref</th>
-                <th className="text-left px-3 py-2 font-medium">Description</th>
-                <th className="text-left px-3 py-2 font-medium">Method</th>
-                <th className="text-right px-3 py-2 font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-slate-400">
-                    No transactions yet
-                  </td>
-                </tr>
-              ) : grouped ? (
-                grouped.map(([day, dayTxs]) => (
-                  <Fragment key={day}>
-                    <tr className="bg-slate-50">
-                      <td colSpan={6} className="px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                        {formatBusinessDate(day)}
-                      </td>
-                    </tr>
-                    {dayTxs.map((tx) => renderRow(tx))}
-                  </Fragment>
-                ))
-              ) : (
-                transactions.map((tx) => renderRow(tx))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {scrollable ? <AdminTableShell className="border-0 shadow-none rounded-none">{table}</AdminTableShell> : (
+          <div className="overflow-x-auto flex-1">{table}</div>
+        )}
         <div className={`px-4 py-3 border-t text-sm font-semibold flex justify-between ${headerClass}`}>
           <span>Total</span>
           <span>{formatPrice(String(total))}</span>

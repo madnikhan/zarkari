@@ -48,7 +48,7 @@ export function MobileBottomNav() {
 
 export function SupplierMobileNav() {
   const pathname = usePathname();
-  const supplierItems = [{ label: "Orders", href: "/supplier", icon: ShoppingBag }];
+  const supplierItems = [{ label: "History", href: "/supplier", icon: ShoppingBag }];
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 lg:hidden">

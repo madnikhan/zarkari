@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { Product } from "@/lib/data/seed";
 import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
 import { getDb, isUuid, schema } from "./index";
@@ -336,12 +336,33 @@ export type StockOverviewRow = {
   variants: { id: string; size: StandardSizeKey; inventoryQty: number; lowStockThreshold?: number }[];
 };
 
-export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
+export async function listStockOverviewDb(opts?: {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ products: StockOverviewRow[]; total: number }> {
   const db = getDb();
-  if (!db) return [];
+  if (!db) return { products: [], total: 0 };
 
-  const products = await db.select().from(schema.products).orderBy(asc(schema.products.title));
-  if (!products.length) return [];
+  const limit = opts?.limit ?? 500;
+  const offset = opts?.offset ?? 0;
+  const conditions = [];
+  if (opts?.q?.trim()) conditions.push(ilike(schema.products.title, `%${opts.q.trim()}%`));
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.products)
+    .where(whereClause);
+
+  const products = await db
+    .select()
+    .from(schema.products)
+    .where(whereClause)
+    .orderBy(asc(schema.products.title))
+    .limit(limit)
+    .offset(offset);
+  if (!products.length) return { products: [], total: Number(countRow?.count ?? 0) };
 
   const productIds = products.map((p) => p.id);
   const variants = await db
@@ -349,7 +370,7 @@ export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
     .from(schema.productVariants)
     .where(inArray(schema.productVariants.productId, productIds));
 
-  return products.map((p) => {
+  const rows = products.map((p) => {
     const pVariants = variants.filter((v) => v.productId === p.id);
     const sizeStock = Object.fromEntries(STANDARD_SIZES.map((s) => [s, 0])) as Record<StandardSizeKey, number>;
     const variantRows: StockOverviewRow["variants"] = [];
@@ -385,6 +406,8 @@ export async function listStockOverviewDb(): Promise<StockOverviewRow[]> {
       variants: variantRows,
     };
   });
+
+  return { products: rows, total: Number(countRow?.count ?? 0) };
 }
 
 export async function listStockMovementsDb(productId: string, limit = 50) {

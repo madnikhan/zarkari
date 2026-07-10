@@ -4,11 +4,11 @@ import { OrdersPageClient } from "@/components/admin/OrdersPageClient";
 const PAGE_SIZE = 20;
 
 interface Props {
-  searchParams: Promise<{ type?: string; tab?: string; page?: string }>;
+  searchParams: Promise<{ type?: string; tab?: string; page?: string; q?: string }>;
 }
 
 export default async function AdminOrdersPage({ searchParams }: Props) {
-  const { type = "all", tab = "recent", page: pageStr = "1" } = await searchParams;
+  const { type = "all", tab = "recent", page: pageStr = "1", q = "" } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
 
   const typeFilter = ["all", "custom", "online", "walk_in"].includes(type) ? type : "all";
@@ -27,6 +27,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
     tab: tabKey,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
+    q: q.trim() || undefined,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -39,6 +40,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
       totalPages={totalPages}
       typeFilter={typeFilter}
       tab={tabKey}
+      q={q.trim()}
     />
   );
 }

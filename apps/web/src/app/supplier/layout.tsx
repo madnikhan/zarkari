@@ -15,7 +15,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   const session = await getSession();
   return (
     <>
-      <BomsShell role="supplier" userName={session?.name} userRole="supplier">
+      <BomsShell role="supplier" userName={session?.name} userRole="supplier" supplierId={session?.supplierId}>
         <PushPermissionPrompt variant="staff" />
         <PwaInstallBanner />
         {children}

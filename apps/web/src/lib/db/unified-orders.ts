@@ -119,8 +119,9 @@ export async function getUnifiedOrders(params: {
   tab?: string;
   limit?: number;
   offset?: number;
+  q?: string;
 }): Promise<{ orders: UnifiedOrder[]; total: number }> {
-  const { type = "all", tab = "recent", limit = 20, offset = 0 } = params;
+  const { type = "all", tab = "recent", limit = 20, offset = 0, q } = params;
 
   const includeCustom = type === "all" || type === "custom";
   const includeOnline = type === "all" || type === "online";
@@ -178,8 +179,19 @@ export async function getUnifiedOrders(params: {
 
   unified.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const total = unified.length;
-  const orders = unified.slice(offset, offset + limit);
+  let filtered = unified;
+  if (q?.trim()) {
+    const needle = q.trim().toLowerCase();
+    filtered = unified.filter(
+      (o) =>
+        o.orderNumber.toLowerCase().includes(needle) ||
+        o.customerLabel.toLowerCase().includes(needle) ||
+        (o.customerPhone?.includes(needle) ?? false)
+    );
+  }
+
+  const total = filtered.length;
+  const orders = filtered.slice(offset, offset + limit);
 
   return { orders, total };
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type {
   SocialInboxStats,
   SocialMessage,
@@ -44,22 +44,45 @@ export async function listSocialThreadsDb(filters?: {
   platform?: SocialPlatform;
   unreadOnly?: boolean;
   status?: SocialThreadStatus;
-}): Promise<SocialThread[]> {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ threads: SocialThread[]; total: number }> {
   const db = getDb();
-  if (!db) return [];
+  if (!db) return { threads: [], total: 0 };
 
   const conditions = [];
   if (filters?.platform) conditions.push(eq(schema.socialThreads.platform, filters.platform));
   if (filters?.unreadOnly) conditions.push(sql`${schema.socialThreads.unreadCount} > 0`);
   if (filters?.status) conditions.push(eq(schema.socialThreads.status, filters.status));
+  if (filters?.q?.trim()) {
+    const pat = `%${filters.q.trim()}%`;
+    conditions.push(
+      or(
+        ilike(schema.socialThreads.contactName, pat),
+        ilike(schema.socialThreads.lastMessagePreview, pat),
+        ilike(schema.socialThreads.contactHandle, pat)
+      )
+    );
+  }
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+  const limit = filters?.limit ?? 50;
+  const offset = filters?.offset ?? 0;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.socialThreads)
+    .where(whereClause);
 
   const rows = await db
     .select()
     .from(schema.socialThreads)
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(schema.socialThreads.lastMessageAt));
+    .where(whereClause)
+    .orderBy(desc(schema.socialThreads.lastMessageAt))
+    .limit(limit)
+    .offset(offset);
 
-  return rows.map(mapThread);
+  return { threads: rows.map(mapThread), total: Number(countRow?.count ?? 0) };
 }
 
 export async function getSocialThreadDb(threadId: string): Promise<SocialThread | null> {

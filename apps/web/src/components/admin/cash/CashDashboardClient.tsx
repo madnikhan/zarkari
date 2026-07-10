@@ -6,7 +6,7 @@ import { CashDateNav } from "./CashDateNav";
 import { CashPeriodNav } from "./CashPeriodNav";
 import { CashSummaryCards } from "./CashSummaryCards";
 import { CashQuickActions } from "./CashQuickActions";
-import { CashTransactionTable } from "./CashTransactionTable";
+import { SearchableCashTransactionTable } from "./SearchableCashTransactionTable";
 import { CashClosingCards } from "./CashClosingCards";
 import { AddTransactionModal } from "./AddTransactionModal";
 import type { CashTransaction, DailyCashSummary, RangeCashSummary } from "@/lib/db/cash-ledger";
@@ -75,13 +75,13 @@ export function CashDashboardClient(props: Props) {
         <CashQuickActions date={date} />
 
         <div className="grid lg:grid-cols-2 gap-4">
-          <CashTransactionTable
+          <SearchableCashTransactionTable
             title="Today's Cash In Transactions"
             accent="in"
             transactions={cashIn}
             total={summary.totalCashIn}
           />
-          <CashTransactionTable
+          <SearchableCashTransactionTable
             title="Today's Cash Out Transactions"
             accent="out"
             transactions={cashOut}
@@ -126,14 +126,14 @@ export function CashDashboardClient(props: Props) {
       <CashQuickActions date={transactionDate} />
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <CashTransactionTable
+        <SearchableCashTransactionTable
           title="Cash In Transactions"
           accent="in"
           transactions={cashIn}
           total={rangeSummary.totalCashIn}
           groupByDay
         />
-        <CashTransactionTable
+        <SearchableCashTransactionTable
           title="Cash Out Transactions"
           accent="out"
           transactions={cashOut}

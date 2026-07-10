@@ -156,6 +156,7 @@ export async function listBridalOrdersWithRelationsDb(filters: {
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
+  q?: string;
 }): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
   const db = getDb();
   if (!db) return { orders: [], total: 0 };
@@ -165,12 +166,19 @@ export async function listBridalOrdersWithRelationsDb(filters: {
   if (filters.supplierTab) conditions.push(supplierTabCondition(filters.supplierTab));
   else if (filters.tab) conditions.push(ordersTabCondition(filters.tab));
   else if (filters.activeOnly) conditions.push(notInArray(schema.bridalOrders.status, TERMINAL_STATUSES));
+  if (filters.q?.trim()) {
+    const pat = `%${filters.q.trim()}%`;
+    conditions.push(
+      or(ilike(schema.bridalOrders.orderNumber, pat), ilike(schema.customers.name, pat))
+    );
+  }
 
   const whereClause = conditions.length ? and(...conditions) : undefined;
 
   const [countRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.bridalOrders)
+    .innerJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
     .where(whereClause);
 
   let query = db
@@ -422,6 +430,23 @@ export async function listCustomerOrderLinksDb(): Promise<
       orderNumber: schema.bridalOrders.orderNumber,
     })
     .from(schema.bridalOrders)
+    .orderBy(desc(schema.bridalOrders.bookingDate));
+  return rows;
+}
+
+export async function listCustomerOrderLinksForCustomersDb(customerIds: string[]): Promise<
+  { customerId: string; orderId: string; orderNumber: string }[]
+> {
+  const db = getDb();
+  if (!db || !customerIds.length) return [];
+  const rows = await db
+    .select({
+      customerId: schema.bridalOrders.customerId,
+      orderId: schema.bridalOrders.id,
+      orderNumber: schema.bridalOrders.orderNumber,
+    })
+    .from(schema.bridalOrders)
+    .where(inArray(schema.bridalOrders.customerId, customerIds))
     .orderBy(desc(schema.bridalOrders.bookingDate));
   return rows;
 }
@@ -934,6 +959,50 @@ export async function listCustomersDb(): Promise<Customer[]> {
     email: row.email ?? undefined,
     address: row.address ?? undefined,
   }));
+}
+
+export async function listCustomersPagedDb(opts?: {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ customers: Customer[]; total: number }> {
+  const db = getDb();
+  if (!db) return { customers: [], total: 0 };
+  const limit = opts?.limit ?? 20;
+  const offset = opts?.offset ?? 0;
+  const conditions = [];
+  if (opts?.q?.trim()) {
+    const pat = `%${opts.q.trim()}%`;
+    conditions.push(
+      or(
+        ilike(schema.customers.name, pat),
+        ilike(schema.customers.phone, pat),
+        ilike(schema.customers.email, pat)
+      )
+    );
+  }
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.customers)
+    .where(whereClause);
+  const rows = await db
+    .select()
+    .from(schema.customers)
+    .where(whereClause)
+    .orderBy(schema.customers.name)
+    .limit(limit)
+    .offset(offset);
+  return {
+    customers: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email ?? undefined,
+      address: row.address ?? undefined,
+    })),
+    total: Number(countRow?.count ?? 0),
+  };
 }
 
 export async function listSuppliersDb(includeInactive = false): Promise<Supplier[]> {

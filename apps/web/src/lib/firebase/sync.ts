@@ -212,3 +212,36 @@ export function resetSupplierUnread(supplierId: string): void {
     .set({ unreadCount: 0, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
     .catch(console.error);
 }
+
+export function decrementSupplierUnread(supplierId: string): void {
+  if (!isFirebaseConfigured()) return;
+  const db = getAdminFirestore();
+  if (!db) return;
+
+  db.collection("supplier_inbox")
+    .doc(supplierId)
+    .set(
+      {
+        unreadCount: FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
+    .catch(console.error);
+}
+
+export async function readStaffInboxUnread(userId?: string): Promise<number> {
+  if (!isFirebaseConfigured()) return 0;
+  const db = getAdminFirestore();
+  if (!db) return 0;
+  const snap = await db.collection("staff_inbox").doc(userId ?? "shared").get();
+  return typeof snap.data()?.unreadCount === "number" ? Math.max(0, snap.data()!.unreadCount) : 0;
+}
+
+export async function readSupplierInboxUnread(supplierId: string): Promise<number> {
+  if (!isFirebaseConfigured()) return 0;
+  const db = getAdminFirestore();
+  if (!db) return 0;
+  const snap = await db.collection("supplier_inbox").doc(supplierId).get();
+  return typeof snap.data()?.unreadCount === "number" ? Math.max(0, snap.data()!.unreadCount) : 0;
+}

@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { UnifiedOrder } from "@/lib/db/unified-orders";
 import { UnifiedOrdersTable } from "@/components/admin/UnifiedOrdersTable";
 import { WalkInSaleForm } from "@/components/admin/WalkInSaleForm";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { AdminTableSearch } from "@/components/admin/AdminTableSearch";
+import { AdminTableShell } from "@/components/admin/AdminTableShell";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -15,9 +18,10 @@ interface Props {
   totalPages: number;
   typeFilter: string;
   tab: string;
+  q?: string;
 }
 
-export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, tab }: Props) {
+export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, tab, q = "" }: Props) {
   const router = useRouter();
   const [walkInOpen, setWalkInOpen] = useState(false);
 
@@ -62,6 +66,7 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
     const params = new URLSearchParams();
     params.set("type", next.type ?? typeFilter);
     params.set("tab", next.tab ?? tab);
+    if (q) params.set("q", q);
     if (next.page && next.page > 1) params.set("page", String(next.page));
     return `/admin/orders?${params.toString()}`;
   }
@@ -116,25 +121,23 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
         ))}
       </div>
 
-      <UnifiedOrdersTable orders={orders} />
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminTableSearch placeholder="Search order # or customer…" defaultValue={q} />
+        </Suspense>
+      </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-6">
-          {page > 1 && (
-            <Link href={hrefFor({ page: page - 1 })} className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
-              Previous
-            </Link>
-          )}
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} orders)
-          </span>
-          {page < totalPages && (
-            <Link href={hrefFor({ page: page + 1 })} className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
-              Next
-            </Link>
-          )}
-        </div>
-      )}
+      <AdminTableShell>
+        <UnifiedOrdersTable orders={orders} />
+      </AdminTableShell>
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        pageSize={20}
+        buildHref={(p) => hrefFor({ page: p })}
+      />
 
       <WalkInSaleForm
         open={walkInOpen}

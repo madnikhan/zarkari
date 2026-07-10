@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { getSupplierLedgerBalances } from "@/lib/supplier-ledger/service";
-import { formatPrice } from "@/lib/utils";
+import { SupplierPaymentsPageClient } from "@/components/admin/SupplierPaymentsPageClient";
 
-const numCell = "px-4 py-3 text-right tabular-nums whitespace-nowrap";
+interface Props {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}
 
-export default async function SupplierPaymentsPage() {
+export default async function SupplierPaymentsPage({ searchParams }: Props) {
+  const { page: pageStr = "1", q = "" } = await searchParams;
+  const page = Math.max(1, parseInt(pageStr, 10) || 1);
   const balances = await getSupplierLedgerBalances();
 
   return (
@@ -16,53 +20,7 @@ export default async function SupplierPaymentsPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Supplier Payments</h1>
         <p className="text-sm text-slate-500 mt-1">Khata balances in GBP and PKR for Pakistani suppliers</p>
       </div>
-
-      <div className="boms-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80">
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Supplier</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Bills (GBP)</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Bills (PKR)</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Paid (GBP)</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Paid (PKR)</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Balance (GBP)</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-500">Balance (PKR)</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {balances.map((b) => (
-                <tr key={b.supplierId} className="hover:bg-slate-50/50">
-                  <td className="px-4 py-3 font-medium">{b.supplierName}</td>
-                  <td className={numCell}>{formatPrice(String(b.totalBillsGbp))}</td>
-                  <td className={numCell}>Rs {b.totalBillsPkr.toLocaleString("en-GB")}</td>
-                  <td className={numCell}>{formatPrice(String(b.totalPaymentsGbp))}</td>
-                  <td className={numCell}>Rs {b.totalPaymentsPkr.toLocaleString("en-GB")}</td>
-                  <td className={numCell}>{formatPrice(String(b.balanceGbp))}</td>
-                  <td
-                    className={`${numCell} font-semibold bg-violet-50/60 text-slate-800`}
-                  >
-                    Rs {b.balancePkr.toLocaleString("en-GB")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/admin/suppliers/${b.supplierId}/khata`}
-                      className="text-[#4C3BCF] hover:underline text-xs whitespace-nowrap"
-                    >
-                      View khata →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!balances.length && (
-          <p className="text-center text-slate-400 py-12 text-sm">No supplier ledger entries yet.</p>
-        )}
-      </div>
+      <SupplierPaymentsPageClient balances={balances} q={q.trim()} page={page} />
     </div>
   );
 }
