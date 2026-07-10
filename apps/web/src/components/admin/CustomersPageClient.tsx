@@ -23,14 +23,6 @@ interface Props {
 }
 
 export function CustomersPageClient({ customers, page, totalPages, total, q }: Props) {
-  function buildHref(p: number) {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
-    return qs ? `/admin/customers?${qs}` : "/admin/customers";
-  }
-
   return (
     <>
       <div className="mb-4">
@@ -80,7 +72,14 @@ export function CustomersPageClient({ customers, page, totalPages, total, q }: P
           </tbody>
         </table>
       </AdminTableShell>
-      <AdminPagination page={page} totalPages={totalPages} totalItems={total} pageSize={20} buildHref={buildHref} />
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        pageSize={20}
+        basePath="/admin/customers"
+        query={{ q: q || undefined }}
+      />
     </>
   );
 }

@@ -136,7 +136,8 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
         totalPages={totalPages}
         totalItems={total}
         pageSize={20}
-        buildHref={(p) => hrefFor({ page: p })}
+        basePath="/admin/orders"
+        query={{ type: typeFilter, tab, q: q || undefined }}
       />
 
       <WalkInSaleForm

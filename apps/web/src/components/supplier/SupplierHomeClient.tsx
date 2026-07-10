@@ -30,14 +30,6 @@ export function SupplierHomeClient({ tab, page, totalPages, total, q, counts, or
     return `/supplier?${params.toString()}`;
   };
 
-  function hrefFor(nextPage: number) {
-    const params = new URLSearchParams();
-    params.set("tab", tab);
-    if (q) params.set("q", q);
-    if (nextPage > 1) params.set("page", String(nextPage));
-    return `/supplier?${params.toString()}`;
-  }
-
   const tabLabels: Record<SupplierTab, string> = {
     new: "New",
     "in-progress": "In Progress",
@@ -135,7 +127,8 @@ export function SupplierHomeClient({ tab, page, totalPages, total, q, counts, or
         totalPages={totalPages}
         totalItems={total}
         pageSize={20}
-        buildHref={hrefFor}
+        basePath="/supplier"
+        query={{ tab, q: q || undefined }}
       />
     </div>
   );

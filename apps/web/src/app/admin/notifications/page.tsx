@@ -35,14 +35,6 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  function buildHref(p: number) {
-    const params = new URLSearchParams();
-    if (filter === "unread") params.set("filter", "unread");
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
-    return qs ? `/admin/notifications?${qs}` : "/admin/notifications";
-  }
-
   return (
     <div className="p-4 lg:p-8">
       <div className="flex items-center justify-between mb-4">
@@ -92,7 +84,8 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
         totalPages={totalPages}
         totalItems={total}
         pageSize={PAGE_SIZE}
-        buildHref={buildHref}
+        basePath="/admin/notifications"
+        query={unreadOnly ? { filter: "unread" } : undefined}
       />
     </div>
   );

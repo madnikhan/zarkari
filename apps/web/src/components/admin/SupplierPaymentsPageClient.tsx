@@ -38,10 +38,6 @@ export function SupplierPaymentsPageClient({ balances, q, page }: Props) {
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  function buildHref(p: number) {
-    return p > 1 ? `/admin/suppliers/payments?page=${p}` : "/admin/suppliers/payments";
-  }
-
   return (
     <>
       <div className="mb-4">
@@ -100,7 +96,8 @@ export function SupplierPaymentsPageClient({ balances, q, page }: Props) {
         totalPages={totalPages}
         totalItems={filtered.length}
         pageSize={PAGE_SIZE}
-        buildHref={buildHref}
+        basePath="/admin/suppliers/payments"
+        query={{ q: q || undefined }}
       />
     </>
   );

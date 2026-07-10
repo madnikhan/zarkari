@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { doc, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { notificationHref } from "@/lib/notification-link";
-import { getClientFirestore } from "@/lib/firebase/client";
+import { getClientAuth, getClientFirestore } from "@/lib/firebase/client";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { stopNotificationAlert, useNotificationAlert } from "@/hooks/useNotificationAlert";
@@ -95,23 +96,40 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
 
   useEffect(() => {
     if (!ready || !isFirebaseClientConfigured()) return;
+    const auth = getClientAuth();
     const db = getClientFirestore();
-    if (!db) return;
+    if (!auth || !db) return;
 
-    const inboxPath = isSupplier && supplierId
-      ? doc(db, "supplier_inbox", supplierId)
-      : doc(db, "staff_inbox", "shared");
+    let inboxUnsub: (() => void) | undefined;
 
-    const unsub = onSnapshot(
-      inboxPath,
-      () => {
-        void pollCount();
-        void load();
-      },
-      (err) => console.error("inbox listener error", err)
-    );
+    const authUnsub = onAuthStateChanged(auth, (user) => {
+      inboxUnsub?.();
+      inboxUnsub = undefined;
+      if (!user) return;
 
-    return () => unsub();
+      const inboxPath =
+        isSupplier && supplierId
+          ? doc(db, "supplier_inbox", supplierId)
+          : doc(db, "staff_inbox", "shared");
+
+      inboxUnsub = onSnapshot(
+        inboxPath,
+        () => {
+          void pollCount();
+          void load();
+        },
+        (err: { code?: string }) => {
+          if (err.code !== "permission-denied") {
+            console.error("inbox listener error", err);
+          }
+        }
+      );
+    });
+
+    return () => {
+      authUnsub();
+      inboxUnsub?.();
+    };
   }, [ready, isSupplier, supplierId]);
 
   useNotificationAlert(unreadCount, !open);

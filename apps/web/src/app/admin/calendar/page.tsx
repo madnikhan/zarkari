@@ -19,7 +19,10 @@ export default async function AdminCalendarPage({ searchParams }: Props) {
   const byDate = orders.reduce<
     Record<string, { order: (typeof orders)[0]; customerName?: string }[]>
   >((acc, order) => {
-    const key = new Date(order.deliveryDate).toLocaleDateString("en-GB", {
+    if (!order.deliveryDate) return acc;
+    const delivery = new Date(order.deliveryDate);
+    if (Number.isNaN(delivery.getTime())) return acc;
+    const key = delivery.toLocaleDateString("en-GB", {
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -75,7 +78,7 @@ export default async function AdminCalendarPage({ searchParams }: Props) {
         totalPages={totalPages}
         totalItems={total}
         pageSize={GROUPS_PER_PAGE}
-        buildHref={(p) => (p > 1 ? `/admin/calendar?page=${p}` : "/admin/calendar")}
+        basePath="/admin/calendar"
       />
     </div>
   );

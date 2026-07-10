@@ -28,14 +28,6 @@ export function PaymentsPageClient({
   q,
   paymentCountByOrder,
 }: Props) {
-  function hrefFor(p: number) {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
-    return qs ? `/admin/payments?${qs}` : "/admin/payments";
-  }
-
   return (
     <div className="p-4 lg:p-8">
       <h1 className="text-2xl font-semibold text-slate-900 mb-6">Payments</h1>
@@ -94,7 +86,14 @@ export function PaymentsPageClient({
         </table>
       </AdminTableShell>
 
-      <AdminPagination page={page} totalPages={totalPages} totalItems={total} pageSize={50} buildHref={hrefFor} />
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        pageSize={50}
+        basePath="/admin/payments"
+        query={{ q: q || undefined }}
+      />
     </div>
   );
 }

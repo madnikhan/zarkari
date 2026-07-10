@@ -15,14 +15,6 @@ interface Props {
 }
 
 export function StockPageWrapper({ products, page, totalPages, total, q }: Props) {
-  function buildHref(p: number) {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
-    return qs ? `/admin/stock?${qs}` : "/admin/stock";
-  }
-
   return (
     <>
       <div className="mb-4">
@@ -31,7 +23,7 @@ export function StockPageWrapper({ products, page, totalPages, total, q }: Props
         </Suspense>
       </div>
       <StockPageClient products={products} />
-      <AdminPagination page={page} totalPages={totalPages} totalItems={total} pageSize={20} buildHref={buildHref} />
+      <AdminPagination page={page} totalPages={totalPages} totalItems={total} pageSize={20} basePath="/admin/stock" query={{ q: q || undefined }} />
     </>
   );
 }

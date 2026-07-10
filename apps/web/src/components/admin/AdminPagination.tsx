@@ -3,12 +3,31 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+export type AdminPaginationQuery = Record<string, string | undefined>;
+
+export function buildAdminPageHref(
+  basePath: string,
+  query: AdminPaginationQuery | undefined,
+  page: number
+): string {
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value) params.set(key, value);
+    }
+  }
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
+}
+
 interface Props {
   page: number;
   totalPages: number;
   totalItems?: number;
   pageSize?: number;
-  buildHref: (page: number) => string;
+  basePath: string;
+  query?: AdminPaginationQuery;
   className?: string;
 }
 
@@ -23,11 +42,13 @@ export function AdminPagination({
   totalPages,
   totalItems,
   pageSize,
-  buildHref,
+  basePath,
+  query,
   className = "",
 }: Props) {
   if (totalPages <= 1) return null;
 
+  const hrefFor = (p: number) => buildAdminPageHref(basePath, query, p);
   const pages = pageWindow(page, totalPages);
   const btn =
     "px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none";
@@ -36,14 +57,14 @@ export function AdminPagination({
     <div className={cn("flex flex-col sm:flex-row items-center justify-center gap-3 mt-6", className)}>
       <div className="flex flex-wrap items-center justify-center gap-1">
         {page > 1 ? (
-          <Link href={buildHref(1)} className={btn}>
+          <Link href={hrefFor(1)} className={btn}>
             First
           </Link>
         ) : (
           <span className={cn(btn, "opacity-40")}>First</span>
         )}
         {page > 1 ? (
-          <Link href={buildHref(page - 1)} className={btn}>
+          <Link href={hrefFor(page - 1)} className={btn}>
             Prev
           </Link>
         ) : (
@@ -56,7 +77,7 @@ export function AdminPagination({
             <span key={p} className="flex items-center gap-1">
               {gap && <span className="px-1 text-slate-400">…</span>}
               <Link
-                href={buildHref(p)}
+                href={hrefFor(p)}
                 className={cn(
                   btn,
                   p === page && "bg-[#4C3BCF] text-white border-[#4C3BCF] hover:bg-[#4C3BCF]"
@@ -68,14 +89,14 @@ export function AdminPagination({
           );
         })}
         {page < totalPages ? (
-          <Link href={buildHref(page + 1)} className={btn}>
+          <Link href={hrefFor(page + 1)} className={btn}>
             Next
           </Link>
         ) : (
           <span className={cn(btn, "opacity-40")}>Next</span>
         )}
         {page < totalPages ? (
-          <Link href={buildHref(totalPages)} className={btn}>
+          <Link href={hrefFor(totalPages)} className={btn}>
             Last
           </Link>
         ) : (

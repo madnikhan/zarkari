@@ -2,16 +2,38 @@
 
 import { useEffect, useRef } from "react";
 
-let sharedAudio: HTMLAudioElement | null = null;
+let alertInterval: ReturnType<typeof setInterval> | null = null;
 
-function getAlertAudio(): HTMLAudioElement | null {
-  if (typeof window === "undefined") return null;
-  if (!sharedAudio) {
-    sharedAudio = new Audio("/audio/sample-voice.webm");
-    sharedAudio.loop = true;
-    sharedAudio.volume = 0.6;
+function playBeep() {
+  if (typeof window === "undefined") return;
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.12;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+    osc.onended = () => void ctx.close();
+  } catch {
+    /* autoplay or Web Audio blocked */
   }
-  return sharedAudio;
+}
+
+function startAlertLoop() {
+  if (alertInterval) return;
+  playBeep();
+  alertInterval = setInterval(playBeep, 2000);
+}
+
+function stopAlertLoop() {
+  if (alertInterval) {
+    clearInterval(alertInterval);
+    alertInterval = null;
+  }
 }
 
 export function useNotificationAlert(unreadCount: number, enabled = true) {
@@ -20,32 +42,25 @@ export function useNotificationAlert(unreadCount: number, enabled = true) {
 
   useEffect(() => {
     if (!enabled) return;
-    const audio = getAlertAudio();
-    if (!audio) return;
 
     const increased = unreadCount > prevUnread.current && unreadCount > 0;
     prevUnread.current = unreadCount;
 
     if (increased && !playing.current) {
       playing.current = true;
-      audio.play().catch(() => {
-        playing.current = false;
-      });
+      startAlertLoop();
     }
 
     if (unreadCount === 0 && playing.current) {
-      audio.pause();
-      audio.currentTime = 0;
+      stopAlertLoop();
       playing.current = false;
     }
   }, [unreadCount, enabled]);
 
   useEffect(() => {
     return () => {
-      const audio = getAlertAudio();
-      if (audio && playing.current) {
-        audio.pause();
-        audio.currentTime = 0;
+      if (playing.current) {
+        stopAlertLoop();
         playing.current = false;
       }
     };
@@ -53,8 +68,5 @@ export function useNotificationAlert(unreadCount: number, enabled = true) {
 }
 
 export function stopNotificationAlert() {
-  const audio = getAlertAudio();
-  if (!audio) return;
-  audio.pause();
-  audio.currentTime = 0;
+  stopAlertLoop();
 }

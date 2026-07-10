@@ -40,18 +40,13 @@ export function InboxPageClient({
 }: InboxPageClientProps) {
   const [showManual, setShowManual] = useState(false);
 
-  function buildHref(p: number) {
-    const params = new URLSearchParams();
-    if (activeFilter === "unread") params.set("unread", "1");
-    else if (activeFilter !== "all") {
-      const f = FILTERS.find((x) => x.key === activeFilter);
-      if (f?.platform) params.set("platform", f.platform);
-    }
-    if (q) params.set("q", q);
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
-    return qs ? `/admin/inbox?${qs}` : "/admin/inbox";
+  const paginationQuery: Record<string, string | undefined> = {};
+  if (activeFilter === "unread") paginationQuery.unread = "1";
+  else if (activeFilter !== "all") {
+    const f = FILTERS.find((x) => x.key === activeFilter);
+    if (f?.platform) paginationQuery.platform = f.platform;
   }
+  if (q) paginationQuery.q = q;
 
   return (
     <>
@@ -113,7 +108,8 @@ export function InboxPageClient({
         totalPages={totalPages}
         totalItems={total}
         pageSize={20}
-        buildHref={buildHref}
+        basePath="/admin/inbox"
+        query={paginationQuery}
       />
       <ManualInquiryForm open={showManual} onClose={() => setShowManual(false)} />
     </>
