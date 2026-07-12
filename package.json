@@ -14,6 +14,7 @@
     "db:migrate-size-variants": "tsx scripts/migrate-size-variants.ts",
     "db:seed-sample": "tsx scripts/seed-sample-data.ts",
     "db:clear-sample": "tsx scripts/clear-sample-data.ts",
+    "db:wipe-ops": "tsx scripts/wipe-ops-data.ts",
     "test:r2": "tsx scripts/test-r2.ts",
     "audit:admin": "tsx scripts/admin-audit.ts"
   }

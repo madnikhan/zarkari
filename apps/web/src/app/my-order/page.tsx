@@ -50,7 +50,7 @@ function LoginFlow() {
           <input
             value={orderNumber}
             onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="BR-2026-0152"
+            placeholder="Order number"
             className={`${inputClass} font-mono`}
             required
           />
@@ -60,7 +60,7 @@ function LoginFlow() {
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="447700900123"
+            placeholder="WhatsApp number"
             className={inputClass}
             required
           />
@@ -73,8 +73,6 @@ function LoginFlow() {
           {loading ? "Loading…" : "View Order Status"}
         </button>
       </form>
-
-      <p className="text-xs text-slate-400 text-center mt-6">Demo: BR-2026-0152 · 447700900123</p>
     </div>
   );
 }
