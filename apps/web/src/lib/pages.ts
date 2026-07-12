@@ -1,3 +1,5 @@
+import { bridalTermsAsHtml } from "@/lib/bridal-terms";
+
 export interface StaticPage {
   slug: string;
   title: string;
@@ -91,22 +93,9 @@ export const staticPages: StaticPage[] = [
   },
   {
     slug: "terms",
-    title: "Terms of Service",
-    description: "Terms and conditions for shopping at ZARKARI.",
-    content: `
-      <p><em>Last updated: June 2026</em></p>
-      <p>By using the ZARKARI website and placing an order, you agree to these terms.</p>
-      <h2>Products & Pricing</h2>
-      <p>All prices are shown in GBP and include UK VAT where applicable. We reserve the right to correct pricing errors.</p>
-      <h2>Orders</h2>
-      <p>An order confirmation email constitutes acceptance of your order. We may cancel orders in cases of stock unavailability or suspected fraud.</p>
-      <h2>Payment</h2>
-      <p>Payment is processed securely via Stripe. We accept major credit/debit cards, Apple Pay, and Google Pay.</p>
-      <h2>Intellectual Property</h2>
-      <p>All content on this website — including images, text, and branding — is the property of ZARKARI and may not be reproduced without permission.</p>
-      <h2>Governing Law</h2>
-      <p>These terms are governed by the laws of England and Wales. Disputes are subject to the exclusive jurisdiction of the courts of England and Wales.</p>
-    `,
+    title: "Terms & Conditions",
+    description: "Terms and conditions for bridal and custom orders at ZARKARI.",
+    content: bridalTermsAsHtml(),
   },
 ];
 

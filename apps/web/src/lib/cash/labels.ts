@@ -64,11 +64,11 @@ function endOfWeekSunday(dateStr: string): string {
   return shiftDate(start, 6);
 }
 
-function startOfMonth(dateStr: string): string {
+export function startOfMonthFor(dateStr: string): string {
   return `${dateStr.slice(0, 7)}-01`;
 }
 
-function endOfMonth(dateStr: string): string {
+export function endOfMonthFor(dateStr: string): string {
   const d = new Date(`${dateStr.slice(0, 7)}-01T12:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() + 1);
   d.setUTCDate(0);
@@ -115,8 +115,8 @@ export function resolvePeriodBounds(
       return { start, end, label: `This week · ${formatPeriodLabel(start, end)}`, preset };
     }
     case "month": {
-      const start = startOfMonth(today);
-      const end = endOfMonth(today);
+      const start = startOfMonthFor(today);
+      const end = endOfMonthFor(today);
       return { start, end, label: `This month · ${formatPeriodLabel(start, end)}`, preset };
     }
     case "7d": {

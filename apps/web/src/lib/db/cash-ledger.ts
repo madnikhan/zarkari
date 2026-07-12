@@ -754,6 +754,158 @@ export async function getCashAnalytics(input: {
   };
 }
 
+export interface ProfitAndLossReport {
+  startDate: string;
+  endDate: string;
+  presetLabel: string;
+  periodDays: number;
+  totalIncome: number;
+  totalCosts: number;
+  netProfit: number;
+  marginPercent: number;
+  incomeByType: { type: CashTransactionType; total: number }[];
+  costsByType: { type: CashTransactionType; total: number }[];
+  daily: { date: string; income: number; costs: number; net: number }[];
+  previousPeriod: {
+    startDate: string;
+    endDate: string;
+    label: string;
+    totalIncome: number;
+    totalCosts: number;
+    netProfit: number;
+  } | null;
+}
+
+async function aggregatePnLRange(
+  startDate: string,
+  endDate: string
+): Promise<{
+  totalIncome: number;
+  totalCosts: number;
+  incomeByType: Map<CashTransactionType, number>;
+  costsByType: Map<CashTransactionType, number>;
+  daily: { date: string; income: number; costs: number; net: number }[];
+}> {
+  const db = getDb();
+  const incomeByType = new Map<CashTransactionType, number>();
+  const costsByType = new Map<CashTransactionType, number>();
+  const dailyMap = new Map<string, { income: number; costs: number }>();
+
+  if (!db) {
+    return {
+      totalIncome: 0,
+      totalCosts: 0,
+      incomeByType,
+      costsByType,
+      daily: [],
+    };
+  }
+
+  const rows = await db
+    .select({
+      businessDate: schema.cashTransactions.businessDate,
+      amount: schema.cashTransactions.amount,
+      direction: schema.cashTransactions.direction,
+      type: schema.cashTransactions.type,
+    })
+    .from(schema.cashTransactions)
+    .where(
+      and(
+        gte(schema.cashTransactions.businessDate, startDate),
+        lte(schema.cashTransactions.businessDate, endDate)
+      )
+    );
+
+  let totalIncome = 0;
+  let totalCosts = 0;
+
+  for (const row of rows) {
+    const amt = parseFloat(row.amount);
+    const type = row.type as CashTransactionType;
+    const day = dailyMap.get(row.businessDate) ?? { income: 0, costs: 0 };
+
+    if (row.direction === "in") {
+      totalIncome += amt;
+      day.income += amt;
+      incomeByType.set(type, (incomeByType.get(type) ?? 0) + amt);
+    } else {
+      totalCosts += amt;
+      day.costs += amt;
+      costsByType.set(type, (costsByType.get(type) ?? 0) + amt);
+    }
+    dailyMap.set(row.businessDate, day);
+  }
+
+  const allDates: string[] = [];
+  let cursor = new Date(`${startDate}T12:00:00Z`);
+  const target = new Date(`${endDate}T12:00:00Z`);
+  while (cursor <= target) {
+    allDates.push(toDateString(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const daily = allDates.map((date) => {
+    const v = dailyMap.get(date) ?? { income: 0, costs: 0 };
+    return { date, income: v.income, costs: v.costs, net: v.income - v.costs };
+  });
+
+  return { totalIncome, totalCosts, incomeByType, costsByType, daily };
+}
+
+export async function getProfitAndLoss(input: {
+  startDate: string;
+  endDate: string;
+  presetLabel?: string;
+  previousStartDate?: string;
+  previousEndDate?: string;
+  previousLabel?: string;
+}): Promise<ProfitAndLossReport> {
+  const startDate = parseDateInput(input.startDate);
+  const endDate = parseDateInput(input.endDate);
+  const periodDays = countDaysInclusive(startDate, endDate);
+  const presetLabel = input.presetLabel ?? `${startDate} – ${endDate}`;
+
+  const current = await aggregatePnLRange(startDate, endDate);
+  const netProfit = current.totalIncome - current.totalCosts;
+  const marginPercent = current.totalIncome > 0 ? (netProfit / current.totalIncome) * 100 : 0;
+
+  let previousPeriod: ProfitAndLossReport["previousPeriod"] = null;
+  if (input.previousStartDate && input.previousEndDate) {
+    const prevStart = parseDateInput(input.previousStartDate);
+    const prevEnd = parseDateInput(input.previousEndDate);
+    const prev = await aggregatePnLRange(prevStart, prevEnd);
+    previousPeriod = {
+      startDate: prevStart,
+      endDate: prevEnd,
+      label: input.previousLabel ?? `${prevStart} – ${prevEnd}`,
+      totalIncome: prev.totalIncome,
+      totalCosts: prev.totalCosts,
+      netProfit: prev.totalIncome - prev.totalCosts,
+    };
+  }
+
+  const sortDesc = (a: { total: number }, b: { total: number }) => b.total - a.total;
+
+  return {
+    startDate,
+    endDate,
+    presetLabel,
+    periodDays,
+    totalIncome: current.totalIncome,
+    totalCosts: current.totalCosts,
+    netProfit,
+    marginPercent,
+    incomeByType: Array.from(current.incomeByType.entries())
+      .map(([type, total]) => ({ type, total }))
+      .sort(sortDesc),
+    costsByType: Array.from(current.costsByType.entries())
+      .map(([type, total]) => ({ type, total }))
+      .sort(sortDesc),
+    daily: current.daily,
+    previousPeriod,
+  };
+}
+
 export async function countSampleCashRows(): Promise<number> {
   const db = getDb();
   if (!db) return 0;

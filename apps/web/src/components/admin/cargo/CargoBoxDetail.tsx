@@ -1,8 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Pencil, Printer, Trash2, Plus } from "lucide-react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import {
+  Pencil,
+  Printer,
+  Trash2,
+  Plus,
+  Calendar,
+  Truck,
+  Barcode,
+  Scale,
+  User,
+  ListChecks,
+  Banknote,
+} from "lucide-react";
 import type { CargoBox, CargoBoxItem, CargoCompany } from "@/lib/cargo/demo-store";
 import type { Supplier } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
@@ -14,6 +26,28 @@ interface Props {
   suppliers: Supplier[];
   onRefresh: () => void;
   onDeleted: () => void;
+}
+
+function InfoField({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex gap-2.5 min-w-0">
+      <div className="mt-0.5 h-8 w-8 shrink-0 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+        <div className="text-sm font-medium text-slate-900 truncate">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted }: Props) {
@@ -28,6 +62,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
   const [saving, setSaving] = useState(false);
   const [postingKhata, setPostingKhata] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
   const [showAddItem, setShowAddItem] = useState(false);
   const [editItem, setEditItem] = useState<CargoBoxItem | null>(null);
@@ -36,6 +71,19 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
   const items = box.items ?? [];
   const totalPkr = box.totalCostPkr ?? items.reduce((s, i) => s + parseFloat(i.costPkr || "0"), 0);
   const totalGbp = box.totalCostGbp ?? items.reduce((s, i) => s + parseFloat(i.costGbp || "0"), 0);
+
+  useEffect(() => {
+    setCargoCompanyId(box.cargoCompanyId);
+    setTrackingNumber(box.trackingNumber);
+    setSupplierId(box.supplierId);
+    setReceivedDate(box.receivedDate);
+    setWeightKg(box.weightKg ?? "");
+    setNotes(box.notes ?? "");
+    setExchangeRate(box.exchangeRate ?? "");
+    setEditing(false);
+    setSelectedItems(new Set());
+    setError("");
+  }, [box.id, box.updatedAt]);
 
   function resetForm() {
     setCargoCompanyId(box.cargoCompanyId);
@@ -115,6 +163,11 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
       const res = await fetch(`/api/cargo/boxes/${box.id}/items/${itemId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to delete item");
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
       onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete item");
@@ -130,12 +183,63 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     });
   }
 
+  function toggleAll() {
+    if (selectedItems.size === items.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(items.map((i) => i.id)));
+    }
+  }
+
+  function editSelected() {
+    if (selectedItems.size === 0) {
+      setError("Select one item to edit.");
+      return;
+    }
+    if (selectedItems.size > 1) {
+      setError("Select exactly one item to edit.");
+      return;
+    }
+    const id = [...selectedItems][0];
+    const item = items.find((i) => i.id === id);
+    if (!item) {
+      setError("Selected item not found.");
+      return;
+    }
+    setError("");
+    setEditItem(item);
+  }
+
+  async function deleteSelected() {
+    if (selectedItems.size === 0) {
+      setError("Select at least one item to delete.");
+      return;
+    }
+    if (!confirm(`Delete ${selectedItems.size} selected item(s)?`)) return;
+    setBulkDeleting(true);
+    setError("");
+    try {
+      for (const itemId of selectedItems) {
+        const res = await fetch(`/api/cargo/boxes/${box.id}/items/${itemId}`, { method: "DELETE" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to delete item");
+      }
+      setSelectedItems(new Set());
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete selected items");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   return (
     <div className="boms-card flex flex-col min-h-full">
       <div className="flex flex-wrap items-start justify-between gap-3 p-4 border-b border-slate-100">
         <div>
-          <h2 className="font-mono text-lg font-semibold text-[#4C3BCF]">{box.boxNumber}</h2>
-          <p className="text-sm text-slate-500">{box.cargoCompanyName}</p>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Box Details - <span className="font-mono text-[#4C3BCF]">{box.boxNumber}</span>
+          </h2>
           {box.khataEntryId && (
             <span className="inline-block mt-1 text-[10px] uppercase tracking-wide bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
               Posted to khata
@@ -147,7 +251,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-[#4C3BCF] text-[#4C3BCF] rounded-lg hover:bg-[#F4F3FF]"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit Box Info
             </button>
@@ -176,7 +280,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
           <Link
             href={`/admin/cargo/${box.id}/print`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
           >
             <Printer className="h-3.5 w-3.5" /> Print
           </Link>
@@ -184,7 +288,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
             type="button"
             onClick={() => void deleteBox()}
             disabled={deleting || Boolean(box.khataEntryId)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-40"
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete Box
           </button>
@@ -202,7 +306,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
         {editing ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-slate-500">Received date</label>
+              <label className="text-xs text-slate-500">Date Received</label>
               <input
                 type="date"
                 value={receivedDate}
@@ -211,7 +315,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500">Cargo company</label>
+              <label className="text-xs text-slate-500">Cargo Company</label>
               <select
                 value={cargoCompanyId}
                 onChange={(e) => setCargoCompanyId(e.target.value)}
@@ -225,7 +329,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500">Tracking no.</label>
+              <label className="text-xs text-slate-500">Tracking Number</label>
               <input
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
@@ -267,7 +371,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               />
             </div>
             <div className="sm:col-span-2 lg:col-span-3">
-              <label className="text-xs text-slate-500">Notes</label>
+              <label className="text-xs text-slate-500">Notes (optional)</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -277,90 +381,113 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
             </div>
           </div>
         ) : (
-          <dl className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-            <div>
-              <dt className="text-xs text-slate-400">Received</dt>
-              <dd>{new Date(box.receivedDate).toLocaleDateString("en-GB")}</dd>
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <InfoField icon={Calendar} label="Date Received">
+                {new Date(box.receivedDate).toLocaleDateString("en-GB")}
+              </InfoField>
+              <InfoField icon={Truck} label="Cargo Company">
+                {box.cargoCompanyName || "—"}
+              </InfoField>
+              <InfoField icon={Barcode} label="Tracking Number">
+                <span className="font-mono">{box.trackingNumber || "—"}</span>
+              </InfoField>
+              <InfoField icon={Scale} label="Weight">
+                {box.weightKg ? `${box.weightKg} kg` : "—"}
+              </InfoField>
+              <InfoField icon={User} label="Supplier">
+                {box.supplierName || "—"}
+              </InfoField>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">Cargo company</dt>
-              <dd>{box.cargoCompanyName}</dd>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Notes (optional)</p>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 min-h-[2.5rem]">
+                {box.notes || "—"}
+              </p>
             </div>
-            <div>
-              <dt className="text-xs text-slate-400">Tracking</dt>
-              <dd className="font-mono">{box.trackingNumber}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-400">Weight</dt>
-              <dd>{box.weightKg ? `${box.weightKg} kg` : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-400">Supplier</dt>
-              <dd>{box.supplierName}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-400">Exchange rate</dt>
-              <dd>{box.exchangeRate ?? "—"}</dd>
-            </div>
-            {box.notes && (
-              <div className="sm:col-span-2 lg:col-span-3">
-                <dt className="text-xs text-slate-400">Notes</dt>
-                <dd className="text-slate-600">{box.notes}</dd>
-              </div>
-            )}
-          </dl>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-100 bg-slate-50/50">
-        <div className="text-center">
-          <p className="text-xs text-slate-400 uppercase">Total Items</p>
-          <p className="text-xl font-semibold text-slate-900">{items.length}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-slate-400 uppercase">Total PKR</p>
-          <p className="text-xl font-semibold text-slate-900">Rs {totalPkr.toLocaleString("en-GB")}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-slate-400 uppercase">Total GBP</p>
-          <p className="text-xl font-semibold text-slate-900">{formatPrice(String(totalGbp))}</p>
-        </div>
-      </div>
-
       <div className="p-4 flex-1" data-tour="cargo-items">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">Dresses in this box</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Record each dress name with its cost price (PKR and/or GBP)
-            </p>
+        <h3 className="text-sm font-semibold text-slate-900 mb-3">Box Contents / Items</h3>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddItem(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg boms-btn-primary"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Item
+            </button>
+            <button
+              type="button"
+              onClick={editSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+            >
+              Edit Selected
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteSelected()}
+              disabled={bulkDeleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-40"
+            >
+              {bulkDeleting ? "Deleting…" : "Delete Selected"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowAddItem(true)}
-            className="inline-flex items-center gap-1 text-xs text-[#4C3BCF] hover:underline"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add dress
-          </button>
+
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 min-w-[6.5rem]">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase text-slate-400">
+                <ListChecks className="h-3 w-3" /> Total Items
+              </div>
+              <p className="text-lg font-semibold text-slate-900">{items.length}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 min-w-[7.5rem]">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase text-slate-400">
+                <Banknote className="h-3 w-3 text-emerald-600" /> Total Cost (PKR)
+              </div>
+              <p className="text-lg font-semibold text-emerald-600">
+                {totalPkr.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 min-w-[7.5rem]">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase text-slate-400">
+                <Banknote className="h-3 w-3 text-blue-600" /> Total Cost (£ GBP)
+              </div>
+              <p className="text-lg font-semibold text-blue-600">{formatPrice(String(totalGbp))}</p>
+            </div>
+          </div>
         </div>
+
         <div className="overflow-x-auto -mx-4 px-4">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
-              <tr className="border-b border-slate-100 text-left">
-                <th className="py-2 pr-2 w-8" />
-                <th className="py-2 pr-2 font-medium text-slate-500">Date</th>
-                <th className="py-2 pr-2 font-medium text-slate-500">Dress name</th>
-                <th className="py-2 pr-2 font-medium text-slate-500">Order</th>
-                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost (PKR)</th>
-                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost (GBP)</th>
-                <th className="py-2 font-medium text-slate-500 w-20" />
+              <tr className="bg-slate-800 text-left text-white">
+                <th className="py-2.5 px-2 w-10">
+                  <input
+                    type="checkbox"
+                    checked={items.length > 0 && selectedItems.size === items.length}
+                    onChange={toggleAll}
+                    className="rounded border-slate-400"
+                    aria-label="Select all items"
+                  />
+                </th>
+                <th className="py-2.5 px-2 font-medium">Date</th>
+                <th className="py-2.5 px-2 font-medium">Article Name</th>
+                <th className="py-2.5 px-2 font-medium">Order Number</th>
+                <th className="py-2.5 px-2 font-medium text-right">Cost Price (PKR)</th>
+                <th className="py-2.5 px-2 font-medium text-right">Cost Price (£ GBP)</th>
+                <th className="py-2.5 px-2 font-medium text-center w-24">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {items.length ? (
                 items.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50">
-                    <td className="py-2 pr-2">
+                    <td className="py-2 px-2">
                       <input
                         type="checkbox"
                         checked={selectedItems.has(item.id)}
@@ -368,11 +495,11 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                         className="rounded border-slate-300"
                       />
                     </td>
-                    <td className="py-2 pr-2 text-slate-600 whitespace-nowrap">
+                    <td className="py-2 px-2 text-slate-600 whitespace-nowrap">
                       {new Date(item.itemDate).toLocaleDateString("en-GB")}
                     </td>
-                    <td className="py-2 pr-2 font-medium">{item.articleName}</td>
-                    <td className="py-2 pr-2 font-mono text-[#4C3BCF] text-xs">
+                    <td className="py-2 px-2 font-medium">{item.articleName}</td>
+                    <td className="py-2 px-2 font-mono text-[#4C3BCF] text-xs">
                       {item.orderNumber ? (
                         <Link href={`/admin/orders/${item.bridalOrderId}`} className="hover:underline">
                           {item.orderNumber}
@@ -381,30 +508,39 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                         "—"
                       )}
                     </td>
-                    <td className="py-2 pr-2 text-right">Rs {parseFloat(item.costPkr).toLocaleString("en-GB")}</td>
-                    <td className="py-2 pr-2 text-right">{formatPrice(item.costGbp)}</td>
-                    <td className="py-2 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setEditItem(item)}
-                        className="text-xs text-[#4C3BCF] hover:underline mr-2"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteItem(item.id)}
-                        className="text-xs text-red-600 hover:underline"
-                      >
-                        Del
-                      </button>
+                    <td className="py-2 px-2 text-right">
+                      {parseFloat(item.costPkr).toLocaleString("en-GB", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="py-2 px-2 text-right">{formatPrice(item.costGbp)}</td>
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditItem(item)}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 text-blue-600 hover:bg-blue-50"
+                          aria-label="Edit item"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteItem(item.id)}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded border border-red-200 text-red-600 hover:bg-red-50"
+                          aria-label="Delete item"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
-                    Add each dress with its cost price
+                    Add items with cost prices (PKR and GBP)
                   </td>
                 </tr>
               )}
@@ -413,17 +549,9 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
         </div>
       </div>
 
-      <div className="p-4 border-t border-slate-100 bg-slate-50/80">
+      <div className="p-4 border-t border-slate-100 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-slate-500 space-y-0.5">
-            <p>
-              <span className="font-medium text-slate-700">Summary:</span> {items.length} items · Rs{" "}
-              {totalPkr.toLocaleString("en-GB")} · {formatPrice(String(totalGbp))}
-              {box.weightKg && ` · ${box.weightKg} kg`}
-              {box.supplierName && ` · ${box.supplierName}`}
-              {box.trackingNumber && ` · ${box.trackingNumber}`}
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-900">Box Summary</h3>
           {!box.khataEntryId && (
             <button
               type="button"
@@ -435,6 +563,39 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               {postingKhata ? "Posting…" : "Post to khata"}
             </button>
           )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px] border border-slate-200 rounded-lg overflow-hidden">
+            <thead>
+              <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <th className="py-2 px-3 font-medium">Total Items</th>
+                <th className="py-2 px-3 font-medium">Total Cost (PKR)</th>
+                <th className="py-2 px-3 font-medium">Total Cost (£ GBP)</th>
+                <th className="py-2 px-3 font-medium">Weight</th>
+                <th className="py-2 px-3 font-medium">Supplier</th>
+                <th className="py-2 px-3 font-medium">Cargo Company</th>
+                <th className="py-2 px-3 font-medium">Tracking Number</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="py-2.5 px-3 font-semibold">{items.length}</td>
+                <td className="py-2.5 px-3 font-semibold text-emerald-600">
+                  {totalPkr.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="py-2.5 px-3 font-semibold text-blue-600">{formatPrice(String(totalGbp))}</td>
+                <td className="py-2.5 px-3">{box.weightKg ? `${box.weightKg} kg` : "—"}</td>
+                <td className="py-2.5 px-3">{box.supplierName || "—"}</td>
+                <td className="py-2.5 px-3">{box.cargoCompanyName || "—"}</td>
+                <td className="py-2.5 px-3 font-mono text-xs">{box.trackingNumber || "—"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
+          Each box has its own separate page. All information related to this box is stored here including
+          supplier, cargo company, tracking number, weight and all items with cost prices.
         </div>
       </div>
 

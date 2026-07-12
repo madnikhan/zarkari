@@ -8,6 +8,7 @@ import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { CustomerOrderProgressTracker } from "./OrderProgressTracker";
 import { getCustomerStatusLabel } from "@/lib/orders/status-machine";
 import { formatPrice } from "@/lib/utils";
+import { BRIDAL_TERMS_ACCEPTANCE, BRIDAL_TERMS_CLAUSES } from "@/lib/bridal-terms";
 
 interface MyBridalOrderProps {
   order: BridalOrder;
@@ -198,15 +199,16 @@ function CustomerActionButtons({
 
       <section className="boms-card p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-2">Terms &amp; Conditions</h2>
-        <p className="text-sm text-slate-600 mb-3">
-          By placing this order you agree to our terms regarding deposits, delivery timelines, colour and design
-          changes, alterations, and collection. Custom orders may not be eligible for refund once production has started.
-        </p>
-        <ul className="text-xs text-slate-500 space-y-1 mb-3 list-disc pl-4">
-          <li>Deposits are non-refundable once the order is sent to the supplier.</li>
-          <li>Colour and design changes are not guaranteed after production begins.</li>
-          <li>Remaining balance is due on collection unless agreed otherwise.</li>
-        </ul>
+        <div className="max-h-64 overflow-y-auto pr-1 mb-3">
+          <ol className="text-xs text-slate-600 space-y-2 list-decimal pl-4">
+            {BRIDAL_TERMS_CLAUSES.map((clause) => (
+              <li key={clause.title}>
+                <span className="font-medium text-slate-800">{clause.title}:</span> {clause.body}
+              </li>
+            ))}
+          </ol>
+          <p className="text-xs text-slate-500 mt-3 italic">{BRIDAL_TERMS_ACCEPTANCE}</p>
+        </div>
         <a href="/pages/terms" target="_blank" rel="noreferrer" className="text-sm text-[#4C3BCF] hover:underline">
           Read full terms &amp; conditions
         </a>

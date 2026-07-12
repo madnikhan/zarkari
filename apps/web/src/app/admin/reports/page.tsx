@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import { getSession } from "@/lib/auth/session";
 import { ReportsPrintView } from "@/components/admin/ReportsPrintView";
 import { CashAnalyticsCharts } from "@/components/admin/cash/CashAnalyticsCharts";
+import { ProfitLossReport } from "@/components/admin/ProfitLossReport";
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>;
@@ -14,6 +15,7 @@ interface Props {
 const TABS: { key: string; label: string; ownerOnly?: boolean }[] = [
   { key: "overview", label: "Overview" },
   { key: "cash", label: "Cash Analytics", ownerOnly: true },
+  { key: "pnl", label: "Profit & Loss", ownerOnly: true },
   { key: "finance", label: "Finance", ownerOnly: true },
 ];
 
@@ -23,7 +25,7 @@ export default async function AdminReportsPage({ searchParams }: Props) {
   const isOwner = session?.role === "owner";
 
   const tabKey = TABS.some((t) => t.key === tab) ? tab : "overview";
-  if ((tabKey === "cash" || tabKey === "finance") && !isOwner) {
+  if ((tabKey === "cash" || tabKey === "finance" || tabKey === "pnl") && !isOwner) {
     redirect("/admin/reports?tab=overview");
   }
 
@@ -99,6 +101,12 @@ export default async function AdminReportsPage({ searchParams }: Props) {
         {tabKey === "cash" && isOwner && (
           <Suspense fallback={<p className="text-sm text-slate-500 py-12 text-center">Loading analytics…</p>}>
             <CashAnalyticsCharts />
+          </Suspense>
+        )}
+
+        {tabKey === "pnl" && isOwner && (
+          <Suspense fallback={<p className="text-sm text-slate-500 py-12 text-center">Loading profit &amp; loss…</p>}>
+            <ProfitLossReport />
           </Suspense>
         )}
 
