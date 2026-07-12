@@ -329,13 +329,18 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
 
       <div className="p-4 flex-1" data-tour="cargo-items">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-medium uppercase text-slate-500">Box Contents</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Dresses in this box</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Record each dress name with its cost price (PKR and/or GBP)
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setShowAddItem(true)}
             className="inline-flex items-center gap-1 text-xs text-[#4C3BCF] hover:underline"
           >
-            <Plus className="h-3.5 w-3.5" /> Add Item
+            <Plus className="h-3.5 w-3.5" /> Add dress
           </button>
         </div>
         <div className="overflow-x-auto -mx-4 px-4">
@@ -344,10 +349,10 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               <tr className="border-b border-slate-100 text-left">
                 <th className="py-2 pr-2 w-8" />
                 <th className="py-2 pr-2 font-medium text-slate-500">Date</th>
-                <th className="py-2 pr-2 font-medium text-slate-500">Article</th>
-                <th className="py-2 pr-2 font-medium text-slate-500">Order No.</th>
-                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost PKR</th>
-                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost GBP</th>
+                <th className="py-2 pr-2 font-medium text-slate-500">Dress name</th>
+                <th className="py-2 pr-2 font-medium text-slate-500">Order</th>
+                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost (PKR)</th>
+                <th className="py-2 pr-2 font-medium text-slate-500 text-right">Cost (GBP)</th>
                 <th className="py-2 font-medium text-slate-500 w-20" />
               </tr>
             </thead>
@@ -366,7 +371,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                     <td className="py-2 pr-2 text-slate-600 whitespace-nowrap">
                       {new Date(item.itemDate).toLocaleDateString("en-GB")}
                     </td>
-                    <td className="py-2 pr-2">{item.articleName}</td>
+                    <td className="py-2 pr-2 font-medium">{item.articleName}</td>
                     <td className="py-2 pr-2 font-mono text-[#4C3BCF] text-xs">
                       {item.orderNumber ? (
                         <Link href={`/admin/orders/${item.bridalOrderId}`} className="hover:underline">
@@ -399,7 +404,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
               ) : (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
-                    No items yet — add articles received in this box
+                    Add each dress with its cost price
                   </td>
                 </tr>
               )}

@@ -125,6 +125,7 @@ export async function createBridalOrder(input: {
   depositPaid?: string;
   deliveryDate?: string;
   customisationNotes?: string;
+  measurements?: import("@/lib/measurements/bridal-form").BridalMeasurements;
   mediaFiles?: { url: string; name: string; category: string }[];
   createdById?: string;
   createdByName?: string;
@@ -161,6 +162,7 @@ export async function createBridalOrder(input: {
         remainingBalance: remaining,
         deliveryDate: delivery,
         customisationNotes: input.customisationNotes,
+        measurements: input.measurements,
         createdById: input.createdById,
       });
       if (dbOrder) {
@@ -214,6 +216,7 @@ export async function createBridalOrder(input: {
     colour: input.colour,
     size: input.size,
     customisationNotes: input.customisationNotes,
+    measurements: input.measurements,
     supplierLocked: false,
     createdById: input.createdById,
   };

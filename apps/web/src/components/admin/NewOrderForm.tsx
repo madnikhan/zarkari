@@ -2,11 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Ruler } from "lucide-react";
 import type { Supplier } from "@/lib/data/seed";
 import { MediaUploadZone, type UploadedFile } from "@/components/boms/MediaUploadZone";
 import { VoiceNoteRecorder, type AudioUploadedFile } from "@/components/boms/VoiceNoteRecorder";
+import { MeasurementFormModal } from "@/components/admin/MeasurementFormModal";
 import { whatsAppUrl, orderTrackingMessage, getSiteUrl } from "@/lib/whatsapp";
+import {
+  hasAnyMeasurementValue,
+  type BridalMeasurements,
+} from "@/lib/measurements/bridal-form";
 
 function defaultDeliveryDate(): string {
   const d = new Date(Date.now() + 56 * 86400000);
@@ -18,6 +23,8 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mediaFiles, setMediaFiles] = useState<UploadedFile[]>([]);
+  const [measurements, setMeasurements] = useState<BridalMeasurements | null>(null);
+  const [showMeasurements, setShowMeasurements] = useState(false);
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -111,6 +118,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
           ...form,
           depositPaid: form.depositPaid,
           remainingBalance: remaining,
+          measurements: hasAnyMeasurementValue(measurements) ? measurements : undefined,
           mediaFiles: mapMediaCategories(mediaFiles),
         }),
       });
@@ -215,6 +223,25 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
 
       {field("deliveryDate", "Delivery Date", "date", true)}
 
+      <div>
+        <span className="text-slate-500 text-xs uppercase tracking-wide">Measurements</span>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowMeasurements(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm border border-slate-200 rounded-lg hover:border-[#4C3BCF]/40 hover:bg-slate-50"
+          >
+            <Ruler className="h-4 w-4 text-[#4C3BCF]" />
+            {hasAnyMeasurementValue(measurements) ? "Edit measurements" : "Enter measurements"}
+          </button>
+          {hasAnyMeasurementValue(measurements) && (
+            <span className="text-sm text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+              Measurements saved ({measurements!.unit})
+            </span>
+          )}
+        </div>
+      </div>
+
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Customisation Notes</span>
         <textarea
@@ -269,6 +296,14 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
       <button type="submit" disabled={loading} className="boms-btn-primary w-full py-3.5 rounded-lg text-sm font-medium">
         {loading ? "Saving…" : "Create Order"}
       </button>
+
+      {showMeasurements && (
+        <MeasurementFormModal
+          initial={measurements}
+          onSave={setMeasurements}
+          onClose={() => setShowMeasurements(false)}
+        />
+      )}
     </form>
   );
 }

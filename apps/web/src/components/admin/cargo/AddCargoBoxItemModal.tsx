@@ -39,9 +39,21 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
     e.preventDefault();
     setSaving(true);
     setError("");
+    if (!articleName.trim()) {
+      setError("Dress name is required");
+      setSaving(false);
+      return;
+    }
+    const pkr = parseFloat(amountPkr || "0");
+    const gbp = parseFloat(amountGbp || "0");
+    if ((!pkr || pkr <= 0) && (!gbp || gbp <= 0)) {
+      setError("Enter a cost price in PKR and/or GBP");
+      setSaving(false);
+      return;
+    }
     const payload = {
       itemDate,
-      articleName,
+      articleName: articleName.trim(),
       bridalOrderId: order?.id,
       orderNumber: order?.orderNumber,
       costGbp: amountGbp || "0",
@@ -72,7 +84,7 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">{isEdit ? "Edit Item" : "Add Item to Box"}</h2>
+          <h2 className="font-semibold text-slate-900">{isEdit ? "Edit dress" : "Add dress to box"}</h2>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />
           </button>
@@ -100,13 +112,17 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
             </div>
           </div>
           <div>
-            <label className="text-xs text-slate-500 uppercase">Article name</label>
+            <label className="text-xs text-slate-500 uppercase">Dress name</label>
             <input
               required
               value={articleName}
               onChange={(e) => setArticleName(e.target.value)}
+              placeholder="e.g. Red bridal lehenga"
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             />
+            <p className="text-xs text-slate-400 mt-1">
+              Enter the dress name and its manufacturing cost price below.
+            </p>
           </div>
           <GbpPkrConverter
             amountGbp={amountGbp}
@@ -125,7 +141,7 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
               disabled={saving}
               className="flex-1 boms-btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
             >
-              {saving ? "Saving…" : isEdit ? "Update Item" : "Add Item"}
+              {saving ? "Saving…" : isEdit ? "Update dress" : "Add dress"}
             </button>
           </div>
         </form>

@@ -27,6 +27,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Deposit must be between 0 and total price" }, { status: 400 });
     }
 
+    const { normalizeBridalMeasurements, hasAnyMeasurementValue } = await import(
+      "@/lib/measurements/bridal-form"
+    );
+    const measurements = normalizeBridalMeasurements(body.measurements);
     const order = await createBridalOrder({
       customer: {
         name: body.customerName.trim(),
@@ -40,6 +44,7 @@ export async function POST(request: Request) {
         ? new Date(body.deliveryDate).toISOString()
         : undefined,
       customisationNotes: body.customisationNotes,
+      measurements: hasAnyMeasurementValue(measurements) ? measurements : undefined,
       mediaFiles: body.mediaFiles,
       createdById: session.id,
       createdByName: session.name,

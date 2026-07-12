@@ -11,6 +11,10 @@ import type {
   OrderRefund,
   OrderCollection,
 } from "@/lib/data/seed";
+import {
+  normalizeBridalMeasurements,
+  type BridalMeasurements,
+} from "@/lib/measurements/bridal-form";
 import { getDb, schema } from "./index";
 
 function mapOrder(row: typeof schema.bridalOrders.$inferSelect): BridalOrder {
@@ -30,6 +34,7 @@ function mapOrder(row: typeof schema.bridalOrders.$inferSelect): BridalOrder {
     size: row.size ?? undefined,
     comments: row.comments ?? undefined,
     customisationNotes: row.customisationNotes ?? undefined,
+    measurements: normalizeBridalMeasurements(row.measurements),
     filesUnlockedAt: row.filesUnlockedAt?.toISOString(),
     lastSupplierActionAt: row.lastSupplierActionAt?.toISOString(),
     supplierLocked: row.supplierLocked,
@@ -676,10 +681,12 @@ export async function createBridalOrderDb(input: {
   remainingBalance: string;
   deliveryDate: string;
   customisationNotes?: string;
+  measurements?: BridalMeasurements;
   createdById?: string;
 }): Promise<BridalOrder | null> {
   const db = getDb();
   if (!db) return null;
+  const measurements = normalizeBridalMeasurements(input.measurements) ?? null;
   const [row] = await db
     .insert(schema.bridalOrders)
     .values({
@@ -695,6 +702,7 @@ export async function createBridalOrderDb(input: {
       colour: input.colour ?? null,
       size: input.size ?? null,
       customisationNotes: input.customisationNotes ?? null,
+      measurements,
       createdById: input.createdById ?? null,
     })
     .returning();

@@ -158,6 +158,9 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
             />
             Post costs to supplier khata on save
           </label>
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+            After creating the box, add each dress with its name and detailed cost price (PKR / GBP).
+          </p>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg">
               Cancel

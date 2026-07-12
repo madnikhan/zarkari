@@ -67,6 +67,8 @@ export interface BridalOrder {
   size?: string;
   comments?: string;
   customisationNotes?: string;
+  /** Structured TOP / BOTTOM / DUPATTA form + unit (cm | inches | m). */
+  measurements?: import("@/lib/measurements/bridal-form").BridalMeasurements;
   filesUnlockedAt?: string;
   lastSupplierActionAt?: string;
   supplierLocked: boolean;

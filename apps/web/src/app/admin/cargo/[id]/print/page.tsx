@@ -62,27 +62,34 @@ export default async function CargoBoxPrintPage({ params }: Props) {
         <thead>
           <tr className="border-b-2 border-slate-200 text-left">
             <th className="py-2 pr-2">Date</th>
-            <th className="py-2 pr-2">Article</th>
-            <th className="py-2 pr-2">Order No.</th>
-            <th className="py-2 pr-2 text-right">PKR</th>
-            <th className="py-2 text-right">GBP</th>
+            <th className="py-2 pr-2">Dress name</th>
+            <th className="py-2 pr-2">Order</th>
+            <th className="py-2 pr-2 text-right">Cost (PKR)</th>
+            <th className="py-2 text-right">Cost (GBP)</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
             <tr key={item.id} className="border-b border-slate-100">
               <td className="py-2 pr-2">{new Date(item.itemDate).toLocaleDateString("en-GB")}</td>
-              <td className="py-2 pr-2">{item.articleName}</td>
+              <td className="py-2 pr-2 font-medium">{item.articleName}</td>
               <td className="py-2 pr-2 font-mono">{item.orderNumber ?? "—"}</td>
               <td className="py-2 pr-2 text-right">Rs {parseFloat(item.costPkr).toLocaleString("en-GB")}</td>
               <td className="py-2 text-right">{formatPrice(item.costGbp)}</td>
             </tr>
           ))}
+          {!items.length && (
+            <tr>
+              <td colSpan={5} className="py-6 text-center text-slate-400">
+                No dresses recorded in this box
+              </td>
+            </tr>
+          )}
         </tbody>
         <tfoot>
           <tr className="font-semibold border-t-2 border-slate-200">
             <td colSpan={3} className="py-3 pr-2">
-              Total ({items.length} items)
+              Box total ({items.length} dress{items.length === 1 ? "" : "es"})
             </td>
             <td className="py-3 pr-2 text-right">Rs {totalPkr.toLocaleString("en-GB")}</td>
             <td className="py-3 text-right">{formatPrice(String(totalGbp))}</td>

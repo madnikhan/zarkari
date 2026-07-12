@@ -23,6 +23,7 @@ import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
 import { CustomerCard } from "@/components/boms/CustomerCard";
 import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
+import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -113,6 +114,12 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       <div className="mb-4">
         <OrderSummaryGrid rows={summaryRows} />
       </div>
+
+      {order.measurements && (
+        <div className="mb-4">
+          <MeasurementsReadOnly measurements={order.measurements} />
+        </div>
+      )}
 
       <div className="boms-card p-5 mb-4">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Actions</h2>

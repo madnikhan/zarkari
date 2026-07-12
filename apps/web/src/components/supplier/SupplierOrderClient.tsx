@@ -15,6 +15,7 @@ import { SupplierMessagesPanel } from "@/components/supplier/SupplierMessagesPan
 import type { CustomerMessage } from "@/lib/data/seed";
 import { CheckCircle } from "lucide-react";
 import { CustomerOrderProgressTracker } from "@/components/customer/OrderProgressTracker";
+import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClientFirestore } from "@/lib/firebase/client";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
@@ -199,6 +200,12 @@ export function SupplierOrderClient({
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Order Journey</h2>
         <CustomerOrderProgressTracker status={order.status} />
       </div>
+
+      {order.measurements && (
+        <div className="mb-6">
+          <MeasurementsReadOnly measurements={order.measurements} />
+        </div>
+      )}
 
       {canUndo && !canAccept && !order.supplierLocked && (
         <div className="mb-6">

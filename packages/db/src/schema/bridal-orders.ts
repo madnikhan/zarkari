@@ -48,6 +48,7 @@ export const bridalOrders = pgTable(
     size: text("size"),
     comments: text("comments"),
     customisationNotes: text("customisation_notes"),
+    measurements: jsonb("measurements"),
     filesUnlockedAt: timestamp("files_unlocked_at"),
     lastSupplierActionAt: timestamp("last_supplier_action_at"),
     supplierLocked: boolean("supplier_locked").default(false).notNull(),
