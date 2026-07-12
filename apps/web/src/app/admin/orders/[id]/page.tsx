@@ -22,6 +22,7 @@ import { OrderMessagesLive } from "@/components/admin/OrderMessagesLive";
 import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
 import { CustomerCard } from "@/components/boms/CustomerCard";
 import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
+import { InvoiceActions } from "@/components/admin/InvoiceActions";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 
@@ -110,6 +111,18 @@ export default async function AdminOrderDetailPage({ params }: Props) {
           />
         </div>
       )}
+
+      <div className="boms-card p-4 mb-4">
+        <h2 className="text-xs font-semibold uppercase text-slate-500 mb-3">Invoice</h2>
+        <InvoiceActions
+          kind="bridal"
+          orderId={order.id}
+          orderNumber={order.orderNumber}
+          customerName={customer?.name}
+          customerPhone={customer?.phone}
+          size="sm"
+        />
+      </div>
 
       <div className="mb-4">
         <OrderSummaryGrid rows={summaryRows} />

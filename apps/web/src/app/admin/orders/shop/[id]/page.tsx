@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRetailOrderByIdDb } from "@/lib/db/retail-orders";
 import { RetailOrderStatusSelect } from "@/components/admin/RetailOrderStatusSelect";
+import { InvoiceActions } from "@/components/admin/InvoiceActions";
 import { MEASUREMENT_FIELDS, formatInches } from "@/lib/sizing";
 import { formatPrice } from "@/lib/utils";
 
@@ -44,6 +45,17 @@ export default async function ShopOrderDetailPage({ params }: Props) {
           </p>
         </div>
         <RetailOrderStatusSelect orderId={order.id} currentStatus={order.status} />
+      </div>
+
+      <div className="boms-card p-5 mb-4">
+        <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">Invoice</h2>
+        <InvoiceActions
+          kind="retail"
+          orderId={order.id}
+          orderNumber={order.orderNumber}
+          customerName={order.customerName}
+          customerPhone={order.customerPhone}
+        />
       </div>
 
       <div className="boms-card p-5 mb-4 space-y-2">

@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
+import {
+  STORE_ADDRESS_ONE_LINE,
+  STORE_PHONE_DISPLAY,
+  STORE_SITE_URL,
+  getPublicWhatsAppDigits,
+} from "@/lib/brand/store-contact";
 
 const footerLinks = {
   shop: [
@@ -16,7 +22,7 @@ const footerLinks = {
 };
 
 export function Footer() {
-  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+  const whatsapp = getPublicWhatsAppDigits();
 
   return (
     <footer className="bg-charcoal text-cream mt-auto">
@@ -26,9 +32,24 @@ export function Footer() {
             <div className="mb-4">
               <ZarkariLogo size="md" variant="light" />
             </div>
-            <p className="text-cream/60 text-sm leading-relaxed mb-4">
+            <p className="text-cream/60 text-sm leading-relaxed mb-3">
               Designer formal wear from the ZARKARI catalogue.
             </p>
+            <p className="text-cream/60 text-sm leading-relaxed mb-1">{STORE_ADDRESS_ONE_LINE}</p>
+            <p className="text-cream/60 text-sm mb-3">
+              <a
+                href={`tel:${STORE_PHONE_DISPLAY.replace(/\s/g, "")}`}
+                className="hover:text-gold transition-colors"
+              >
+                {STORE_PHONE_DISPLAY}
+              </a>
+            </p>
+            <a
+              href={STORE_SITE_URL}
+              className="block text-sm text-cream/60 hover:text-gold transition-colors mb-3"
+            >
+              {STORE_SITE_URL.replace(/^https?:\/\//, "")}
+            </a>
             {whatsapp && (
               <a
                 href={`https://wa.me/${whatsapp}`}
@@ -66,8 +87,12 @@ export function Footer() {
             &copy; {new Date().getFullYear()} ZARKARI. All rights reserved.
           </p>
           <div className="flex gap-6 text-xs text-cream/40">
-            <Link href="/pages/privacy" className="hover:text-cream transition-colors">Privacy</Link>
-            <Link href="/pages/terms" className="hover:text-cream transition-colors">Terms</Link>
+            <Link href="/pages/privacy" className="hover:text-cream transition-colors">
+              Privacy
+            </Link>
+            <Link href="/pages/terms" className="hover:text-cream transition-colors">
+              Terms
+            </Link>
           </div>
         </div>
       </div>

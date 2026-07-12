@@ -58,8 +58,11 @@ export const staticPages: StaticPage[] = [
     content: `
       <p>We'd love to hear from you. Whether you have a question about sizing, an order, or our catalogue — our team is here to help.</p>
       <ul>
+        <li><strong>Address:</strong> 438-A Stratford Road, B11 4AD Birmingham UK</li>
+        <li><strong>Phone:</strong> <a href="tel:+447863176321">+44 7863 176321</a></li>
         <li><strong>Email:</strong> hello@zarkari.co.uk</li>
-        <li><strong>WhatsApp:</strong> Available via the chat button on our website</li>
+        <li><strong>WhatsApp:</strong> <a href="https://wa.me/447863176321">+44 7863 176321</a></li>
+        <li><strong>Website:</strong> <a href="https://zarkari.co.uk">https://zarkari.co.uk</a></li>
       </ul>
       <p>We aim to respond to all enquiries within 24 hours during business days (Monday–Friday, 9am–5pm GMT).</p>
     `,

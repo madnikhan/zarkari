@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
 import { formatPrice } from "@/lib/utils";
+import { InvoiceActions } from "@/components/admin/InvoiceActions";
 
 type ProductOption = {
   id: string;
@@ -31,9 +32,16 @@ export function WalkInSaleForm({ open, onClose, onCreated }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [completed, setCompleted] = useState<{
+    id: string;
+    orderNumber: string;
+    customerName?: string;
+    customerPhone?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setCompleted(null);
     fetch("/api/stock")
       .then((r) => r.json())
       .then(async (d) => {
@@ -89,6 +97,15 @@ export function WalkInSaleForm({ open, onClose, onCreated }: Props) {
     return sum + parseFloat(variant.price) * line.quantity;
   }, 0);
 
+  function resetAndClose() {
+    setLines([{ productId: "", size: "M", quantity: 1 }]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCompleted(null);
+    setError("");
+    onClose();
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -115,10 +132,12 @@ export function WalkInSaleForm({ open, onClose, onCreated }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
       onCreated();
-      onClose();
-      setLines([{ productId: "", size: "M", quantity: 1 }]);
-      setCustomerName("");
-      setCustomerPhone("");
+      setCompleted({
+        id: data.order.id,
+        orderNumber: data.order.orderNumber,
+        customerName: data.order.customerName ?? customerName,
+        customerPhone: data.order.customerPhone ?? customerPhone,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -132,106 +151,140 @@ export function WalkInSaleForm({ open, onClose, onCreated }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-slate-100 sticky top-0 bg-white">
-          <h2 className="font-semibold text-slate-900">Walk-in sale</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <h2 className="font-semibold text-slate-900">
+            {completed ? "Sale complete" : "Walk-in sale"}
+          </h2>
+          <button type="button" onClick={resetAndClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <form onSubmit={submit} className="p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500 uppercase">Customer name</label>
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                placeholder="Optional"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 uppercase">Phone</label>
-              <input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                placeholder="Optional"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="text-xs text-slate-500 uppercase">Payment</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card")}
-              className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        {completed ? (
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-slate-600">
+              Order <span className="font-mono font-medium text-slate-900">{completed.orderNumber}</span>{" "}
+              recorded. Download, print, or WhatsApp the invoice now.
+            </p>
+            <InvoiceActions
+              kind="retail"
+              orderId={completed.id}
+              orderNumber={completed.orderNumber}
+              customerName={completed.customerName}
+              customerPhone={completed.customerPhone}
+            />
+            <button
+              type="button"
+              onClick={resetAndClose}
+              className="w-full py-2.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
             >
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-            </select>
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500 uppercase">Items</p>
-            {lines.map((line, index) => {
-              const product = products.find((p) => p.id === line.productId);
-              return (
-                <div key={index} className="border border-slate-100 rounded-lg p-3 space-y-2">
-                  <select
-                    value={line.productId}
-                    onChange={(e) => updateLine(index, { productId: e.target.value })}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    required={index === 0}
-                  >
-                    <option value="">Select product…</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex gap-2 items-center">
-                    <select
-                      value={line.size}
-                      onChange={(e) => updateLine(index, { size: e.target.value as StandardSizeKey })}
-                      className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    >
-                      {STANDARD_SIZES.map((s) => {
-                        const stock = product?.variants.find((v) => v.size === s)?.inventoryQty ?? 0;
-                        return (
-                          <option key={s} value={s} disabled={stock <= 0}>
-                            {s} ({stock} in stock)
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <input
-                      type="number"
-                      min={1}
-                      value={line.quantity}
-                      onChange={(e) => updateLine(index, { quantity: parseInt(e.target.value, 10) || 1 })}
-                      className="w-16 border border-slate-200 rounded-lg px-2 py-2 text-sm text-center"
-                    />
-                    {lines.length > 1 && (
-                      <button type="button" onClick={() => removeLine(index)} className="text-slate-400 hover:text-red-500">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <button type="button" onClick={addLine} className="text-sm text-[#4C3BCF] flex items-center gap-1">
-              <Plus className="h-4 w-4" /> Add item
+              Done
             </button>
           </div>
+        ) : (
+          <form onSubmit={submit} className="p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 uppercase">Customer name</label>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 uppercase">Phone</label>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="For WhatsApp invoice"
+                />
+              </div>
+            </div>
 
-          <p className="text-lg font-semibold">Total: {formatPrice(total.toFixed(2))}</p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={loading} className="boms-btn-primary w-full py-2.5 rounded-lg text-sm disabled:opacity-50">
-            {loading ? "Processing…" : "Complete sale"}
-          </button>
-        </form>
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Payment</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card")}
+                className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500 uppercase">Items</p>
+              {lines.map((line, index) => {
+                const product = products.find((p) => p.id === line.productId);
+                return (
+                  <div key={index} className="border border-slate-100 rounded-lg p-3 space-y-2">
+                    <select
+                      value={line.productId}
+                      onChange={(e) => updateLine(index, { productId: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      required={index === 0}
+                    >
+                      <option value="">Select product…</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value={line.size}
+                        onChange={(e) => updateLine(index, { size: e.target.value as StandardSizeKey })}
+                        className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        {STANDARD_SIZES.map((s) => {
+                          const stock = product?.variants.find((v) => v.size === s)?.inventoryQty ?? 0;
+                          return (
+                            <option key={s} value={s} disabled={stock <= 0}>
+                              {s} ({stock} in stock)
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        value={line.quantity}
+                        onChange={(e) => updateLine(index, { quantity: parseInt(e.target.value, 10) || 1 })}
+                        className="w-16 border border-slate-200 rounded-lg px-2 py-2 text-sm text-center"
+                      />
+                      {lines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeLine(index)}
+                          className="text-slate-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <button type="button" onClick={addLine} className="text-sm text-[#4C3BCF] flex items-center gap-1">
+                <Plus className="h-4 w-4" /> Add item
+              </button>
+            </div>
+
+            <p className="text-lg font-semibold">Total: {formatPrice(total.toFixed(2))}</p>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="boms-btn-primary w-full py-2.5 rounded-lg text-sm disabled:opacity-50"
+            >
+              {loading ? "Processing…" : "Complete sale"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

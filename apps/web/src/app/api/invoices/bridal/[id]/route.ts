@@ -1,22 +1,30 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth/session";
 import { getBridalOrderById, getCustomer, getPayments } from "@/lib/data";
-import { cookies } from "next/headers";
 import { bridalOrderToInvoice } from "@/lib/invoices/build-invoice-data";
 import { renderStoreInvoiceHtml } from "@/lib/invoices/store-invoice-html";
+import { verifyInvoiceToken } from "@/lib/invoices/invoice-token";
 
-export async function GET(request: Request) {
-  const orderId = new URL(request.url).searchParams.get("orderId");
-  if (!orderId) return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
-  const store = await cookies();
-  if (store.get("zarkari-customer-order")?.value !== orderId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(request: Request, { params }: Props) {
+  const { id } = await params;
+  const token = new URL(request.url).searchParams.get("t");
+  const session = await getSession();
+  const isStaff = session?.role === "owner" || session?.role === "staff";
+
+  if (!isStaff) {
+    if (!token || !(await verifyInvoiceToken(token, "bridal", id))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
-  const order = await getBridalOrderById(orderId);
+  const order = await getBridalOrderById(id);
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const [customer, payments] = await Promise.all([getCustomer(order.customerId), getPayments(orderId)]);
+  const [customer, payments] = await Promise.all([getCustomer(order.customerId), getPayments(id)]);
   const data = bridalOrderToInvoice(order, customer?.name ?? "Customer", customer?.phone);
   const methods = payments.map((p) => (p.method ?? "").toLowerCase());
   data.paymentCash = methods.some((m) => m.includes("cash"));
