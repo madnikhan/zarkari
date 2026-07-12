@@ -22,11 +22,10 @@ export default async function SupplierOrderPage({ params }: Props) {
   const order = await getBridalOrderById(id);
   if (!order || order.supplierId !== session.supplierId) notFound();
 
-  const filesUnlocked = !!order.filesUnlockedAt;
   const [customer, timeline, files, supplierMessages, { orders: otherOrders }] = await Promise.all([
     getCustomer(order.customerId),
     getTimeline(order.id),
-    getOrderFiles(order.id, filesUnlocked),
+    getOrderFiles(order.id, true),
     getSupplierMessages(order.id),
     getBridalOrdersWithRelations({
       supplierId: session.supplierId,

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
-  getBridalOrderById,
   getBridalOrderByNumber,
   getOrderFiles,
   getCustomerMessages,
+  getCancellations,
+  getRefunds,
 } from "@/lib/data";
 
 export async function GET(request: Request) {
@@ -19,10 +20,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Please verify your order first" }, { status: 401 });
   }
 
-  const [files, messages] = await Promise.all([
+  const [files, messages, cancellations, refunds] = await Promise.all([
     getOrderFiles(order.id, true),
     getCustomerMessages(order.id),
+    getCancellations(order.id),
+    getRefunds(order.id),
   ]);
+
+  const cancellationReason =
+    cancellations.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0]?.reason ?? undefined;
+  const refundReason =
+    refunds.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+      ?.reason ?? undefined;
 
   import("@/lib/firebase/sync")
     .then((m) => {
@@ -33,5 +44,11 @@ export async function GET(request: Request) {
     })
     .catch(console.error);
 
-  return NextResponse.json({ order, files, messages });
+  return NextResponse.json({
+    order,
+    files,
+    messages,
+    cancellationReason,
+    refundReason,
+  });
 }

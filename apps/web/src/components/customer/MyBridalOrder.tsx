@@ -13,6 +13,8 @@ interface MyBridalOrderProps {
   order: BridalOrder;
   files: OrderFile[];
   messages: CustomerMessage[];
+  cancellationReason?: string;
+  refundReason?: string;
   onSendMessage: (message: string) => Promise<boolean>;
   messageError?: string;
   sending?: boolean;
@@ -22,10 +24,38 @@ export function MyBridalOrder({
   order,
   files,
   messages,
+  cancellationReason,
+  refundReason,
   onSendMessage,
   messageError,
   sending,
 }: MyBridalOrderProps) {
+  if (order.status === "cancelled" || order.status === "refunded") {
+    const isCancelled = order.status === "cancelled";
+    const reason = isCancelled ? cancellationReason : refundReason;
+    return (
+      <div className="max-w-lg mx-auto py-8 px-2 text-center">
+        <p className="font-mono text-sm text-slate-500 mb-6">{order.orderNumber}</p>
+        <div className="rounded-2xl border-2 border-red-500 bg-red-50 px-6 py-12">
+          <p className="text-3xl sm:text-4xl font-bold uppercase tracking-wide text-red-600 leading-tight">
+            {isCancelled ? "Cancelled" : "Refunded"}
+          </p>
+          <p className="mt-4 text-base sm:text-lg font-medium text-red-800">
+            {isCancelled
+              ? "Your order has been cancelled"
+              : "Your order has been refunded"}
+          </p>
+          {reason?.trim() ? (
+            <p className="mt-6 text-sm text-red-900/80 max-w-sm mx-auto">
+              <span className="font-semibold">Reason: </span>
+              {reason.trim()}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   const designFiles = files.filter((f) => f.category === "design");
   const measurementFiles = files.filter((f) => f.category === "measurements");
   const progressFiles = files.filter(

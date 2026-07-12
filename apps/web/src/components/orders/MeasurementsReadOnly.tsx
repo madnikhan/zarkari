@@ -38,8 +38,22 @@ function Section({
   );
 }
 
-export function MeasurementsReadOnly({ measurements }: { measurements?: BridalMeasurements | null }) {
-  if (!hasAnyMeasurementValue(measurements)) return null;
+export function MeasurementsReadOnly({
+  measurements,
+  showEmpty = false,
+}: {
+  measurements?: BridalMeasurements | null;
+  showEmpty?: boolean;
+}) {
+  if (!hasAnyMeasurementValue(measurements)) {
+    if (!showEmpty) return null;
+    return (
+      <section className="boms-card p-4 lg:p-6">
+        <h2 className="text-sm font-semibold text-slate-900 mb-2">Measurements</h2>
+        <p className="text-sm text-slate-500">No measurements entered by the shop yet.</p>
+      </section>
+    );
+  }
   const m = measurements!;
 
   return (

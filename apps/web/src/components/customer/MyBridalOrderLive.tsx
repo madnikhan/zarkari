@@ -13,6 +13,8 @@ interface Props {
   order: BridalOrder;
   files: Parameters<typeof MyBridalOrder>[0]["files"];
   initialMessages: CustomerMessage[];
+  cancellationReason?: string;
+  refundReason?: string;
   onSendMessage: (message: string) => Promise<boolean>;
 }
 
@@ -20,6 +22,8 @@ export function MyBridalOrderLive({
   order,
   files,
   initialMessages,
+  cancellationReason,
+  refundReason,
   onSendMessage,
 }: Props) {
   const { ready } = useFirebaseAuth();
@@ -89,6 +93,8 @@ export function MyBridalOrderLive({
       order={liveOrder}
       files={files}
       messages={messages}
+      cancellationReason={cancellationReason}
+      refundReason={refundReason}
       onSendMessage={handleSend}
       messageError={messageError}
       sending={sending}

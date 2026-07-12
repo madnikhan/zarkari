@@ -30,10 +30,14 @@ interface Props {
   defaultType?: CashTransactionType;
 }
 
-const ORDER_LINKED_TYPES: CashTransactionType[] = ["order_deposit", "order_collection", "refund"];
+const ORDER_LINKED_TYPES: CashTransactionType[] = ["order_collection", "refund"];
 
 function needsOrderPicker(type: CashTransactionType): boolean {
   return ORDER_LINKED_TYPES.includes(type);
+}
+
+function needsManualOrderNumber(type: CashTransactionType): boolean {
+  return type === "order_deposit";
 }
 
 export function AddTransactionModal({ open, onClose, date, direction, defaultType }: Props) {
@@ -89,14 +93,29 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
 
   const types = direction === "in" ? CASH_IN_TYPES : CASH_OUT_TYPES;
   const showOrderPicker = needsOrderPicker(type);
+  const showManualOrderNumber = needsManualOrderNumber(type);
   const showSupplierPicker = type === "supplier_payment";
   const showExpenseCategory = type === "business_expense";
   const selectedOrder = payableOrders.find((o) => o.id === orderId);
+
+  const filteredOrders = (() => {
+    if (!showOrderPicker) return payableOrders;
+    const q = reference.trim().toLowerCase();
+    if (!q || orderId) return payableOrders;
+    return payableOrders.filter(
+      (o) =>
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customerName.toLowerCase().includes(q)
+    );
+  })();
 
   function handleTypeChange(next: CashTransactionType) {
     setType(next);
     if (!needsOrderPicker(next)) {
       setOrderId("");
+    }
+    if (!needsManualOrderNumber(next) && !needsOrderPicker(next)) {
+      setReference("");
     }
     if (next !== "supplier_payment") {
       setSupplierId("");
@@ -129,6 +148,9 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       if (showOrderPicker && !orderId) {
         throw new Error("Please select an order / invoice number");
       }
+      if (showManualOrderNumber && !reference.trim()) {
+        throw new Error("Please enter an order / invoice number");
+      }
       if (showSupplierPicker && !supplierId) {
         throw new Error("Please select a supplier");
       }
@@ -140,13 +162,48 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
         throw new Error("Please enter an amount");
       }
 
-      if ((type === "order_deposit" || type === "order_collection") && orderId) {
-        const paymentType = type === "order_deposit" ? "deposit" : "balance";
+      if (type === "order_deposit") {
+        const matched =
+          payableOrders.find(
+            (o) => o.orderNumber.toLowerCase() === reference.trim().toLowerCase()
+          ) ?? null;
+        if (matched) {
+          const res = await fetch(`/api/orders/${matched.id}/payment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "deposit",
+              amount,
+              method: method === "cash" ? "cash" : "card",
+              businessDate: date,
+              description: description || matched.customerName,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Failed to save payment");
+        } else {
+          const res = await fetch("/api/cash/transactions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              direction,
+              type: "order_deposit",
+              amount,
+              method,
+              reference: reference.trim(),
+              description: description || undefined,
+              businessDate: date,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Failed to save");
+        }
+      } else if (type === "order_collection" && orderId) {
         const res = await fetch(`/api/orders/${orderId}/payment`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type: paymentType,
+            type: "balance",
             amount,
             method: method === "cash" ? "cash" : "card",
             businessDate: date,
@@ -216,24 +273,59 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             </select>
           </div>
 
+          {showManualOrderNumber && (
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Order / Invoice</label>
+              <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                required
+                placeholder="Enter order / invoice number"
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Type the order number manually. If it matches an order in the system, the deposit will update that order too.
+              </p>
+            </div>
+          )}
+
           {showOrderPicker && (
             <div>
               <label className="text-xs text-slate-500 uppercase">Order / Invoice</label>
-              <select
-                value={orderId}
-                onChange={(e) => handleOrderSelect(e.target.value)}
+              <input
+                list="payable-orders-list"
+                value={
+                  orderId
+                    ? `${selectedOrder?.orderNumber ?? ""} — ${selectedOrder?.customerName ?? ""}`
+                    : reference
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const match = payableOrders.find(
+                    (o) =>
+                      `${o.orderNumber} — ${o.customerName}` === val ||
+                      o.orderNumber.toLowerCase() === val.trim().toLowerCase()
+                  );
+                  if (match) {
+                    handleOrderSelect(match.id);
+                  } else {
+                    setOrderId("");
+                    setReference(val);
+                    setDescription("");
+                  }
+                }}
                 required
+                placeholder={loadingOrders ? "Loading orders…" : "Select customer order…"}
                 className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">
-                  {loadingOrders ? "Loading orders…" : "Select customer order…"}
-                </option>
-                {payableOrders.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.orderNumber} — {o.customerName} ({formatPrice(o.remainingBalance)} due)
-                  </option>
+              />
+              <datalist id="payable-orders-list">
+                {filteredOrders.map((o) => (
+                  <option
+                    key={o.id}
+                    value={`${o.orderNumber} — ${o.customerName}`}
+                  >{`${formatPrice(o.remainingBalance)} due`}</option>
                 ))}
-              </select>
+              </datalist>
               {selectedOrder && (
                 <p className="text-xs text-slate-500 mt-1">
                   Total {formatPrice(selectedOrder.totalPrice)} · Paid {formatPrice(selectedOrder.depositPaid)} ·
@@ -345,7 +437,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             </div>
           </div>
 
-          {!showOrderPicker && (
+          {!showOrderPicker && !showManualOrderNumber && (
             <div>
               <label className="text-xs text-slate-500 uppercase">Reference</label>
               <input
@@ -362,7 +454,13 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={showOrderPicker ? "Customer name (auto-filled from order)" : "Optional note"}
+              placeholder={
+                showOrderPicker
+                  ? "Customer name (auto-filled from order)"
+                  : showManualOrderNumber
+                    ? "Customer name or note"
+                    : "Optional note"
+              }
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>

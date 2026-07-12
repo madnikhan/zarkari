@@ -12,6 +12,8 @@ export default function MyOrderDetailPage({ params }: Props) {
   const [order, setOrder] = useState<BridalOrder | null>(null);
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
+  const [cancellationReason, setCancellationReason] = useState<string | undefined>();
+  const [refundReason, setRefundReason] = useState<string | undefined>();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -24,6 +26,8 @@ export default function MyOrderDetailPage({ params }: Props) {
             setOrder(data.order);
             setFiles(data.files ?? []);
             setMessages(data.messages ?? []);
+            setCancellationReason(data.cancellationReason);
+            setRefundReason(data.refundReason);
           }
         });
     });
@@ -54,6 +58,8 @@ export default function MyOrderDetailPage({ params }: Props) {
       order={order}
       files={files}
       initialMessages={messages}
+      cancellationReason={cancellationReason}
+      refundReason={refundReason}
       onSendMessage={onSendMessage}
     />
   );

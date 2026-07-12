@@ -166,6 +166,8 @@ export function SupplierOrderClient({
   }
 
   const filesUnlocked = !!order.filesUnlockedAt;
+  const filesVisible = true; // suppliers can view design/measurement files before accept
+  const productionUnlocked = filesUnlocked;
   const canAccept = order.status === "sent_to_supplier";
   const currentStageIdx = PRODUCTION_STAGES.indexOf(order.status as (typeof PRODUCTION_STAGES)[number]);
   const canComplete = order.status === "delivered_to_shop" || order.status === "shipping";
@@ -179,7 +181,7 @@ export function SupplierOrderClient({
       <div className="p-8 text-center max-w-sm mx-auto">
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-xl font-semibold text-slate-900 mb-2">Order Accepted</h1>
-        <p className="text-sm text-slate-500 mb-6">You can now view order files and begin production.</p>
+        <p className="text-sm text-slate-500 mb-6">You can now begin production stages.</p>
         <button type="button" onClick={() => setAccepted(false)} className="boms-btn-primary px-6 py-2.5 rounded-lg text-sm">
           Continue
         </button>
@@ -201,11 +203,9 @@ export function SupplierOrderClient({
         <CustomerOrderProgressTracker status={order.status} />
       </div>
 
-      {order.measurements && (
-        <div className="mb-6">
-          <MeasurementsReadOnly measurements={order.measurements} />
-        </div>
-      )}
+      <div className="mb-6">
+        <MeasurementsReadOnly measurements={order.measurements} showEmpty />
+      </div>
 
       {canUndo && !canAccept && !order.supplierLocked && (
         <div className="mb-6">
@@ -267,21 +267,23 @@ export function SupplierOrderClient({
         </div>
       )}
 
-      {filesUnlocked ? (
+      {filesVisible ? (
         <section className="boms-card p-4 mb-6">
           <h2 className="text-sm font-semibold mb-3">Order Files</h2>
           <p className="text-xs text-slate-500 mb-3">Tap a thumbnail to view the full image or video.</p>
-          <OrderFileGallery files={files} columns={2} />
+          {files.length ? (
+            <OrderFileGallery files={files} columns={2} />
+          ) : (
+            <p className="text-sm text-slate-500">No design or measurement files attached yet.</p>
+          )}
         </section>
-      ) : canAccept ? null : (
-        <p className="text-sm text-slate-500 boms-card p-4 mb-6">Files unlock after you accept this order.</p>
-      )}
+      ) : null}
 
-      {filesUnlocked && (
+      {productionUnlocked && (
         <SupplierMessagesPanel orderId={order.id} initialMessages={supplierMessages} />
       )}
 
-      {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
         <section className="boms-card p-4 mb-6">
           <h2 className="text-sm font-semibold mb-1">Send progress update</h2>
           <p className="text-xs text-slate-500 mb-3">
@@ -308,7 +310,7 @@ export function SupplierOrderClient({
         </section>
       )}
 
-      {filesUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
         <section className="boms-card p-4 mb-6">
           <h2 className="text-sm font-semibold text-slate-900 mb-3">Production Stages</h2>
           <ProductionStageStepper
