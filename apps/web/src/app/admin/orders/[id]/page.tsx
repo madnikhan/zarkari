@@ -25,6 +25,9 @@ import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
 import { InvoiceActions } from "@/components/admin/InvoiceActions";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
+import { BridalOrderEditSection } from "@/components/admin/BridalOrderEditSection";
+import { OrderMarginCard } from "@/components/admin/OrderMarginCard";
+import { getOrderMarginForOrderDb } from "@/lib/db/order-margins";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -36,7 +39,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   const order = await getBridalOrderById(id);
   if (!order) notFound();
 
-  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments, customerMessages, supplierMessages, pendingUpdates] =
+  const [customer, supplier, timeline, files, redesigns, cancellations, refunds, payments, customerMessages, supplierMessages, pendingUpdates, margin] =
     await Promise.all([
       getCustomer(order.customerId),
       order.supplierId ? getSupplier(order.supplierId) : null,
@@ -49,6 +52,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       getCustomerMessages(order.id),
       getSupplierMessages(order.id),
       getPendingSupplierUpdates(order.id),
+      getOrderMarginForOrderDb(order.id, order.totalPrice),
     ]);
 
   if (pendingUpdates.length) {
@@ -127,6 +131,12 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       <div className="mb-4">
         <OrderSummaryGrid rows={summaryRows} />
       </div>
+
+      <OrderMarginCard margin={margin} />
+
+      {(session?.role === "owner" || session?.role === "staff") && (
+        <BridalOrderEditSection order={order} />
+      )}
 
       {order.measurements && (
         <div className="mb-4">

@@ -15,6 +15,8 @@ export interface CargoBoxItem {
   costGbp: string;
   exchangeRate?: string;
   sortOrder: number;
+  imageUrl?: string;
+  imageKey?: string;
   createdAt: string;
 }
 

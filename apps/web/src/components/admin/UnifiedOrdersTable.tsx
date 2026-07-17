@@ -6,7 +6,7 @@ import type { UnifiedOrder } from "@/lib/db/unified-orders";
 const TYPE_LABELS: Record<UnifiedOrder["type"], string> = {
   custom: "Custom",
   online: "Online",
-  walk_in: "Walk-in",
+  walk_in: "Ready-made Sale",
 };
 
 const TYPE_STYLES: Record<UnifiedOrder["type"], string> = {

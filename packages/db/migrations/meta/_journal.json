@@ -8,6 +8,13 @@
       "when": 1783356524848,
       "tag": "0000_sleepy_ben_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783356524849,
+      "tag": "0001_cargo_item_image",
+      "breakpoints": true
     }
   ]
 }

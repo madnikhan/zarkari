@@ -881,3 +881,89 @@ export async function recordPayment(
     });
   }
 }
+
+export async function editBridalOrder(
+  orderId: string,
+  input: {
+    dressType?: string;
+    customisationNotes?: string;
+    deliveryDate?: string;
+    totalPrice?: string;
+    depositPaid?: string;
+    measurements?: import("@/lib/measurements/bridal-form").BridalMeasurements | null;
+    extraCharge?: { label: string; amountGbp: string };
+    performedByName?: string;
+  }
+): Promise<BridalOrder | null> {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+
+  let totalPrice = order.totalPrice;
+  let depositPaid = order.depositPaid;
+  let customisationNotes = order.customisationNotes ?? order.comments ?? "";
+  let remainingBalance = order.remainingBalance;
+
+  if (input.extraCharge) {
+    const bump = parseFloat(input.extraCharge.amountGbp);
+    if (!Number.isFinite(bump) || bump <= 0) {
+      throw new Error("Extra charge amount must be greater than zero");
+    }
+    totalPrice = (parseFloat(totalPrice) + bump).toFixed(2);
+    remainingBalance = (parseFloat(remainingBalance) + bump).toFixed(2);
+    const line = `Extra: ${input.extraCharge.label} +£${bump.toFixed(2)}`;
+    customisationNotes = customisationNotes ? `${customisationNotes}\n${line}` : line;
+    await syncTimeline(orderId, "stage_update", {
+      comment: line,
+      performedByName: input.performedByName,
+      performedByRole: "staff",
+    });
+  } else {
+    if (input.totalPrice !== undefined) totalPrice = input.totalPrice;
+    if (input.depositPaid !== undefined) depositPaid = input.depositPaid;
+    const total = parseFloat(totalPrice) || 0;
+    const deposit = parseFloat(depositPaid) || 0;
+    remainingBalance = Math.max(0, total - deposit).toFixed(2);
+  }
+
+  const patch: Partial<BridalOrder> = {
+    totalPrice,
+    depositPaid,
+    remainingBalance,
+    customisationNotes: customisationNotes || undefined,
+  };
+  if (input.dressType !== undefined) patch.dressType = input.dressType;
+  if (input.deliveryDate !== undefined) patch.deliveryDate = new Date(input.deliveryDate).toISOString();
+  if (input.measurements !== undefined) patch.measurements = input.measurements ?? undefined;
+  if (!input.extraCharge && input.customisationNotes !== undefined) {
+    patch.customisationNotes = input.customisationNotes;
+  }
+
+  Object.assign(order, patch);
+
+  if (isDbConfigured()) {
+    const { updateBridalOrderDb } = await import("@/lib/db/bridal-orders");
+    const dbPatch: Parameters<typeof updateBridalOrderDb>[1] = {
+      totalPrice,
+      depositPaid,
+      remainingBalance,
+      customisationNotes: patch.customisationNotes ?? null,
+    };
+    if (input.dressType !== undefined) dbPatch.dressType = input.dressType || null;
+    if (input.deliveryDate) dbPatch.deliveryDate = new Date(input.deliveryDate);
+    if (input.measurements !== undefined) dbPatch.measurements = input.measurements;
+    if (!input.extraCharge && input.customisationNotes !== undefined) {
+      dbPatch.customisationNotes = input.customisationNotes || null;
+    }
+    await updateBridalOrderDb(orderId, dbPatch);
+  }
+
+  if (input.deliveryDate) {
+    const { syncOrderLive } = await import("@/lib/firebase/sync");
+    await syncOrderLive(orderId, {
+      status: order.status,
+      deliveryDate: order.deliveryDate,
+    }).catch(console.error);
+  }
+
+  return order;
+}

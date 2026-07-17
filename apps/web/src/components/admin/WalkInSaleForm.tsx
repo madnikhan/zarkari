@@ -152,7 +152,7 @@ export function WalkInSaleForm({ open, onClose, onCreated }: Props) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-slate-100 sticky top-0 bg-white">
           <h2 className="font-semibold text-slate-900">
-            {completed ? "Sale complete" : "Walk-in sale"}
+            {completed ? "Sale complete" : "Ready-made Sale"}
           </h2>
           <button type="button" onClick={resetAndClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />

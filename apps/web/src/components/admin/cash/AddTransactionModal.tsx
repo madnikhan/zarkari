@@ -376,12 +376,11 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
                   className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Select category…</option>
-                  <option value="Rent">Rent</option>
-                  <option value="Utilities">Utilities</option>
-                  <option value="Staff wages">Staff wages</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Travel">Travel</option>
-                  <option value="Cargo / freight">Cargo / freight</option>
+                  <option value="Electricity bill">Electricity bill</option>
+                  <option value="Water bill">Water bill</option>
+                  <option value="Food">Food</option>
+                  <option value="Worker wages">Worker wages</option>
+                  <option value="Partner's wages">Partner&apos;s wages</option>
                   <option value="Other">Other</option>
                 </select>
               </div>

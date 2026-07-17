@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, lte, lt, notInArray, sql } from "drizzle-orm";
 import { getDb, schema } from "./index";
+import type { OrderMarginsSummary } from "@/lib/finance/order-margin";
 
 export type CashDirection = "in" | "out";
 export type CashTransactionType =
@@ -774,6 +775,7 @@ export interface ProfitAndLossReport {
     totalCosts: number;
     netProfit: number;
   } | null;
+  orderMargins?: OrderMarginsSummary | null;
 }
 
 async function aggregatePnLRange(

@@ -42,7 +42,7 @@ export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export type CashPeriodPreset = "today" | "week" | "month" | "7d" | "30d" | "90d" | "custom";
+export type CashPeriodPreset = "today" | "week" | "month" | "year" | "7d" | "30d" | "90d" | "custom";
 
 export interface PeriodBounds {
   start: string;
@@ -118,6 +118,12 @@ export function resolvePeriodBounds(
       const start = startOfMonthFor(today);
       const end = endOfMonthFor(today);
       return { start, end, label: `This month · ${formatPeriodLabel(start, end)}`, preset };
+    }
+    case "year": {
+      const year = today.slice(0, 4);
+      const start = `${year}-01-01`;
+      const end = `${year}-12-31`;
+      return { start, end, label: `${year} · Annual report`, preset };
     }
     case "7d": {
       const start = shiftDate(today, -6);

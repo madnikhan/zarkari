@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { X } from "lucide-react";
 import { GbpPkrConverter } from "@/components/admin/suppliers/GbpPkrConverter";
 import { BridalOrderPicker } from "./BridalOrderPicker";
+import { MediaUploadZone, type UploadedFile } from "@/components/boms/MediaUploadZone";
 import type { CargoBoxItem } from "@/lib/cargo/demo-store";
 
 interface OrderResult {
@@ -32,6 +34,8 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
   const [amountGbp, setAmountGbp] = useState(item?.costGbp ?? "");
   const [amountPkr, setAmountPkr] = useState(item?.costPkr ?? "");
   const [exchangeRate, setExchangeRate] = useState(item?.exchangeRate ?? defaultExchangeRate ?? "");
+  const [imageUrl, setImageUrl] = useState(item?.imageUrl ?? "");
+  const [imageKey, setImageKey] = useState(item?.imageKey ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,6 +63,8 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
       costGbp: amountGbp || "0",
       costPkr: amountPkr || "0",
       exchangeRate: exchangeRate || undefined,
+      imageUrl: imageUrl || undefined,
+      imageKey: imageKey || undefined,
     };
     try {
       const url = isEdit
@@ -121,8 +127,42 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             />
             <p className="text-xs text-slate-400 mt-1">
-              Enter the dress name and its manufacturing cost price below.
+              Use a temporary name (e.g. &quot;Unknown packet&quot;) and add a photo to identify later.
             </p>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase">Item photo</label>
+            {imageUrl ? (
+              <div className="mt-2 flex items-start gap-3">
+                <div className="relative h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                  <Image src={imageUrl} alt="" fill sizes="80px" className="object-cover" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageUrl("");
+                    setImageKey("");
+                  }}
+                  className="text-xs text-red-600 hover:underline"
+                >
+                  Remove photo
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1">
+                <MediaUploadZone
+                  label="Upload photo"
+                  accept="image/*"
+                  category="cargo-item"
+                  showCameraButtons
+                  sizeHint="Photos up to 4 MB"
+                  onSingleUploaded={(file: UploadedFile) => {
+                    setImageUrl(file.url);
+                    setImageKey(file.name);
+                  }}
+                />
+              </div>
+            )}
           </div>
           <GbpPkrConverter
             amountGbp={amountGbp}

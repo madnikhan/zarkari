@@ -29,7 +29,7 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
     { key: "all", label: "All" },
     { key: "custom", label: "Custom" },
     { key: "online", label: "Online" },
-    { key: "walk_in", label: "Walk-in" },
+    { key: "walk_in", label: "Ready-made Sale" },
   ];
 
   const customTabs = [
@@ -81,7 +81,7 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
             onClick={() => setWalkInOpen(true)}
             className="px-4 py-2.5 rounded-lg text-sm font-medium border border-[#4C3BCF] text-[#4C3BCF] hover:bg-[#F4F3FF]"
           >
-            Walk-in sale
+            Ready-made Sale
           </button>
           <Link href="/admin/orders/new" className="boms-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium">
             New custom order

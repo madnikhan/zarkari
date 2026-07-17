@@ -13,9 +13,10 @@ import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
 import { SupplierMessagesPanel } from "@/components/supplier/SupplierMessagesPanel";
 import type { CustomerMessage } from "@/lib/data/seed";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Printer } from "lucide-react";
 import { CustomerOrderProgressTracker } from "@/components/customer/OrderProgressTracker";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
+import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClientFirestore } from "@/lib/firebase/client";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
@@ -195,7 +196,22 @@ export function SupplierOrderClient({
         ← All orders
       </Link>
       <p className="font-mono text-xs text-[#4C3BCF] mb-1">{order.orderNumber}</p>
-      <h1 className="text-xl font-semibold text-slate-900 mb-2">{customerName}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+        <h1 className="text-xl font-semibold text-slate-900">{customerName}</h1>
+        <CountdownBadge deliveryDate={order.deliveryDate} />
+      </div>
+      <p className="text-sm text-slate-500 mb-4">
+        Due {new Date(order.deliveryDate).toLocaleDateString("en-GB")}
+      </p>
+      <div className="mb-6">
+        <Link
+          href={`/supplier/orders/${order.id}/print`}
+          target="_blank"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          <Printer className="h-3.5 w-3.5" /> Print order
+        </Link>
+      </div>
       <OrderStatusLive orderId={order.id} initialStatus={order.status} className="mb-6" />
 
       <div className="boms-card p-5 mb-6">
@@ -206,6 +222,15 @@ export function SupplierOrderClient({
       <div className="mb-6">
         <MeasurementsReadOnly measurements={order.measurements} showEmpty />
       </div>
+
+      {(order.customisationNotes || order.comments) && (
+        <section className="boms-card p-4 mb-6">
+          <h2 className="text-sm font-semibold text-slate-900 mb-2">Customisation notes</h2>
+          <p className="text-sm text-slate-600 whitespace-pre-wrap">
+            {order.customisationNotes || order.comments}
+          </p>
+        </section>
+      )}
 
       {canUndo && !canAccept && !order.supplierLocked && (
         <div className="mb-6">

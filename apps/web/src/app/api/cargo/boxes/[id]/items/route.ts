@@ -28,6 +28,8 @@ export async function POST(request: Request, { params }: Params) {
     costPkr: body.costPkr ?? "0",
     costGbp: body.costGbp ?? "0",
     exchangeRate: body.exchangeRate,
+    imageUrl: body.imageUrl,
+    imageKey: body.imageKey,
   });
 
   if (!item) return NextResponse.json({ error: "Failed to add item" }, { status: 500 });

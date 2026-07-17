@@ -920,6 +920,12 @@ export async function updateBridalOrderDb(
     supplierLocked: boolean;
     remainingBalance: string;
     depositPaid: string;
+    totalPrice: string;
+    dressType: string | null;
+    customisationNotes: string | null;
+    comments: string | null;
+    deliveryDate: Date;
+    measurements: BridalMeasurements | null;
   }>
 ): Promise<void> {
   const db = getDb();

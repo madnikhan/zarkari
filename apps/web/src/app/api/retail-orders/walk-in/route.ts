@@ -85,7 +85,7 @@ export async function POST(request: Request) {
 
   try {
     const order = await createRetailOrderDb({
-      customerName: customerName || "Walk-in customer",
+      customerName: customerName || "Ready-made customer",
       customerPhone,
       customerEmail,
       source: "walk_in",

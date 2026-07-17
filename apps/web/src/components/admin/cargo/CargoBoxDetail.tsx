@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   Pencil,
@@ -475,6 +476,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                     aria-label="Select all items"
                   />
                 </th>
+                <th className="py-2.5 px-2 font-medium w-14">Photo</th>
                 <th className="py-2.5 px-2 font-medium">Date</th>
                 <th className="py-2.5 px-2 font-medium">Article Name</th>
                 <th className="py-2.5 px-2 font-medium">Order Number</th>
@@ -494,6 +496,15 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                         onChange={() => toggleItem(item.id)}
                         className="rounded border-slate-300"
                       />
+                    </td>
+                    <td className="py-2 px-2">
+                      {item.imageUrl ? (
+                        <div className="relative h-10 w-10 rounded overflow-hidden border border-slate-200 bg-slate-50">
+                          <Image src={item.imageUrl} alt="" fill sizes="40px" className="object-cover" />
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="py-2 px-2 text-slate-600 whitespace-nowrap">
                       {new Date(item.itemDate).toLocaleDateString("en-GB")}
@@ -539,7 +550,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
+                  <td colSpan={8} className="py-8 text-center text-slate-400 text-sm">
                     Add items with cost prices (PKR and GBP)
                   </td>
                 </tr>

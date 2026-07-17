@@ -14,7 +14,7 @@ export function retailOrderToInvoice(order: RetailOrder): StoreInvoiceData {
     serialNo: order.orderNumber,
     orderNumber: order.orderNumber,
     date: enGbDate(order.createdAt),
-    customerName: order.customerName?.trim() || "Walk-in customer",
+    customerName: order.customerName?.trim() || "Ready-made customer",
     customerPhone: order.customerPhone,
     descriptionLines: order.items.map((item) => ({
       description: item.sizeSelection?.label

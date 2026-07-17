@@ -42,5 +42,7 @@ export const cargoBoxItems = pgTable("cargo_box_items", {
   costGbp: decimal("cost_gbp", { precision: 12, scale: 2 }).default("0").notNull(),
   exchangeRate: decimal("exchange_rate", { precision: 12, scale: 4 }),
   sortOrder: integer("sort_order").default(0).notNull(),
+  imageUrl: text("image_url"),
+  imageKey: text("image_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

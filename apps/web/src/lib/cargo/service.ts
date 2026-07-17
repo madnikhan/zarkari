@@ -163,6 +163,8 @@ export async function addCargoBoxItem(input: {
   costPkr?: string;
   costGbp?: string;
   exchangeRate?: string;
+  imageUrl?: string;
+  imageKey?: string;
 }): Promise<CargoBoxItem | null> {
   if (isDbConfigured()) {
     const { addCargoBoxItemDb } = await import("@/lib/db/cargo-boxes");
@@ -178,6 +180,8 @@ export async function addCargoBoxItem(input: {
     costPkr: input.costPkr ?? "0",
     costGbp: input.costGbp ?? "0",
     exchangeRate: input.exchangeRate,
+    imageUrl: input.imageUrl,
+    imageKey: input.imageKey,
     sortOrder: demoCargoBoxItems.filter((i) => i.boxId === input.boxId).length,
     createdAt: new Date().toISOString(),
   };
@@ -195,6 +199,8 @@ export async function updateCargoBoxItem(
     costPkr: string;
     costGbp: string;
     exchangeRate: string;
+    imageUrl?: string;
+    imageKey?: string;
   }>
 ): Promise<CargoBoxItem | null> {
   if (isDbConfigured()) {

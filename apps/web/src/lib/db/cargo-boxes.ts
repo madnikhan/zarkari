@@ -21,6 +21,8 @@ function mapItem(
     costGbp: row.costGbp,
     exchangeRate: row.exchangeRate ?? undefined,
     sortOrder: row.sortOrder,
+    imageUrl: row.imageUrl ?? undefined,
+    imageKey: row.imageKey ?? undefined,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -250,6 +252,8 @@ export async function addCargoBoxItemDb(input: {
   costGbp?: string;
   exchangeRate?: string;
   sortOrder?: number;
+  imageUrl?: string;
+  imageKey?: string;
 }): Promise<CargoBoxItem | null> {
   const db = getDb();
   if (!db) return null;
@@ -265,6 +269,8 @@ export async function addCargoBoxItemDb(input: {
       costGbp: input.costGbp ?? "0",
       exchangeRate: input.exchangeRate ?? null,
       sortOrder: input.sortOrder ?? 0,
+      imageUrl: input.imageUrl ?? null,
+      imageKey: input.imageKey ?? null,
     })
     .returning();
 
@@ -293,6 +299,8 @@ export async function updateCargoBoxItemDb(
     costGbp: string;
     exchangeRate: string;
     sortOrder: number;
+    imageUrl: string | null;
+    imageKey: string | null;
   }>
 ): Promise<CargoBoxItem | null> {
   const db = getDb();

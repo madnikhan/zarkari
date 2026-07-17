@@ -16,7 +16,7 @@ import { CASH_TYPE_LABELS } from "@/lib/cash/labels";
 import type { ProfitAndLossReport } from "@/lib/db/cash-ledger";
 import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
 
-type PnLPreset = "week" | "month";
+type PnLPreset = "week" | "month" | "year";
 
 export function ProfitLossReport() {
   const [preset, setPreset] = useState<PnLPreset>("week");
@@ -100,6 +100,15 @@ export function ProfitLossReport() {
             }`}
           >
             Monthly report
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreset("year")}
+            className={`px-3 py-1.5 text-xs rounded-lg border ${
+              preset === "year" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
+            }`}
+          >
+            Annual report
           </button>
         </div>
       </div>
@@ -217,6 +226,72 @@ export function ProfitLossReport() {
           )}
         </div>
       </div>
+
+      {report.orderMargins && report.orderMargins.orderCount > 0 && (
+        <div className="boms-card p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Order margins (dresses)</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Accrual view for bridal orders with known cost in this period
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-slate-500 uppercase">Orders</p>
+              <p className="text-xl font-semibold mt-1">{report.orderMargins.orderCount}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase">Total sell</p>
+              <p className="text-xl font-semibold mt-1">
+                {formatPrice(String(report.orderMargins.totalSellGbp.toFixed(2)))}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase">Total cost</p>
+              <p className="text-xl font-semibold mt-1 text-red-600">
+                {formatPrice(String(report.orderMargins.totalCostGbp.toFixed(2)))}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase">Total profit</p>
+              <p
+                className={`text-xl font-semibold mt-1 ${
+                  report.orderMargins.totalProfitGbp >= 0 ? "text-emerald-700" : "text-red-700"
+                }`}
+              >
+                {formatPrice(String(report.orderMargins.totalProfitGbp.toFixed(2)))}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {report.orderMargins.marginPercent.toFixed(1)}% margin
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-100">
+                  <th className="py-2 pr-3">Order</th>
+                  <th className="py-2 pr-3">Sell</th>
+                  <th className="py-2 pr-3">Cost</th>
+                  <th className="py-2 pr-3">Profit</th>
+                  <th className="py-2">Margin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {report.orderMargins.orders.map((row) => (
+                  <tr key={row.orderId}>
+                    <td className="py-2 pr-3 font-mono text-xs text-[#4C3BCF]">{row.orderNumber}</td>
+                    <td className="py-2 pr-3">{formatPrice(String(row.sellingPriceGbp.toFixed(2)))}</td>
+                    <td className="py-2 pr-3">{formatPrice(String(row.costGbp.toFixed(2)))}</td>
+                    <td className="py-2 pr-3">{formatPrice(String(row.profitGbp.toFixed(2)))}</td>
+                    <td className="py-2">{row.marginPercent.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

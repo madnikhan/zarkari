@@ -23,6 +23,8 @@ export async function PATCH(request: Request, { params }: Params) {
     costPkr: body.costPkr,
     costGbp: body.costGbp,
     exchangeRate: body.exchangeRate,
+    imageUrl: body.imageUrl,
+    imageKey: body.imageKey,
   });
 
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });

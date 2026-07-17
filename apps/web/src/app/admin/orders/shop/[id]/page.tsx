@@ -12,7 +12,7 @@ interface Props {
 
 const SOURCE_LABELS = {
   online: "Online shop",
-  walk_in: "Walk-in shop",
+  walk_in: "Ready-made shop",
 };
 
 const PAYMENT_LABELS = {

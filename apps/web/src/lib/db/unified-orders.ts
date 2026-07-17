@@ -64,7 +64,7 @@ function mapRetailOrder(order: RetailOrder): UnifiedOrder {
     id: order.id,
     orderNumber: order.orderNumber,
     type,
-    customerLabel: order.customerName ?? order.customerPhone ?? order.customerEmail ?? "Walk-in customer",
+    customerLabel: order.customerName ?? order.customerPhone ?? order.customerEmail ?? "Ready-made customer",
     customerPhone: order.customerPhone,
     total: order.total,
     status: order.status,
