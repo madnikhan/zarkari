@@ -1,8 +1,9 @@
 import { MAX_VIDEO_DURATION_SEC } from "./constants";
 import { isVideoFile, resolveFileMime } from "./mime";
 
+/** Returns duration in seconds, or NaN if metadata cannot be read. */
 export function getVideoDuration(file: File): Promise<number> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
@@ -12,7 +13,8 @@ export function getVideoDuration(file: File): Promise<number> {
     };
     video.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Could not read video file"));
+      // Phone HEVC/.mov often fails metadata outside Safari — skip duration gate.
+      resolve(Number.NaN);
     };
     video.src = url;
   });

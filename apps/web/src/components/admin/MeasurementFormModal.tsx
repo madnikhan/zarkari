@@ -71,8 +71,7 @@ export function MeasurementFormModal({ initial, onSave, onClose }: Props) {
     }));
   }
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSave() {
     onSave(data);
     onClose();
   }
@@ -90,7 +89,7 @@ export function MeasurementFormModal({ initial, onSave, onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="flex flex-col min-h-0 flex-1">
+        <div className="flex flex-col min-h-0 flex-1">
           <div className="overflow-y-auto p-5 space-y-6">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Measurement scale</p>
@@ -165,11 +164,15 @@ export function MeasurementFormModal({ initial, onSave, onClose }: Props) {
             >
               Cancel
             </button>
-            <button type="submit" className="boms-btn-primary px-4 py-2 rounded-lg text-sm font-medium">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="boms-btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+            >
               Save measurements
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

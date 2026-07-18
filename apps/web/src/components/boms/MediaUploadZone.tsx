@@ -6,7 +6,7 @@ import { AudioPlayer } from "@/components/boms/AudioPlayer";
 import { UploadProgressBar } from "@/components/boms/UploadProgressBar";
 import { uploadFileWithProgress, type UploadProgressState } from "@/lib/upload/client";
 import { assertVideoDurationAllowed, isVideoUpload } from "@/lib/upload/video";
-import { isVideoFile, resolveFileMime } from "@/lib/upload/mime";
+import { isVideoFile, withResolvedMime } from "@/lib/upload/mime";
 
 export type MediaFileType = "image" | "video" | "audio";
 
@@ -28,7 +28,7 @@ interface Props {
 
 export function MediaUploadZone({
   label = "Upload photos or videos",
-  accept = "image/*,video/*",
+  accept = "image/*,video/*,.mov,.mp4,.webm",
   category = "supplier-completion",
   sizeHint = "Photos up to 4 MB · Videos up to 10 minutes",
   onUploaded,
@@ -50,7 +50,7 @@ export function MediaUploadZone({
     return "image";
   }
 
-  async function uploadFiles(selected: File[]) {
+  async function uploadFiles(selected: File[], kindHint?: "image" | "video") {
     if (!selected.length) return;
     setUploading(true);
     setError("");
@@ -61,7 +61,7 @@ export function MediaUploadZone({
 
     try {
       for (const raw of selected) {
-        const file = raw.type ? raw : new File([raw], raw.name, { type: resolveFileMime(raw) });
+        const file = withResolvedMime(raw, kindHint);
         failedAt = [file];
         if (isVideoUpload(file)) {
           await assertVideoDurationAllowed(file);
@@ -92,9 +92,12 @@ export function MediaUploadZone({
     }
   }
 
-  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+    kindHint?: "image" | "video"
+  ) {
     const selected = Array.from(e.target.files ?? []);
-    await uploadFiles(selected);
+    await uploadFiles(selected, kindHint);
     e.target.value = "";
   }
 
@@ -158,10 +161,34 @@ export function MediaUploadZone({
         </label>
       )}
 
-      <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading} onChange={handleChange} />
-      <input ref={videoInputRef} type="file" accept="video/*" capture="environment" className="hidden" disabled={uploading} onChange={handleChange} />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => void handleChange(e, "image")}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*,.mov,.mp4,.webm"
+        capture="environment"
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => void handleChange(e, "video")}
+      />
       {showCameraButtons && (
-        <input ref={fileInputRef} type="file" accept={accept} multiple className="hidden" disabled={uploading} onChange={handleChange} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          multiple
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => void handleChange(e)}
+        />
       )}
 
       {showCameraButtons && (

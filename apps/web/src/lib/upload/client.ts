@@ -96,7 +96,13 @@ function rejectAudioPlaceholder(url: string | undefined, file: File): void {
 }
 
 function isCorsError(err: unknown): boolean {
-  return err instanceof Error && err.message.includes("storage CORS");
+  if (!(err instanceof Error)) return false;
+  const msg = err.message;
+  return (
+    msg.includes("CORS") ||
+    msg.includes("Direct storage upload blocked") ||
+    msg.includes("storage CORS")
+  );
 }
 
 async function probeDirectR2Upload(): Promise<boolean> {
@@ -308,7 +314,9 @@ async function uploadViaServerRelay(
 
 function isRetryableUploadError(err: Error): boolean {
   const msg = err.message;
-  if (msg.includes("storage CORS") || msg.includes("ETag missing")) return false;
+  if (msg.includes("CORS") || msg.includes("ETag missing") || msg.includes("Direct storage upload blocked")) {
+    return false;
+  }
   return true;
 }
 

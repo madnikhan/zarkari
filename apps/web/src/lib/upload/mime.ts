@@ -60,8 +60,24 @@ export function getMediaKind(fileName: string, mimeType?: string, category?: str
   return "image";
 }
 
-export function withResolvedMime(file: File): File {
-  const mime = resolveFileMime(file);
-  if (file.type === mime) return file;
-  return new File([file], file.name, { type: mime, lastModified: file.lastModified });
+export function withResolvedMime(file: File, kindHint?: MediaKind): File {
+  let name = file.name?.trim() || "upload";
+  let mime = resolveFileMime(file);
+
+  if (kindHint === "video" && !mime.startsWith("video/")) {
+    mime = "video/mp4";
+  }
+
+  if (mime.startsWith("video/") && !extensionOf(name)) {
+    const ext =
+      mime.includes("quicktime") || mime.includes("mov")
+        ? ".mov"
+        : mime.includes("webm")
+          ? ".webm"
+          : ".mp4";
+    name = `${name}${ext}`;
+  }
+
+  if (file.type === mime && file.name === name) return file;
+  return new File([file], name, { type: mime, lastModified: file.lastModified });
 }

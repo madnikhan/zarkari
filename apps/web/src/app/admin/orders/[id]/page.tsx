@@ -138,11 +138,9 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         <BridalOrderEditSection order={order} />
       )}
 
-      {order.measurements && (
-        <div className="mb-4">
-          <MeasurementsReadOnly measurements={order.measurements} />
-        </div>
-      )}
+      <div className="mb-4">
+        <MeasurementsReadOnly measurements={order.measurements} showEmpty />
+      </div>
 
       <div className="boms-card p-5 mb-4">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Actions</h2>

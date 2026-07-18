@@ -87,7 +87,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
   function inferMediaType(f: UploadedFile): UploadedFile["mediaType"] {
     if (f.mediaType) return f.mediaType;
     if (/^voice-note-/i.test(f.name) || /\.(m4a|mp3|ogg|wav)$/i.test(f.name)) return "audio";
-    if (/\.(mp4|mov)$/i.test(f.name)) return "video";
+    if (/\.(mp4|mov|webm|m4v)$/i.test(f.name)) return "video";
     return "image";
   }
 
@@ -152,6 +152,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
   );
 
   return (
+    <>
     <form onSubmit={submit} className="boms-card p-6 space-y-5">
       {field("customerName", "Customer Name", "text", true)}
 
@@ -296,14 +297,15 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
       <button type="submit" disabled={loading} className="boms-btn-primary w-full py-3.5 rounded-lg text-sm font-medium">
         {loading ? "Saving…" : "Create Order"}
       </button>
-
-      {showMeasurements && (
-        <MeasurementFormModal
-          initial={measurements}
-          onSave={setMeasurements}
-          onClose={() => setShowMeasurements(false)}
-        />
-      )}
     </form>
+
+    {showMeasurements && (
+      <MeasurementFormModal
+        initial={measurements}
+        onSave={setMeasurements}
+        onClose={() => setShowMeasurements(false)}
+      />
+    )}
+    </>
   );
 }
