@@ -5,6 +5,7 @@ import type { BridalOrder, CustomerMessage, OrderFile } from "@/lib/data/seed";
 import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
 import { MessageAttachment } from "@/components/orders/MessageAttachment";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
+import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 import { CustomerOrderProgressTracker } from "./OrderProgressTracker";
 import { getCustomerStatusLabel } from "@/lib/orders/status-machine";
 import { formatPrice } from "@/lib/utils";
@@ -216,18 +217,28 @@ function CustomerActionButtons({
 
       {view && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-xl">
             <h3 className="font-display text-lg mb-4 capitalize">{view.replace("_", " ")}</h3>
             {view === "design" && (
               <OrderFileGallery files={designFiles} groupByCategory={false} columns={2} emptyMessage="No design files yet." />
             )}
             {view === "measurements" && (
-              <OrderFileGallery
-                files={measurementFiles}
-                groupByCategory={false}
-                columns={2}
-                emptyMessage="No measurement files yet."
-              />
+              <div className="space-y-4">
+                <MeasurementsReadOnly measurements={order.measurements} showEmpty />
+                {measurementFiles.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                      Measurement photos
+                    </h4>
+                    <OrderFileGallery
+                      files={measurementFiles}
+                      groupByCategory={false}
+                      columns={2}
+                      emptyMessage="No measurement files yet."
+                    />
+                  </div>
+                )}
+              </div>
             )}
             {view === "progress" && (
               <OrderFileGallery
