@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
+import { isUuid } from "@/lib/db";
 import {
   createCashTransaction,
   listTransactionsForDay,
@@ -38,76 +39,87 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const {
-    direction,
-    type,
-    amount,
-    method,
-    reference,
-    description,
-    expenseCategory,
-    businessDate,
-    orderId,
-    retailOrderId,
-    supplierId,
-    amountPkr,
-    exchangeRate,
-  } = body as {
-    direction?: CashDirection;
-    type?: CashTransactionType;
-    amount?: string;
-    method?: "cash" | "online";
-    reference?: string;
-    description?: string;
-    expenseCategory?: string;
-    businessDate?: string;
-    orderId?: string;
-    retailOrderId?: string;
-    supplierId?: string;
-    amountPkr?: string;
-    exchangeRate?: string;
-  };
-
-  if (!direction || !type || !amount || !method) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  const tx = await createCashTransaction({
-    direction,
-    type,
-    amount,
-    method,
-    reference,
-    description,
-    expenseCategory: type === "business_expense" ? expenseCategory : undefined,
-    businessDate: businessDate ?? todayDateString(),
-    orderId,
-    retailOrderId,
-    supplierId,
-    createdByUserId: session.id,
-    source: "manual",
-  });
-
-  if (!tx) return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 });
-
-  if (type === "supplier_payment" && supplierId) {
-    await addSupplierLedgerEntry({
+  try {
+    const body = await request.json();
+    const {
+      direction,
+      type,
+      amount,
+      method,
+      reference,
+      description,
+      expenseCategory,
+      businessDate,
+      orderId,
+      retailOrderId,
       supplierId,
-      type: "payment",
-      description: description ?? reference ?? "Supplier payment",
-      amountGbp: amount,
-      amountPkr: amountPkr ?? "0",
+      amountPkr,
       exchangeRate,
-      businessDate: businessDate ?? todayDateString(),
-      cashTransactionId: tx.id,
-    });
-    revalidatePath("/admin/suppliers/payments");
-    revalidatePath(`/admin/suppliers/${supplierId}/khata`);
-  }
+    } = body as {
+      direction?: CashDirection;
+      type?: CashTransactionType;
+      amount?: string;
+      method?: "cash" | "online";
+      reference?: string;
+      description?: string;
+      expenseCategory?: string;
+      businessDate?: string;
+      orderId?: string;
+      retailOrderId?: string;
+      supplierId?: string;
+      amountPkr?: string;
+      exchangeRate?: string;
+    };
 
-  revalidatePath("/admin/cash");
-  revalidatePath("/admin/cash/analytics");
-  revalidatePath("/admin/reports");
-  return NextResponse.json({ transaction: tx });
+    if (!direction || !type || !amount || !method) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const tx = await createCashTransaction({
+      direction,
+      type,
+      amount,
+      method,
+      reference,
+      description,
+      expenseCategory: type === "business_expense" ? expenseCategory : undefined,
+      businessDate: businessDate ?? todayDateString(),
+      orderId: orderId && isUuid(orderId) ? orderId : undefined,
+      retailOrderId: retailOrderId && isUuid(retailOrderId) ? retailOrderId : undefined,
+      supplierId: supplierId && isUuid(supplierId) ? supplierId : undefined,
+      createdByUserId: isUuid(session.id) ? session.id : undefined,
+      source: "manual",
+    });
+
+    if (!tx) {
+      return NextResponse.json(
+        { error: "Failed to create transaction — database unavailable" },
+        { status: 500 }
+      );
+    }
+
+    if (type === "supplier_payment" && supplierId && isUuid(supplierId)) {
+      await addSupplierLedgerEntry({
+        supplierId,
+        type: "payment",
+        description: description ?? reference ?? "Supplier payment",
+        amountGbp: amount,
+        amountPkr: amountPkr ?? "0",
+        exchangeRate,
+        businessDate: businessDate ?? todayDateString(),
+        cashTransactionId: tx.id,
+      });
+      revalidatePath("/admin/suppliers/payments");
+      revalidatePath(`/admin/suppliers/${supplierId}/khata`);
+    }
+
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin/cash/analytics");
+    revalidatePath("/admin/reports");
+    return NextResponse.json({ transaction: tx });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create transaction";
+    console.error("[cash/transactions POST]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

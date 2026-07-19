@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, lte, lt, notInArray, sql } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, isUuid, schema } from "./index";
 import type { OrderMarginsSummary } from "@/lib/finance/order-margin";
 
 export type CashDirection = "in" | "out";
@@ -534,12 +534,13 @@ export async function createCashTransaction(input: {
       expenseCategory: input.expenseCategory ?? null,
       businessDate,
       occurredAt,
-      orderId: input.orderId ?? null,
-      retailOrderId: input.retailOrderId ?? null,
-      supplierId: input.supplierId ?? null,
+      orderId: input.orderId && isUuid(input.orderId) ? input.orderId : null,
+      retailOrderId: input.retailOrderId && isUuid(input.retailOrderId) ? input.retailOrderId : null,
+      supplierId: input.supplierId && isUuid(input.supplierId) ? input.supplierId : null,
       source: input.source ?? "manual",
       isSample: input.isSample ?? false,
-      createdByUserId: input.createdByUserId ?? null,
+      createdByUserId:
+        input.createdByUserId && isUuid(input.createdByUserId) ? input.createdByUserId : null,
     })
     .returning();
 

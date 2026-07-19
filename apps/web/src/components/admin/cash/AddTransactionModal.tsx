@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import type { CashDirection, CashTransactionType } from "@/lib/db/cash-ledger";
 import { CASH_TYPE_LABELS, CASH_IN_TYPES, CASH_OUT_TYPES } from "@/lib/cash/labels";
 import { formatPrice } from "@/lib/utils";
+import { parseJsonResponse } from "@/lib/upload/parse-json";
 import { GbpPkrConverter } from "@/components/admin/suppliers/GbpPkrConverter";
 
 interface PayableOrder {
@@ -179,7 +180,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
               description: description || matched.customerName,
             }),
           });
-          const data = await res.json();
+          const data = await parseJsonResponse<{ error?: string }>(res);
           if (!res.ok) throw new Error(data.error ?? "Failed to save payment");
         } else {
           const res = await fetch("/api/cash/transactions", {
@@ -195,7 +196,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
               businessDate: date,
             }),
           });
-          const data = await res.json();
+          const data = await parseJsonResponse<{ error?: string }>(res);
           if (!res.ok) throw new Error(data.error ?? "Failed to save");
         }
       } else if (type === "order_collection" && orderId) {
@@ -210,7 +211,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             description: description || selectedOrder?.customerName,
           }),
         });
-        const data = await res.json();
+        const data = await parseJsonResponse<{ error?: string }>(res);
         if (!res.ok) throw new Error(data.error ?? "Failed to save payment");
       } else {
         const res = await fetch("/api/cash/transactions", {
@@ -236,7 +237,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             exchangeRate: showSupplierPicker ? exchangeRate || undefined : undefined,
           }),
         });
-        const data = await res.json();
+        const data = await parseJsonResponse<{ error?: string }>(res);
         if (!res.ok) throw new Error(data.error ?? "Failed to save");
       }
       onClose();
