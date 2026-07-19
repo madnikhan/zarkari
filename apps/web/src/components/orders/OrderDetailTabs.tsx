@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
+import { OrderFilesPanel } from "@/components/admin/OrderFilesPanel";
 import { OrderTimeline } from "./OrderTimeline";
 import type { TimelineEvent, OrderFile, BridalOrder } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
@@ -18,7 +18,13 @@ interface TabData {
 
 const TABS = ["Timeline", "Files", "Payments", "Notes"] as const;
 
-export function OrderDetailTabs({ data }: { data: TabData }) {
+export function OrderDetailTabs({
+  data,
+  canUploadFiles = false,
+}: {
+  data: TabData;
+  canUploadFiles?: boolean;
+}) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Timeline");
 
   return (
@@ -41,7 +47,11 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
       {tab === "Timeline" && <OrderTimeline events={data.timeline} />}
 
       {tab === "Files" && (
-        <OrderFileGallery files={data.files} emptyMessage="No files yet." />
+        <OrderFilesPanel
+          orderId={data.order.id}
+          files={data.files}
+          canUpload={canUploadFiles}
+        />
       )}
 
       {tab === "Payments" && (
@@ -49,7 +59,9 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
           {data.payments.map((p) => (
             <li key={p.id} className="flex justify-between border-b border-sand pb-2">
               <span className="capitalize">{p.type}</span>
-              <span>{formatPrice(p.amount)} · {p.method}</span>
+              <span>
+                {formatPrice(p.amount)} · {p.method}
+              </span>
             </li>
           ))}
         </ul>
@@ -69,7 +81,9 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
               {data.redesigns.map((r) => (
                 <div key={r.id} className="bg-amber-50 p-3 rounded-lg mb-2">
                   <p>{r.reason}</p>
-                  <p className="text-xs text-slate-500 mt-1">{new Date(r.createdAt).toLocaleString("en-GB")}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {new Date(r.createdAt).toLocaleString("en-GB")}
+                  </p>
                 </div>
               ))}
             </section>
@@ -78,7 +92,9 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
             <section>
               <h3 className="font-medium mb-2 text-slate-900">Cancellations</h3>
               {data.cancellations.map((c) => (
-                <div key={c.id} className="bg-red-50 p-3 rounded-lg mb-2">{c.reason}</div>
+                <div key={c.id} className="bg-red-50 p-3 rounded-lg mb-2">
+                  {c.reason}
+                </div>
               ))}
             </section>
           )}
@@ -86,13 +102,18 @@ export function OrderDetailTabs({ data }: { data: TabData }) {
             <section>
               <h3 className="font-medium mb-2 text-slate-900">Refunds</h3>
               {data.refunds.map((r) => (
-                <div key={r.id} className="bg-slate-50 p-3 rounded-lg mb-2">{r.reason} — {formatPrice(r.amount)}</div>
+                <div key={r.id} className="bg-slate-50 p-3 rounded-lg mb-2">
+                  {r.reason} — {formatPrice(r.amount)}
+                </div>
               ))}
             </section>
           )}
-          {!data.order.customisationNotes && data.redesigns.length === 0 && data.cancellations.length === 0 && data.refunds.length === 0 && (
-            <p className="text-slate-400">No notes yet.</p>
-          )}
+          {!data.order.customisationNotes &&
+            data.redesigns.length === 0 &&
+            data.cancellations.length === 0 &&
+            data.refunds.length === 0 && (
+              <p className="text-slate-400">No notes yet.</p>
+            )}
         </div>
       )}
     </div>

@@ -153,7 +153,10 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       </div>
 
       <div className="boms-card p-5">
-        <OrderDetailTabs data={{ order, timeline, files, redesigns, cancellations, refunds, payments }} />
+        <OrderDetailTabs
+          data={{ order, timeline, files, redesigns, cancellations, refunds, payments }}
+          canUploadFiles={session?.role === "owner" || session?.role === "staff"}
+        />
         <OrderMessagesLive
           orderId={order.id}
           initialCustomerMessages={customerMessages}
