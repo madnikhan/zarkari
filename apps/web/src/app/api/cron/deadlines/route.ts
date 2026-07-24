@@ -6,7 +6,12 @@ import { demoNotifications } from "@/lib/data/seed";
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
+  // Require a secret whenever the DB is live (production) so the endpoint cannot be abused.
+  if (!cronSecret) {
+    if (isDbConfigured() || process.env.NODE_ENV === "production") {
+      return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
+    }
+  } else if (auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

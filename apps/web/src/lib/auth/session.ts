@@ -42,6 +42,9 @@ export async function authenticate(email: string, password: string): Promise<Ses
         supplierId: dbUser.supplierId ?? undefined,
       };
     }
+    // Never fall through to in-memory demo users when Neon is configured —
+    // that would mint non-UUID sessions (user-owner) on production.
+    return null;
   }
 
   const demoUser = demoUsers.find((u) => u.email.toLowerCase() === normalized);
