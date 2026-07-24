@@ -19,6 +19,7 @@ import {
 import type { CargoBox, CargoBoxItem, CargoCompany } from "@/lib/cargo/demo-store";
 import type { Supplier } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
+import { parseJsonResponse } from "@/lib/upload/parse-json";
 import { AddCargoBoxItemModal } from "./AddCargoBoxItemModal";
 
 interface Props {
@@ -113,7 +114,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
           exchangeRate: exchangeRate || undefined,
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
       setEditing(false);
       onRefresh();
@@ -133,7 +134,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     setDeleting(true);
     try {
       const res = await fetch(`/api/cargo/boxes/${box.id}`, { method: "DELETE" });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to delete");
       onDeleted();
     } catch (err) {
@@ -148,7 +149,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     setError("");
     try {
       const res = await fetch(`/api/cargo/boxes/${box.id}/post-khata`, { method: "POST" });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to post to khata");
       onRefresh();
     } catch (err) {
@@ -162,7 +163,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     if (!confirm("Remove this item from the box?")) return;
     try {
       const res = await fetch(`/api/cargo/boxes/${box.id}/items/${itemId}`, { method: "DELETE" });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to delete item");
       setSelectedItems((prev) => {
         const next = new Set(prev);
@@ -222,7 +223,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     try {
       for (const itemId of selectedItems) {
         const res = await fetch(`/api/cargo/boxes/${box.id}/items/${itemId}`, { method: "DELETE" });
-        const data = await res.json();
+        const data = await parseJsonResponse<{ error?: string }>(res);
         if (!res.ok) throw new Error(data.error ?? "Failed to delete item");
       }
       setSelectedItems(new Set());

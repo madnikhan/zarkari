@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import type { CargoBox, CargoCompany } from "@/lib/cargo/demo-store";
 import type { Supplier } from "@/lib/data/seed";
+import { parseJsonResponse } from "@/lib/upload/parse-json";
 
 interface Props {
   companies: CargoCompany[];
@@ -44,8 +45,9 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
           postToKhata,
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ box?: CargoBox; error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to create box");
+      if (!data.box) throw new Error("Failed to create box");
       onCreated(data.box);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create box");
@@ -160,6 +162,7 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
           </label>
           <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
             After creating the box, add each dress with its name and detailed cost price (PKR / GBP).
+            Post to khata after dresses are added if the box starts empty.
           </p>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg">

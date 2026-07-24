@@ -1,5 +1,5 @@
 import { desc, eq, ilike, or, sql } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, isUuid, schema } from "./index";
 import type { CargoBox, CargoBoxItem, CargoCompany } from "@/lib/cargo/demo-store";
 
 function mapCompany(row: typeof schema.cargoCompanies.$inferSelect): CargoCompany {
@@ -207,7 +207,8 @@ export async function createCargoBoxDb(input: {
       weightKg: input.weightKg ?? null,
       notes: input.notes ?? null,
       exchangeRate: input.exchangeRate ?? null,
-      createdByUserId: input.createdByUserId ?? null,
+      createdByUserId:
+        input.createdByUserId && isUuid(input.createdByUserId) ? input.createdByUserId : null,
     })
     .returning();
   return row ? getCargoBoxDb(row.id) : null;

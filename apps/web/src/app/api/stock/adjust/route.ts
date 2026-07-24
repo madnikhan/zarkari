@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { isUuid } from "@/lib/db";
 import { getProductByIdDb } from "@/lib/db/cms-products";
 import { adjustStock, StockError } from "@/lib/stock/service";
 import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       type,
       referenceType: "manual",
       notes: notes ?? `${type === "receive" ? "Stock received" : "Manual adjustment"} (${size})`,
-      createdByUserId: session.id,
+      createdByUserId: isUuid(session.id) ? session.id : undefined,
     });
     if (!result) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
     return NextResponse.json({ ok: true, quantityAfter: result.quantityAfter });
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
     if (err instanceof StockError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    throw err;
+    const message = err instanceof Error ? err.message : "Failed to adjust stock";
+    console.error("[stock/adjust POST]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

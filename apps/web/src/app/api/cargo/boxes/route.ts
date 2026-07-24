@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
+import { isUuid } from "@/lib/db";
 import { createCargoBox, listCargoBoxes } from "@/lib/cargo/service";
 
 export async function GET(request: Request) {
@@ -19,28 +20,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  if (!body.cargoCompanyId || !body.trackingNumber || !body.supplierId || !body.receivedDate) {
-    return NextResponse.json(
-      { error: "cargoCompanyId, trackingNumber, supplierId, and receivedDate required" },
-      { status: 400 }
-    );
+  try {
+    const body = await request.json();
+    if (!body.cargoCompanyId || !body.trackingNumber || !body.supplierId || !body.receivedDate) {
+      return NextResponse.json(
+        { error: "cargoCompanyId, trackingNumber, supplierId, and receivedDate required" },
+        { status: 400 }
+      );
+    }
+    if (!isUuid(body.cargoCompanyId) || !isUuid(body.supplierId)) {
+      return NextResponse.json({ error: "Invalid cargo company or supplier" }, { status: 400 });
+    }
+
+    const box = await createCargoBox({
+      cargoCompanyId: body.cargoCompanyId,
+      trackingNumber: body.trackingNumber,
+      supplierId: body.supplierId,
+      receivedDate: body.receivedDate,
+      weightKg: body.weightKg,
+      notes: body.notes,
+      exchangeRate: body.exchangeRate,
+      createdByUserId: isUuid(session.id) ? session.id : undefined,
+      postToKhata: Boolean(body.postToKhata),
+    });
+
+    if (!box) {
+      return NextResponse.json(
+        { error: "Failed to create box — database unavailable" },
+        { status: 500 }
+      );
+    }
+
+    revalidatePath("/admin/cargo");
+    return NextResponse.json({ box }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create box";
+    console.error("[cargo/boxes POST]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const box = await createCargoBox({
-    cargoCompanyId: body.cargoCompanyId,
-    trackingNumber: body.trackingNumber,
-    supplierId: body.supplierId,
-    receivedDate: body.receivedDate,
-    weightKg: body.weightKg,
-    notes: body.notes,
-    exchangeRate: body.exchangeRate,
-    createdByUserId: session.id,
-    postToKhata: Boolean(body.postToKhata),
-  });
-
-  if (!box) return NextResponse.json({ error: "Failed to create box" }, { status: 500 });
-
-  revalidatePath("/admin/cargo");
-  return NextResponse.json({ box }, { status: 201 });
 }

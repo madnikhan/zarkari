@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
+import { isUuid } from "@/lib/db";
 import { createCashTransaction } from "@/lib/db/cash-ledger";
 import { todayDateString } from "@/lib/cash/labels";
 import {
@@ -34,54 +35,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  if (!body.supplierId || !body.type) {
-    return NextResponse.json({ error: "supplierId and type required" }, { status: 400 });
-  }
-
-  const businessDate = body.businessDate ?? todayDateString();
-  let cashTransactionId: string | undefined = body.cashTransactionId;
-
-  if (body.type === "payment" && !cashTransactionId) {
-    const method = body.method === "online" ? "online" : "cash";
-    const tx = await createCashTransaction({
-      direction: "out",
-      type: "supplier_payment",
-      amount: body.amountGbp ?? "0",
-      method,
-      description: body.description ?? "Supplier payment (khata)",
-      businessDate,
-      supplierId: body.supplierId,
-      createdByUserId: session.id,
-      source: "manual",
-    });
-    if (!tx) {
-      return NextResponse.json({ error: "Failed to create cash-out transaction" }, { status: 500 });
+  try {
+    const body = await request.json();
+    if (!body.supplierId || !body.type) {
+      return NextResponse.json({ error: "supplierId and type required" }, { status: 400 });
     }
-    cashTransactionId = tx.id;
-  }
+    if (!isUuid(body.supplierId)) {
+      return NextResponse.json({ error: "Invalid supplier" }, { status: 400 });
+    }
 
-  const entry = await addSupplierLedgerEntry({
-    supplierId: body.supplierId,
-    type: body.type,
-    orderId: body.orderId,
-    description: body.description,
-    billNumber: body.billNumber,
-    amountGbp: body.amountGbp ?? "0",
-    amountPkr: body.amountPkr ?? "0",
-    exchangeRate: body.exchangeRate,
-    businessDate,
-    cashTransactionId,
-  });
+    const businessDate = body.businessDate ?? todayDateString();
+    let cashTransactionId: string | undefined = body.cashTransactionId;
 
-  revalidatePath("/admin/suppliers/payments");
-  revalidatePath(`/admin/suppliers/${body.supplierId}/khata`);
-  if (body.type === "payment") {
-    revalidatePath("/admin/cash");
-    revalidatePath("/admin/cash/analytics");
-    revalidatePath("/admin/reports");
+    if (body.type === "payment" && !cashTransactionId) {
+      const method = body.method === "online" ? "online" : "cash";
+      const tx = await createCashTransaction({
+        direction: "out",
+        type: "supplier_payment",
+        amount: body.amountGbp ?? "0",
+        method,
+        description: body.description ?? "Supplier payment (khata)",
+        businessDate,
+        supplierId: body.supplierId,
+        createdByUserId: isUuid(session.id) ? session.id : undefined,
+        source: "manual",
+      });
+      if (!tx) {
+        return NextResponse.json({ error: "Failed to create cash-out transaction" }, { status: 500 });
+      }
+      cashTransactionId = tx.id;
+    }
+
+    const entry = await addSupplierLedgerEntry({
+      supplierId: body.supplierId,
+      type: body.type,
+      orderId: body.orderId,
+      description: body.description,
+      billNumber: body.billNumber,
+      amountGbp: body.amountGbp ?? "0",
+      amountPkr: body.amountPkr ?? "0",
+      exchangeRate: body.exchangeRate,
+      businessDate,
+      cashTransactionId,
+    });
+
+    revalidatePath("/admin/suppliers/payments");
+    revalidatePath(`/admin/suppliers/${body.supplierId}/khata`);
+    if (body.type === "payment") {
+      revalidatePath("/admin/cash");
+      revalidatePath("/admin/cash/analytics");
+      revalidatePath("/admin/reports");
+    }
+    return NextResponse.json({ entry });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create ledger entry";
+    console.error("[suppliers/ledger POST]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  return NextResponse.json({ entry });
 }
 
 export async function PATCH(request: Request) {

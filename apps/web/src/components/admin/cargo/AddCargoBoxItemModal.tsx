@@ -7,6 +7,7 @@ import { GbpPkrConverter } from "@/components/admin/suppliers/GbpPkrConverter";
 import { BridalOrderPicker } from "./BridalOrderPicker";
 import { MediaUploadZone, type UploadedFile } from "@/components/boms/MediaUploadZone";
 import type { CargoBoxItem } from "@/lib/cargo/demo-store";
+import { parseJsonResponse } from "@/lib/upload/parse-json";
 
 interface OrderResult {
   id: string;
@@ -75,7 +76,7 @@ export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to save item");
       onSaved();
       onClose();
