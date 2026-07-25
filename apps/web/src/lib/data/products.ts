@@ -106,6 +106,32 @@ export async function updateProduct(
   return product;
 }
 
+export async function deleteProduct(
+  id: string
+): Promise<{ product: Product | null; soft: boolean } | null> {
+  if (isDbConfigured()) {
+    const { deleteProductDb } = await import("@/lib/db/cms-products");
+    const result = await deleteProductDb(id);
+    if (!result) return null;
+    if (!result.soft) {
+      const idx = demoProducts.findIndex((p) => p.id === id);
+      if (idx >= 0) demoProducts.splice(idx, 1);
+    }
+    return result;
+  }
+
+  const idx = demoProducts.findIndex((p) => p.id === id);
+  if (idx < 0) return null;
+
+  const hasOrders = demoRetailOrders.some((o) => o.items.some((i) => i.productId === id));
+  if (hasOrders) {
+    return { product: demoProducts[idx], soft: true };
+  }
+
+  const [removed] = demoProducts.splice(idx, 1);
+  return { product: removed, soft: false };
+}
+
 export function createRetailOrder(input: {
   customerEmail: string;
   customerName?: string;

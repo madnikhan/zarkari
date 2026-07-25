@@ -30,15 +30,19 @@ function enrichDemoBox(box: CargoBox): CargoBox {
   };
 }
 
-export async function listCargoCompanies(): Promise<CargoCompany[]> {
+export async function listCargoCompanies(opts?: {
+  includeInactive?: boolean;
+}): Promise<CargoCompany[]> {
   if (isDbConfigured()) {
     const { listCargoCompaniesDb } = await import("@/lib/db/cargo-boxes");
-    return listCargoCompaniesDb();
+    return listCargoCompaniesDb(opts);
   }
   if (!demoCargoCompanies.some((c) => c.name.toLowerCase() === "skynet")) {
     demoCargoCompanies.push({ id: "cc-skynet", name: "Skynet", active: true });
   }
-  return demoCargoCompanies.filter((c) => c.active);
+  return opts?.includeInactive
+    ? [...demoCargoCompanies].sort((a, b) => a.name.localeCompare(b.name))
+    : demoCargoCompanies.filter((c) => c.active);
 }
 
 export async function createCargoCompany(name: string): Promise<CargoCompany | null> {
@@ -49,6 +53,26 @@ export async function createCargoCompany(name: string): Promise<CargoCompany | n
   const company: CargoCompany = { id: `cc-${Date.now()}`, name, active: true };
   demoCargoCompanies.push(company);
   return company;
+}
+
+export async function updateCargoCompany(
+  id: string,
+  patch: { name?: string; active?: boolean }
+): Promise<CargoCompany | null> {
+  if (isDbConfigured()) {
+    const { updateCargoCompanyDb } = await import("@/lib/db/cargo-boxes");
+    return updateCargoCompanyDb(id, patch);
+  }
+  const company = demoCargoCompanies.find((c) => c.id === id);
+  if (!company) return null;
+  if (patch.name !== undefined) company.name = patch.name;
+  if (patch.active !== undefined) company.active = patch.active;
+  return company;
+}
+
+/** Soft-deactivate; allowed even when boxes still reference the company. */
+export async function deactivateCargoCompany(id: string): Promise<CargoCompany | null> {
+  return updateCargoCompany(id, { active: false });
 }
 
 export async function listCargoBoxes(opts?: {

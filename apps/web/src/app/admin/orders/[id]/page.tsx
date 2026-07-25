@@ -13,7 +13,7 @@ import {
   getSupplierMessages,
   getPendingSupplierUpdates,
 } from "@/lib/data";
-import { getSession } from "@/lib/auth/session";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { OrderDetailTabs } from "@/components/orders/OrderDetailTabs";
@@ -148,6 +148,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
           orderId={order.id}
           status={order.status}
           canOwnerActions={session?.role === "owner"}
+          canDelete={session ? canDeleteRecords(session.role) : false}
           remainingBalance={order.remainingBalance}
         />
       </div>

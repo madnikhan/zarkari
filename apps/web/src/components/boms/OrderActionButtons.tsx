@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { BomsActionButton } from "@/components/boms/BomsActionButton";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 
+const DELETABLE_STATUSES = ["order_created", "cancelled", "refunded"];
+
 interface Props {
   orderId: string;
   status: string;
   canOwnerActions?: boolean;
+  canDelete?: boolean;
   remainingBalance?: string;
 }
 
@@ -16,12 +19,13 @@ export function OrderActionButtons({
   orderId,
   status,
   canOwnerActions = true,
+  canDelete = false,
   remainingBalance = "0",
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [activeModal, setActiveModal] = useState<"cancel" | "refund" | "redesign" | "collect" | null>(null);
+  const [activeModal, setActiveModal] = useState<"cancel" | "refund" | "redesign" | "collect" | "delete" | null>(null);
   const [redesignReason, setRedesignReason] = useState("");
   const [redesignComment, setRedesignComment] = useState("");
   const [cancelReason, setCancelReason] = useState("");
@@ -51,6 +55,22 @@ export function OrderActionButtons({
   }
 
   const showOwnerActions = canOwnerActions && !["collected", "cancelled", "refunded"].includes(status);
+  const showDelete = canDelete && DELETABLE_STATUSES.includes(status);
+
+  async function hardDelete() {
+    setLoading("delete");
+    setError("");
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Delete failed (${res.status})`);
+      router.push("/admin/orders");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -101,6 +121,16 @@ export function OrderActionButtons({
           {status === "ready_for_collection" && (
             <BomsActionButton color="blue" disabled={!!loading} onClick={() => setActiveModal("collect")} className="col-span-2">
               Order Completed
+            </BomsActionButton>
+          )}
+          {showDelete && (
+            <BomsActionButton
+              color="red"
+              disabled={!!loading}
+              onClick={() => setActiveModal("delete")}
+              className="col-span-2"
+            >
+              Delete Order
             </BomsActionButton>
           )}
         </div>
@@ -226,6 +256,21 @@ export function OrderActionButtons({
               }
             >
               Confirm Completion
+            </BomsActionButton>
+          </div>
+        </div>
+      )}
+
+      {activeModal === "delete" && (
+        <div className="boms-card p-5 space-y-3">
+          <h3 className="font-semibold text-slate-900">Delete Order</h3>
+          <p className="text-sm text-slate-600">
+            Permanently delete this order and related files, timeline, payments, and messages. This cannot be undone.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <BomsActionButton color="slate" onClick={() => setActiveModal(null)}>Back</BomsActionButton>
+            <BomsActionButton color="red" disabled={!!loading} onClick={hardDelete}>
+              {loading === "delete" ? "Deleting…" : "Confirm Delete"}
             </BomsActionButton>
           </div>
         </div>

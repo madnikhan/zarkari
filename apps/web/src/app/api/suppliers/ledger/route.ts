@@ -111,6 +111,19 @@ export async function PATCH(request: Request) {
     businessDate: body.businessDate,
   });
 
+  if (entry?.cashTransactionId && (body.amountGbp !== undefined || body.description !== undefined)) {
+    const { updateCashTransaction } = await import("@/lib/db/cash-ledger");
+    await updateCashTransaction(entry.cashTransactionId, {
+      ...(body.amountGbp !== undefined ? { amount: String(body.amountGbp) } : {}),
+      ...(body.description !== undefined
+        ? { description: body.description ? String(body.description) : null }
+        : {}),
+    });
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin/cash/analytics");
+    revalidatePath("/admin/reports");
+  }
+
   revalidatePath("/admin/suppliers/payments");
   if (entry) revalidatePath(`/admin/suppliers/${entry.supplierId}/khata`);
   return NextResponse.json({ entry });

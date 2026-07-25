@@ -151,6 +151,15 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
     stopNotificationAlert();
   }
 
+  async function dismiss(id: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = notifications.find((n) => n.id === id);
+    await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (target && !target.read) setUnreadCount((c) => Math.max(0, c - 1));
+  }
+
   const dropdown = open ? (
     <div
       className="fixed z-[60] w-[min(20rem,calc(100vw-2rem))] bg-white border border-slate-200 rounded-lg shadow-xl max-h-96 overflow-y-auto text-slate-900"
@@ -171,12 +180,22 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
           const href = notificationHref(n);
           const content = (
             <>
-              <p className="font-medium text-slate-900">{n.title}</p>
-              {n.body && <p className="text-slate-600 text-xs mt-0.5">{n.body}</p>}
+              <p className="font-medium text-slate-900 pr-6">{n.title}</p>
+              {n.body && <p className="text-slate-600 text-xs mt-0.5 pr-6">{n.body}</p>}
             </>
           );
+          const dismissBtn = (
+            <button
+              type="button"
+              onClick={(e) => void dismiss(n.id, e)}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
+          );
           const className =
-            "block p-3 border-b border-slate-100 text-sm hover:bg-slate-50 text-slate-900";
+            "relative block p-3 border-b border-slate-100 text-sm hover:bg-slate-50 text-slate-900";
           if (href) {
             return (
               <Link
@@ -190,6 +209,7 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
                 className={className}
               >
                 {content}
+                {dismissBtn}
               </Link>
             );
           }
@@ -206,6 +226,7 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
               tabIndex={0}
             >
               {content}
+              {dismissBtn}
             </div>
           );
         })

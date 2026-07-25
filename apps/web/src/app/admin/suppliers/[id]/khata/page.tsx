@@ -5,19 +5,21 @@ import { getSupplier } from "@/lib/data";
 import { listSupplierLedger, computeRunningBalances } from "@/lib/supplier-ledger/service";
 import { formatPrice } from "@/lib/utils";
 import { AddKhataEntryForm } from "@/components/admin/suppliers/AddKhataEntryForm";
+import { KhataEntriesTable } from "@/components/admin/suppliers/KhataEntriesTable";
 import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { resolveSearchDateBounds } from "@/lib/admin/date-range";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
 
 interface Props {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ from?: string; to?: string; preset?: string }>;
 }
 
-const numCell = "px-3 py-2 text-right tabular-nums whitespace-nowrap";
-
 export default async function SupplierKhataPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { from, to, preset } = await searchParams;
+  const session = await getSession();
+  const canDelete = session ? canDeleteRecords(session.role) : false;
   const supplier = await getSupplier(id);
   if (!supplier) notFound();
 
@@ -60,55 +62,7 @@ export default async function SupplierKhataPage({ params, searchParams }: Props)
 
       <div className="space-y-6 mb-8">
         <AddKhataEntryForm supplierId={id} />
-
-        <div className="boms-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[960px]">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/80">
-                  <th className="text-left px-3 py-2 font-medium text-slate-500">Date</th>
-                  <th className="text-left px-3 py-2 font-medium text-slate-500">Type</th>
-                  <th className="text-left px-3 py-2 font-medium text-slate-500">Description</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">GBP</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">PKR</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">Rate</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">Balance (GBP)</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">Balance (PKR)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {withRunning.map((e) => (
-                  <tr key={e.id}>
-                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                      {new Date(e.businessDate).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="px-3 py-2 capitalize">{e.type}</td>
-                    <td className="px-3 py-2 max-w-xs">
-                      <p className="truncate" title={e.description ?? e.billNumber ?? undefined}>
-                        {e.description ?? e.billNumber ?? "—"}
-                      </p>
-                    </td>
-                    <td className={numCell}>
-                      {e.type === "payment" ? "-" : ""}
-                      {formatPrice(e.amountGbp)}
-                    </td>
-                    <td className={numCell}>
-                      {e.type === "payment" ? "-" : ""}Rs {parseFloat(e.amountPkr).toLocaleString("en-GB")}
-                    </td>
-                    <td className={`${numCell} text-slate-500`}>{e.exchangeRate ?? "—"}</td>
-                    <td className={numCell}>{formatPrice(String(e.runningGbp))}</td>
-                    <td className={`${numCell} font-semibold bg-violet-50/60 text-slate-800`}>
-                      Rs {e.runningPkr.toLocaleString("en-GB")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!withRunning.length && (
-            <p className="text-center text-slate-400 py-8 text-sm">No entries yet.</p>
-          )}
-        </div>
+        <KhataEntriesTable entries={withRunning} canDelete={canDelete} />
       </div>
     </div>
   );

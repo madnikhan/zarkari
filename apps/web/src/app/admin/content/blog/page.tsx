@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getAllBlogPosts } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
-import { NewBlogPostForm } from "@/components/admin/content/BlogEditors";
+import { DeleteBlogPostButton, NewBlogPostForm } from "@/components/admin/content/BlogEditors";
 import { CmsOwnerBanner } from "@/components/admin/content/CmsOwnerBanner";
 
 export default async function ContentBlogPage() {
@@ -42,10 +42,14 @@ export default async function ContentBlogPage() {
                   <td className="p-4 hidden md:table-cell text-slate-500">
                     {new Date(post.publishedAt).toLocaleDateString("en-GB")}
                   </td>
-                  <td className="p-4 text-right">
-                    <Link href={`/admin/content/blog/${post.id}`} className="text-[#4C3BCF] text-xs font-medium hover:underline">
+                  <td className="p-4 text-right whitespace-nowrap">
+                    <Link
+                      href={`/admin/content/blog/${post.id}`}
+                      className="text-[#4C3BCF] text-xs font-medium hover:underline"
+                    >
                       Edit
                     </Link>
+                    {isOwner && <DeleteBlogPostButton id={post.id} title={post.title} />}
                   </td>
                 </tr>
               ))

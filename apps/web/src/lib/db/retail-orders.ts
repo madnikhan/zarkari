@@ -1,4 +1,4 @@
-import { desc, eq, inArray, or, ilike } from "drizzle-orm";
+import { and, desc, eq, inArray, or, ilike } from "drizzle-orm";
 import type { RetailOrder } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
 
@@ -221,4 +221,52 @@ export async function getRetailOrderStatusDb(id: string): Promise<string | null>
     .where(eq(schema.retailOrders.id, id))
     .limit(1);
   return row?.status ?? null;
+}
+
+export async function updateRetailOrderCustomerDb(
+  id: string,
+  patch: { customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null }
+): Promise<RetailOrder | null> {
+  const db = getDb();
+  if (!db) return null;
+  const values: Record<string, string | null> = {};
+  if (patch.customerName !== undefined) values.customerName = patch.customerName;
+  if (patch.customerPhone !== undefined) values.customerPhone = patch.customerPhone;
+  if (patch.customerEmail !== undefined) values.customerEmail = patch.customerEmail;
+  if (!Object.keys(values).length) return getRetailOrderByIdDb(id);
+
+  const [row] = await db
+    .update(schema.retailOrders)
+    .set(values)
+    .where(eq(schema.retailOrders.id, id))
+    .returning();
+  if (!row) return null;
+  return getRetailOrderByIdDb(id);
+}
+
+/** Permanently remove a retail order and its line items. Caller must enforce status/auth. */
+export async function deleteRetailOrderDb(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.retailOrderItems).where(eq(schema.retailOrderItems.orderId, id));
+    await tx
+      .update(schema.cashTransactions)
+      .set({ retailOrderId: null })
+      .where(eq(schema.cashTransactions.retailOrderId, id));
+    await tx
+      .delete(schema.stockMovements)
+      .where(
+        and(
+          eq(schema.stockMovements.referenceType, "retail_order"),
+          eq(schema.stockMovements.referenceId, id)
+        )
+      );
+    const deleted = await tx
+      .delete(schema.retailOrders)
+      .where(eq(schema.retailOrders.id, id))
+      .returning({ id: schema.retailOrders.id });
+    return deleted.length > 0;
+  });
 }

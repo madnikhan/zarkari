@@ -2,7 +2,25 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getBridalOrderById, getCustomer, getOrderFiles, getPendingSupplierUpdates, getSupplierMessages, getTimeline } from "@/lib/data";
 import { editBridalOrder } from "@/lib/data/actions";
-import { getSession } from "@/lib/auth/session";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
+import { isDbConfigured } from "@/lib/db";
+import {
+  canHardDeleteBridalOrder,
+  deleteBridalOrderDb,
+} from "@/lib/db/bridal-orders";
+import {
+  demoBridalOrders,
+  demoCancellations,
+  demoMessages,
+  demoNotifications,
+  demoOrderCollections,
+  demoOrderFiles,
+  demoPayments,
+  demoRedesigns,
+  demoRefunds,
+  demoSupplierCompletions,
+  demoTimeline,
+} from "@/lib/data/seed";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -92,4 +110,55 @@ export async function PATCH(request: Request, { params }: Props) {
     const message = err instanceof Error ? err.message : "Failed to update order";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+}
+
+export async function DELETE(_request: Request, { params }: Props) {
+  const session = await getSession();
+  if (!session || !canDeleteRecords(session.role)) {
+    return NextResponse.json({ error: "Owner only" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const order = await getBridalOrderById(id);
+  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (!canHardDeleteBridalOrder(order.status)) {
+    return NextResponse.json(
+      {
+        error:
+          "Cancel the order first before deleting. Delete is only allowed for order created, cancelled, or refunded.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (isDbConfigured()) {
+    const ok = await deleteBridalOrderDb(id);
+    if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  } else {
+    const idx = demoBridalOrders.findIndex((o) => o.id === id);
+    if (idx < 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    demoBridalOrders.splice(idx, 1);
+    const scrub = <T extends { orderId: string }>(arr: T[]) => {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i].orderId === id) arr.splice(i, 1);
+      }
+    };
+    scrub(demoTimeline);
+    scrub(demoOrderFiles);
+    scrub(demoMessages);
+    scrub(demoRedesigns);
+    scrub(demoCancellations);
+    scrub(demoRefunds);
+    scrub(demoPayments);
+    scrub(demoOrderCollections);
+    scrub(demoSupplierCompletions);
+    for (let i = demoNotifications.length - 1; i >= 0; i--) {
+      if (demoNotifications[i].orderId === id) demoNotifications.splice(i, 1);
+    }
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+  return NextResponse.json({ ok: true });
 }

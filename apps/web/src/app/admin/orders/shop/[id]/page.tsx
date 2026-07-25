@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { getRetailOrderByIdDb } from "@/lib/db/retail-orders";
 import { RetailOrderStatusSelect } from "@/components/admin/RetailOrderStatusSelect";
 import { InvoiceActions } from "@/components/admin/InvoiceActions";
+import { ShopOrderActions } from "@/components/admin/ShopOrderActions";
 import { MEASUREMENT_FIELDS, formatInches } from "@/lib/sizing";
 import { formatPrice } from "@/lib/utils";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -23,10 +25,12 @@ const PAYMENT_LABELS = {
 
 export default async function ShopOrderDetailPage({ params }: Props) {
   const { id } = await params;
+  const session = await getSession();
   const order = await getRetailOrderByIdDb(id);
   if (!order) notFound();
 
   const source = order.source ?? "online";
+  const canDelete = session ? canDeleteRecords(session.role) : false;
 
   return (
     <div className="p-4 lg:p-8 max-w-3xl">
@@ -63,6 +67,17 @@ export default async function ShopOrderDetailPage({ params }: Props) {
         <p className="font-medium">{order.customerName ?? "—"}</p>
         {order.customerPhone && <p className="text-sm text-slate-600">{order.customerPhone}</p>}
         {order.customerEmail && <p className="text-sm text-slate-600">{order.customerEmail}</p>}
+      </div>
+
+      <div className="mb-4">
+        <ShopOrderActions
+          orderId={order.id}
+          status={order.status}
+          canDelete={canDelete}
+          customerName={order.customerName}
+          customerPhone={order.customerPhone}
+          customerEmail={order.customerEmail}
+        />
       </div>
 
       <div className="boms-card p-5 mb-4 space-y-2">

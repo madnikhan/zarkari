@@ -9,6 +9,7 @@ import { resolveSearchDateBounds } from "@/lib/admin/date-range";
 import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { CargoBoxDetail } from "./CargoBoxDetail";
 import { CargoBoxList } from "./CargoBoxList";
+import { ManageCompaniesModal } from "./ManageCompaniesModal";
 import { NewCargoBoxModal } from "./NewCargoBoxModal";
 
 function buildBoxesQuery(search: string, searchParams: URLSearchParams): string {
@@ -28,7 +29,7 @@ function buildBoxesQuery(search: string, searchParams: URLSearchParams): string 
   return qs ? `?${qs}` : "";
 }
 
-export function CargoPageClient() {
+export function CargoPageClient({ canDelete = false }: { canDelete?: boolean }) {
   const searchParams = useSearchParams();
   const [boxes, setBoxes] = useState<CargoBox[]>([]);
   const [companies, setCompanies] = useState<CargoCompany[]>([]);
@@ -38,6 +39,7 @@ export function CargoPageClient() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showNewBox, setShowNewBox] = useState(false);
+  const [showManageCompanies, setShowManageCompanies] = useState(false);
   const [error, setError] = useState("");
 
   const dateKey = `${searchParams.get("from") ?? ""}|${searchParams.get("to") ?? ""}|${searchParams.get("preset") ?? ""}`;
@@ -162,14 +164,23 @@ export function CargoPageClient() {
           <h1 className="text-2xl font-semibold text-slate-900">Cargo &amp; Box Records</h1>
           <p className="text-sm text-slate-500 mt-1">Track incoming shipment boxes from Pakistan</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNewBox(true)}
-          data-tour="cargo-add-box"
-          className="boms-btn-primary px-4 py-2 rounded-lg text-sm font-medium shrink-0"
-        >
-          + Add New Box Entry
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowManageCompanies(true)}
+            className="px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50"
+          >
+            Manage companies
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowNewBox(true)}
+            data-tour="cargo-add-box"
+            className="boms-btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            + Add New Box Entry
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -235,6 +246,14 @@ export function CargoPageClient() {
           suppliers={suppliers}
           onClose={() => setShowNewBox(false)}
           onCreated={(box, company) => void handleBoxCreated(box, company)}
+        />
+      )}
+
+      {showManageCompanies && (
+        <ManageCompaniesModal
+          canDelete={canDelete}
+          onClose={() => setShowManageCompanies(false)}
+          onChanged={setCompanies}
         />
       )}
     </div>

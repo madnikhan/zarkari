@@ -1018,6 +1018,131 @@ export async function listCustomersDb(): Promise<Customer[]> {
   }));
 }
 
+export async function updateCustomerDb(
+  id: string,
+  patch: Partial<{ name: string; phone: string; email: string | null; address: string | null }>
+): Promise<Customer | null> {
+  const db = getDb();
+  if (!db) return null;
+  const values: Record<string, string | null> = {};
+  if (patch.name !== undefined) values.name = patch.name;
+  if (patch.phone !== undefined) values.phone = patch.phone;
+  if (patch.email !== undefined) values.email = patch.email;
+  if (patch.address !== undefined) values.address = patch.address;
+  if (!Object.keys(values).length) return getCustomerDb(id);
+  const [row] = await db
+    .update(schema.customers)
+    .set(values)
+    .where(eq(schema.customers.id, id))
+    .returning();
+  return row
+    ? { id: row.id, name: row.name, phone: row.phone, email: row.email ?? undefined, address: row.address ?? undefined }
+    : null;
+}
+
+export async function customerHasBlockingOrdersDb(
+  customerId: string
+): Promise<{ blocked: boolean; reason?: string }> {
+  const db = getDb();
+  if (!db) return { blocked: false };
+
+  const [bridal] = await db
+    .select({ c: count() })
+    .from(schema.bridalOrders)
+    .where(
+      and(
+        eq(schema.bridalOrders.customerId, customerId),
+        notInArray(schema.bridalOrders.status, ["cancelled", "refunded"])
+      )
+    );
+  if (Number(bridal?.c ?? 0) > 0) {
+    return { blocked: true, reason: "Customer has bridal orders that are not cancelled or refunded" };
+  }
+
+  const customer = await getCustomerDb(customerId);
+  if (!customer) return { blocked: false };
+
+  const matchPhoneOrEmail = [
+    customer.phone ? eq(schema.retailOrders.customerPhone, customer.phone) : undefined,
+    customer.email ? eq(schema.retailOrders.customerEmail, customer.email) : undefined,
+  ].filter(Boolean) as ReturnType<typeof eq>[];
+  if (matchPhoneOrEmail.length) {
+    const [retail] = await db
+      .select({ c: count() })
+      .from(schema.retailOrders)
+      .where(
+        and(
+          or(...matchPhoneOrEmail),
+          notInArray(schema.retailOrders.status, ["cancelled", "refunded"])
+        )
+      );
+    if (Number(retail?.c ?? 0) > 0) {
+      return { blocked: true, reason: "Customer has retail orders that are not cancelled or refunded" };
+    }
+  }
+
+  return { blocked: false };
+}
+
+export async function deleteCustomerDb(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const result = await db.delete(schema.customers).where(eq(schema.customers.id, id));
+  return (result as { rowCount?: number }).rowCount !== 0;
+}
+
+export const BRIDAL_HARD_DELETE_STATUSES: BridalStatus[] = [
+  "order_created",
+  "cancelled",
+  "refunded",
+];
+
+export function canHardDeleteBridalOrder(status: string): boolean {
+  return BRIDAL_HARD_DELETE_STATUSES.includes(status as BridalStatus);
+}
+
+/** Permanently remove a bridal order and related rows. Caller must enforce status/auth. */
+export async function deleteBridalOrderDb(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.customerMessages).where(eq(schema.customerMessages.orderId, id));
+    await tx.delete(schema.orderTimelineEvents).where(eq(schema.orderTimelineEvents.orderId, id));
+    await tx.delete(schema.orderFiles).where(eq(schema.orderFiles.orderId, id));
+    await tx.delete(schema.orderRedesigns).where(eq(schema.orderRedesigns.orderId, id));
+    await tx.delete(schema.orderCancellations).where(eq(schema.orderCancellations.orderId, id));
+    await tx.delete(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, id));
+    await tx.delete(schema.orderCollections).where(eq(schema.orderCollections.orderId, id));
+    await tx.delete(schema.supplierCompletions).where(eq(schema.supplierCompletions.orderId, id));
+    await tx.delete(schema.bridalPayments).where(eq(schema.bridalPayments.orderId, id));
+    await tx.delete(schema.notifications).where(eq(schema.notifications.orderId, id));
+
+    await tx
+      .update(schema.cashTransactions)
+      .set({ orderId: null })
+      .where(eq(schema.cashTransactions.orderId, id));
+    await tx
+      .update(schema.cargoBoxItems)
+      .set({ bridalOrderId: null })
+      .where(eq(schema.cargoBoxItems.bridalOrderId, id));
+    await tx
+      .update(schema.supplierLedgerEntries)
+      .set({ orderId: null })
+      .where(eq(schema.supplierLedgerEntries.orderId, id));
+    await tx
+      .update(schema.deviceTokens)
+      .set({ orderId: null })
+      .where(eq(schema.deviceTokens.orderId, id));
+
+    const deleted = await tx
+      .delete(schema.bridalOrders)
+      .where(eq(schema.bridalOrders.id, id))
+      .returning({ id: schema.bridalOrders.id });
+    return deleted.length > 0;
+  });
+}
+
 export async function listCustomersPagedDb(opts?: {
   q?: string;
   limit?: number;

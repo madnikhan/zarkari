@@ -547,6 +547,42 @@ export async function createCashTransaction(input: {
   return row ? mapTransaction(row) : null;
 }
 
+export async function getCashTransaction(id: string): Promise<CashTransaction | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(schema.cashTransactions)
+    .where(eq(schema.cashTransactions.id, id))
+    .limit(1);
+  return row ? mapTransaction(row) : null;
+}
+
+export async function updateCashTransaction(
+  id: string,
+  patch: Partial<{
+    amount: string;
+    description: string | null;
+    method: CashPaymentMethod;
+    expenseCategory: string | null;
+  }>
+): Promise<CashTransaction | null> {
+  const db = getDb();
+  if (!db) return null;
+  const values: Record<string, string | null> = {};
+  if (patch.amount !== undefined) values.amount = patch.amount;
+  if (patch.description !== undefined) values.description = patch.description;
+  if (patch.method !== undefined) values.method = patch.method;
+  if (patch.expenseCategory !== undefined) values.expenseCategory = patch.expenseCategory;
+  if (!Object.keys(values).length) return getCashTransaction(id);
+  const [row] = await db
+    .update(schema.cashTransactions)
+    .set(values)
+    .where(eq(schema.cashTransactions.id, id))
+    .returning();
+  return row ? mapTransaction(row) : null;
+}
+
 export async function deleteCashTransaction(id: string): Promise<boolean> {
   const db = getDb();
   if (!db) return false;

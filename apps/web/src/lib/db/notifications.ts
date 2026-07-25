@@ -254,3 +254,37 @@ export async function countUnreadNotificationsDb(userId?: string): Promise<numbe
     );
   return rows.length;
 }
+
+export async function deleteNotificationDb(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const deleted = await db
+    .delete(schema.notifications)
+    .where(eq(schema.notifications.id, id))
+    .returning({ id: schema.notifications.id });
+  return deleted.length > 0;
+}
+
+export async function clearReadStaffNotificationsDb(staffUserId?: string): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const base = and(eq(schema.notifications.read, true), staffWhere(staffUserId));
+  const deleted = await db
+    .delete(schema.notifications)
+    .where(base)
+    .returning({ id: schema.notifications.id });
+  return deleted.length;
+}
+
+export async function clearReadSupplierNotificationsDb(supplierId: string): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const read = await listSupplierNotificationsDb(supplierId, { unreadOnly: false, limit: 5000 });
+  const ids = read.filter((n) => n.read).map((n) => n.id);
+  if (!ids.length) return 0;
+  const deleted = await db
+    .delete(schema.notifications)
+    .where(inArray(schema.notifications.id, ids))
+    .returning({ id: schema.notifications.id });
+  return deleted.length;
+}

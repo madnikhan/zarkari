@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, Trash2 } from "lucide-react";
 import type { SocialMessage, SocialThread } from "@/lib/social-inbox/types";
 import { isManualPlatform } from "@/lib/social-inbox/types";
 import { PlatformBadge, ThreadStatusBadge } from "./PlatformBadge";
@@ -20,6 +20,7 @@ export function InboxThreadView({ thread, messages: initialMessages }: InboxThre
   const [reply, setReply] = useState("");
   const [status, setStatus] = useState(thread.status);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -67,6 +68,22 @@ export function InboxThreadView({ thread, messages: initialMessages }: InboxThre
     }
   }
 
+  async function handleDelete() {
+    if (!confirm("Delete this conversation and all messages? This cannot be undone.")) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/inbox/${thread.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      router.push("/admin/inbox");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] lg:h-[calc(100vh-6rem)]">
       <div className="flex items-center gap-3 mb-4">
@@ -88,6 +105,16 @@ export function InboxThreadView({ thread, messages: initialMessages }: InboxThre
           )}
           {thread.subject && <p className="text-sm text-slate-500 truncate">{thread.subject}</p>}
         </div>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="p-2 rounded-lg text-red-500 hover:bg-red-50 disabled:opacity-50"
+          aria-label="Delete conversation"
+          title="Delete conversation"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
         <select
           value={status}
           onChange={(e) => handleStatusChange(e.target.value)}

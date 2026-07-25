@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getNotifications } from "@/lib/data";
 import { markAllNotificationsRead } from "@/lib/data/actions";
 import { getSession } from "@/lib/auth/session";
 import { isDbConfigured } from "@/lib/db";
 import {
+  clearReadStaffNotificationsDb,
+  clearReadSupplierNotificationsDb,
   countStaffUnreadDb,
   countSupplierUnreadDb,
   listStaffNotificationsDb,
@@ -19,6 +22,7 @@ import {
   resetStaffUnread,
   resetSupplierUnread,
 } from "@/lib/firebase/sync";
+import { demoNotifications } from "@/lib/data/seed";
 
 async function filterDemoForSupplier(
   notifications: Awaited<ReturnType<typeof getNotifications>>,
@@ -88,7 +92,6 @@ export async function PATCH(request: Request) {
     await markNotificationReadDb(body.id);
     if (isSupplier) decrementSupplierUnread(session.supplierId!);
     else decrementStaffUnread();
-    const { demoNotifications } = await import("@/lib/data/seed");
     const n = demoNotifications.find((x) => x.id === body.id);
     if (n) n.read = true;
     return NextResponse.json({ ok: true });
@@ -103,4 +106,36 @@ export async function PATCH(request: Request) {
     resetStaffUnread();
   }
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await request.json().catch(() => ({}));
+  if (!body.clearRead) {
+    return NextResponse.json(
+      { error: "Pass { clearRead: true } to clear read notifications" },
+      { status: 400 }
+    );
+  }
+
+  const isSupplier = session.role === "supplier" && !!session.supplierId;
+  let cleared = 0;
+
+  if (isDbConfigured()) {
+    cleared = isSupplier
+      ? await clearReadSupplierNotificationsDb(session.supplierId!)
+      : await clearReadStaffNotificationsDb(session.id);
+  } else {
+    for (let i = demoNotifications.length - 1; i >= 0; i--) {
+      if (demoNotifications[i].read) {
+        demoNotifications.splice(i, 1);
+        cleared += 1;
+      }
+    }
+  }
+
+  revalidatePath("/admin/notifications");
+  return NextResponse.json({ ok: true, cleared });
 }

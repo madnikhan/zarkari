@@ -3,6 +3,7 @@ import { getCustomersWithOrders } from "@/lib/data";
 import { CustomersPageClient } from "@/components/admin/CustomersPageClient";
 import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { dateSearchQuery, resolveSearchDateBounds } from "@/lib/admin/date-range";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
 
 const PAGE_SIZE = 20;
 
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export default async function AdminCustomersPage({ searchParams }: Props) {
+  const session = await getSession();
+  const canDelete = session ? canDeleteRecords(session.role) : false;
   const { page: pageStr = "1", q = "", from, to, preset } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
   const bounds = resolveSearchDateBounds({ from, to, preset });
@@ -47,6 +50,7 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
         total={total}
         q={q.trim()}
         dateQuery={dateQuery}
+        canDelete={canDelete}
       />
     </div>
   );

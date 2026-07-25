@@ -8,6 +8,7 @@ import Link from "next/link";
 import { notificationHref } from "@/lib/notification-link";
 import { getNotifications } from "@/lib/data";
 import { dateSearchQuery, resolveSearchDateBounds } from "@/lib/admin/date-range";
+import { NotificationDeleteButton } from "@/components/admin/NotificationDeleteButton";
 
 const PAGE_SIZE = 20;
 
@@ -103,11 +104,14 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
                     {n.body && <p className="text-sm text-slate-500 mt-1">{n.body}</p>}
                     <p className="text-xs text-slate-400 mt-2">{new Date(n.createdAt).toLocaleString("en-GB")}</p>
                   </div>
-                  {href && (
-                    <Link href={href} className="text-xs text-[#4C3BCF] hover:underline whitespace-nowrap">
-                      {n.threadId ? "View inbox" : n.orderId ? "View order" : "Open"}
-                    </Link>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {href && (
+                      <Link href={href} className="text-xs text-[#4C3BCF] hover:underline whitespace-nowrap">
+                        {n.threadId ? "View inbox" : n.orderId ? "View order" : "Open"}
+                      </Link>
+                    )}
+                    <NotificationDeleteButton id={n.id} />
+                  </div>
                 </div>
               </li>
             );

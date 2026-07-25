@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/auth/session";
-import { createProduct, updateProduct } from "@/lib/data/products";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
+import { createProduct, deleteProduct, updateProduct } from "@/lib/data/products";
 import { getProductById } from "@/lib/data";
 
 function revalidateProduct(handle: string, collectionHandles?: string[]) {
@@ -51,6 +51,39 @@ export async function PATCH(request: Request) {
 
   revalidateProduct(product.handle, [...(existing?.collectionHandles ?? []), ...product.collectionHandles]);
   return NextResponse.json({ product });
+}
+
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session || !canDeleteRecords(session.role)) {
+    return NextResponse.json({ error: "Owner only" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const id =
+    (typeof body.id === "string" && body.id) || searchParams.get("id") || "";
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const existing = await getProductById(id);
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const result = await deleteProduct(id);
+  if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  revalidateProduct(existing.handle, existing.collectionHandles);
+  revalidatePath("/admin/content/products");
+
+  if (result.soft) {
+    return NextResponse.json({
+      ok: true,
+      soft: true,
+      product: result.product,
+      message: "Product has order history and was unpublished instead of deleted",
+    });
+  }
+
+  return NextResponse.json({ ok: true, soft: false });
 }
 
 export async function GET(request: Request) {

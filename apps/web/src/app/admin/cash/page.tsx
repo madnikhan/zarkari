@@ -6,6 +6,7 @@ import {
   listTransactionsForRange,
 } from "@/lib/db/cash-ledger";
 import { parseCashPeriodPreset, resolvePeriodBounds, todayDateString } from "@/lib/cash/labels";
+import { canDeleteRecords, getSession } from "@/lib/auth/session";
 
 interface Props {
   searchParams: Promise<{
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export default async function AdminCashPage({ searchParams }: Props) {
+  const session = await getSession();
+  const canDelete = session ? canDeleteRecords(session.role) : false;
   const params = await searchParams;
   const dateParam = params.date?.slice(0, 10);
   const fromParam = params.from?.slice(0, 10);
@@ -39,6 +42,7 @@ export default async function AdminCashPage({ searchParams }: Props) {
           cashOut={cashOut}
           returnFrom={fromParam}
           returnTo={toParam}
+          canDelete={canDelete}
         />
       </div>
     );
@@ -56,7 +60,14 @@ export default async function AdminCashPage({ searchParams }: Props) {
 
     return (
       <div className="p-4 lg:p-8">
-        <CashDashboardClient viewMode="day" date={date} summary={summary} cashIn={cashIn} cashOut={cashOut} />
+        <CashDashboardClient
+          viewMode="day"
+          date={date}
+          summary={summary}
+          cashIn={cashIn}
+          cashOut={cashOut}
+          canDelete={canDelete}
+        />
       </div>
     );
   }
@@ -81,6 +92,7 @@ export default async function AdminCashPage({ searchParams }: Props) {
         cashIn={cashIn}
         cashOut={cashOut}
         transactionDate={todayDateString()}
+        canDelete={canDelete}
       />
     </div>
   );

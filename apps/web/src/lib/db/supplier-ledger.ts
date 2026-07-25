@@ -69,6 +69,17 @@ export async function addSupplierLedgerEntryDb(input: {
   return row ? mapRow(row) : null;
 }
 
+export async function getSupplierLedgerEntryDb(id: string): Promise<SupplierLedgerEntry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(schema.supplierLedgerEntries)
+    .where(eq(schema.supplierLedgerEntries.id, id))
+    .limit(1);
+  return row ? mapRow(row) : null;
+}
+
 export async function updateSupplierLedgerEntryDb(
   id: string,
   patch: Partial<{
@@ -85,6 +96,16 @@ export async function updateSupplierLedgerEntryDb(
   const [row] = await db
     .update(schema.supplierLedgerEntries)
     .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.supplierLedgerEntries.id, id))
+    .returning();
+  return row ? mapRow(row) : null;
+}
+
+export async function deleteSupplierLedgerEntryDb(id: string): Promise<SupplierLedgerEntry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .delete(schema.supplierLedgerEntries)
     .where(eq(schema.supplierLedgerEntries.id, id))
     .returning();
   return row ? mapRow(row) : null;

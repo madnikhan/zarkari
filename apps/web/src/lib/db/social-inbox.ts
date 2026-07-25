@@ -281,3 +281,18 @@ export async function updateThreadDb(
     .returning();
   return row ? mapThread(row) : null;
 }
+
+export async function deleteThreadDb(threadId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.socialMessages).where(eq(schema.socialMessages.threadId, threadId));
+    await tx.delete(schema.notifications).where(eq(schema.notifications.threadId, threadId));
+    const deleted = await tx
+      .delete(schema.socialThreads)
+      .where(eq(schema.socialThreads.id, threadId))
+      .returning({ id: schema.socialThreads.id });
+    return deleted.length > 0;
+  });
+}

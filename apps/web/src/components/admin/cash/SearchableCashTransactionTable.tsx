@@ -12,6 +12,7 @@ interface Props {
   transactions: CashTransaction[];
   total: number;
   groupByDay?: boolean;
+  canDelete?: boolean;
 }
 
 export function SearchableCashTransactionTable({
@@ -20,6 +21,7 @@ export function SearchableCashTransactionTable({
   transactions,
   total,
   groupByDay = false,
+  canDelete = false,
 }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -58,6 +60,7 @@ export function SearchableCashTransactionTable({
         total={q.trim() ? filteredTotal : total}
         groupByDay={groupByDay}
         scrollable
+        canDelete={canDelete}
       />
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-3">

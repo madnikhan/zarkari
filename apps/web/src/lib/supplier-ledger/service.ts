@@ -126,6 +126,14 @@ export async function addSupplierLedgerEntry(input: {
   return entry;
 }
 
+export async function getSupplierLedgerEntry(id: string): Promise<SupplierLedgerEntry | null> {
+  if (isDbConfigured()) {
+    const { getSupplierLedgerEntryDb } = await import("@/lib/db/supplier-ledger");
+    return getSupplierLedgerEntryDb(id);
+  }
+  return demoSupplierLedger.find((e) => e.id === id) ?? null;
+}
+
 export async function updateSupplierLedgerEntry(
   id: string,
   patch: Partial<{
@@ -145,6 +153,17 @@ export async function updateSupplierLedgerEntry(
   if (!entry) return null;
   Object.assign(entry, patch);
   return entry;
+}
+
+export async function deleteSupplierLedgerEntry(id: string): Promise<SupplierLedgerEntry | null> {
+  if (isDbConfigured()) {
+    const { deleteSupplierLedgerEntryDb } = await import("@/lib/db/supplier-ledger");
+    return deleteSupplierLedgerEntryDb(id);
+  }
+  const idx = demoSupplierLedger.findIndex((e) => e.id === id);
+  if (idx < 0) return null;
+  const [removed] = demoSupplierLedger.splice(idx, 1);
+  return removed ?? null;
 }
 
 export function computeRunningBalances(entries: SupplierLedgerEntry[]): (SupplierLedgerEntry & {

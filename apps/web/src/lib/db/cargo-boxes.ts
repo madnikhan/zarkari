@@ -77,23 +77,51 @@ export async function ensureDefaultCargoCompaniesDb(): Promise<void> {
   }
 }
 
-export async function listCargoCompaniesDb(): Promise<CargoCompany[]> {
-  const db = getDb();
-  if (!db) return [];
-  await ensureDefaultCargoCompaniesDb();
-  const rows = await db
-    .select()
-    .from(schema.cargoCompanies)
-    .where(eq(schema.cargoCompanies.active, true))
-    .orderBy(schema.cargoCompanies.name);
-  return rows.map(mapCompany);
-}
-
 export async function createCargoCompanyDb(name: string): Promise<CargoCompany | null> {
   const db = getDb();
   if (!db) return null;
   const [row] = await db.insert(schema.cargoCompanies).values({ name }).returning();
   return row ? mapCompany(row) : null;
+}
+
+export async function listCargoCompaniesDb(opts?: { includeInactive?: boolean }): Promise<CargoCompany[]> {
+  const db = getDb();
+  if (!db) return [];
+  await ensureDefaultCargoCompaniesDb();
+  const rows = opts?.includeInactive
+    ? await db.select().from(schema.cargoCompanies).orderBy(schema.cargoCompanies.name)
+    : await db
+        .select()
+        .from(schema.cargoCompanies)
+        .where(eq(schema.cargoCompanies.active, true))
+        .orderBy(schema.cargoCompanies.name);
+  return rows.map(mapCompany);
+}
+
+export async function updateCargoCompanyDb(
+  id: string,
+  patch: { name?: string; active?: boolean }
+): Promise<CargoCompany | null> {
+  const db = getDb();
+  if (!db || !isUuid(id)) return null;
+  const updates: Partial<typeof schema.cargoCompanies.$inferInsert> = {};
+  if (patch.name !== undefined) updates.name = patch.name;
+  if (patch.active !== undefined) updates.active = patch.active;
+  if (!Object.keys(updates).length) {
+    const [row] = await db.select().from(schema.cargoCompanies).where(eq(schema.cargoCompanies.id, id)).limit(1);
+    return row ? mapCompany(row) : null;
+  }
+  const [row] = await db
+    .update(schema.cargoCompanies)
+    .set(updates)
+    .where(eq(schema.cargoCompanies.id, id))
+    .returning();
+  return row ? mapCompany(row) : null;
+}
+
+/** Soft-deactivate; allowed even when boxes still reference the company. */
+export async function deactivateCargoCompanyDb(id: string): Promise<CargoCompany | null> {
+  return updateCargoCompanyDb(id, { active: false });
 }
 
 export async function nextBoxNumberDb(): Promise<string> {

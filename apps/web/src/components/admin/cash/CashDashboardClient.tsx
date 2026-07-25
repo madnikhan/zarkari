@@ -20,6 +20,7 @@ interface DayProps {
   cashOut: CashTransaction[];
   returnFrom?: string;
   returnTo?: string;
+  canDelete?: boolean;
 }
 
 interface PeriodProps {
@@ -29,12 +30,14 @@ interface PeriodProps {
   cashIn: CashTransaction[];
   cashOut: CashTransaction[];
   transactionDate: string;
+  canDelete?: boolean;
 }
 
 type Props = DayProps | PeriodProps;
 
 export function CashDashboardClient(props: Props) {
   const [addOpen, setAddOpen] = useState(false);
+  const canDelete = props.canDelete ?? false;
 
   if (props.viewMode === "day") {
     const { date, summary, cashIn, cashOut, returnFrom, returnTo } = props;
@@ -80,12 +83,14 @@ export function CashDashboardClient(props: Props) {
             accent="in"
             transactions={cashIn}
             total={summary.totalCashIn}
+            canDelete={canDelete}
           />
           <SearchableCashTransactionTable
             title="Today's Cash Out Transactions"
             accent="out"
             transactions={cashOut}
             total={summary.totalCashOut}
+            canDelete={canDelete}
           />
         </div>
 
@@ -132,6 +137,7 @@ export function CashDashboardClient(props: Props) {
           transactions={cashIn}
           total={rangeSummary.totalCashIn}
           groupByDay
+          canDelete={canDelete}
         />
         <SearchableCashTransactionTable
           title="Cash Out Transactions"
@@ -139,6 +145,7 @@ export function CashDashboardClient(props: Props) {
           transactions={cashOut}
           total={rangeSummary.totalCashOut}
           groupByDay
+          canDelete={canDelete}
         />
       </div>
 

@@ -14,6 +14,7 @@ interface Props {
   total: number;
   groupByDay?: boolean;
   scrollable?: boolean;
+  canDelete?: boolean;
 }
 
 function groupTransactions(transactions: CashTransaction[]) {
@@ -33,6 +34,7 @@ export function CashTransactionTable({
   total,
   groupByDay = false,
   scrollable = false,
+  canDelete = false,
 }: Props) {
   const [selected, setSelected] = useState<CashTransaction | null>(null);
   const headerClass =
@@ -126,7 +128,11 @@ export function CashTransactionTable({
           <span>{formatPrice(String(total))}</span>
         </div>
       </div>
-      <CashTransactionDetailModal transaction={selected} onClose={() => setSelected(null)} />
+      <CashTransactionDetailModal
+        transaction={selected}
+        onClose={() => setSelected(null)}
+        canDelete={canDelete}
+      />
     </>
   );
 }

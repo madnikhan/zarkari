@@ -318,6 +318,55 @@ export async function updateProductDb(
   return getProductByIdDb(id);
 }
 
+export async function productHasRetailOrderItemsDb(productId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db || !isUuid(productId)) return false;
+  const [row] = await db
+    .select({ id: schema.retailOrderItems.id })
+    .from(schema.retailOrderItems)
+    .where(eq(schema.retailOrderItems.productId, productId))
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * Hard-delete when no retail order history; otherwise unpublish (soft).
+ * Returns { product, soft } — soft true means unpublished, not removed.
+ */
+export async function deleteProductDb(
+  id: string
+): Promise<{ product: Product | null; soft: boolean } | null> {
+  const db = getDb();
+  if (!db || !isUuid(id)) return null;
+
+  const existing = await getProductByIdDb(id);
+  if (!existing) return null;
+
+  const hasOrders = await productHasRetailOrderItemsDb(id);
+  if (hasOrders) {
+    await db.update(schema.products).set({ published: false }).where(eq(schema.products.id, id));
+    const product = await getProductByIdDb(id);
+    return { product, soft: true };
+  }
+
+  const variants = await db
+    .select({ id: schema.productVariants.id })
+    .from(schema.productVariants)
+    .where(eq(schema.productVariants.productId, id));
+  const variantIds = variants.map((v) => v.id);
+
+  await db.delete(schema.stockMovements).where(eq(schema.stockMovements.productId, id));
+  if (variantIds.length) {
+    await db.delete(schema.stockMovements).where(inArray(schema.stockMovements.variantId, variantIds));
+  }
+  await db.delete(schema.productImages).where(eq(schema.productImages.productId, id));
+  await db.delete(schema.productCollections).where(eq(schema.productCollections.productId, id));
+  await db.delete(schema.productVariants).where(eq(schema.productVariants.productId, id));
+  await db.delete(schema.products).where(eq(schema.products.id, id));
+
+  return { product: existing, soft: false };
+}
+
 export async function countProductsDb(): Promise<number> {
   const db = getDb();
   if (!db) return 0;

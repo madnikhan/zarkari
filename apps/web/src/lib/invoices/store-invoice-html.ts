@@ -3,6 +3,7 @@ import {
   STORE_PHONE_DISPLAY,
   STORE_SITE_URL,
 } from "@/lib/brand/store-contact";
+import { BRIDAL_TERMS_ACCEPTANCE, BRIDAL_TERMS_CLAUSES } from "@/lib/bridal-terms";
 import { formatPrice } from "@/lib/utils";
 
 export type StoreInvoiceLine = {
@@ -53,6 +54,11 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
         .join("")
     : `<div class="desc-line"><span>—</span><span></span></div>`;
 
+  const termsItems = BRIDAL_TERMS_CLAUSES.map(
+    (c, i) =>
+      `<li><strong>${i + 1}. ${escapeHtml(c.title)}:</strong> ${escapeHtml(c.body)}</li>`
+  ).join("");
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,6 +87,12 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   .pay-row > span { font-weight: 600; min-width: 120px; }
   .pay { display: inline-flex; align-items: center; gap: 6px; }
   .pay .box { display: inline-flex; width: 16px; height: 16px; border: 1px solid #333; align-items: center; justify-content: center; font-size: 11px; }
+  .terms { margin: 20px 0 8px; padding-top: 12px; border-top: 1px solid #ddd; font-family: system-ui, sans-serif; }
+  .terms h2 { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 8px; color: #333; }
+  .terms ol { margin: 0; padding-left: 1.1rem; font-size: 8px; line-height: 1.35; color: #444; }
+  .terms li { margin-bottom: 3px; }
+  .terms li strong { color: #222; }
+  .terms .accept { margin-top: 8px; font-size: 8px; font-style: italic; color: #333; line-height: 1.35; }
   .footer { margin: 28px -28px 0; background: #1a1a1a; color: #f5f0e8; text-align: center; padding: 12px; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 0.04em; }
   .footer a { color: #f5f0e8; text-decoration: none; }
   .actions { max-width: 520px; margin: 12px auto 32px; display: flex; gap: 8px; justify-content: center; font-family: system-ui, sans-serif; }
@@ -89,6 +101,7 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
     body { background: #fff; }
     .sheet { border: none; margin: 0; max-width: none; }
     .actions { display: none !important; }
+    .terms { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -128,6 +141,12 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
 
     <div class="row"><label>Customer Contact #</label><div class="val">${escapeHtml(data.customerPhone ?? "—")}</div></div>
     <div class="row"><label>Signature</label><div class="val"></div></div>
+
+    <div class="terms">
+      <h2>Terms &amp; Conditions</h2>
+      <ol>${termsItems}</ol>
+      <p class="accept">${escapeHtml(BRIDAL_TERMS_ACCEPTANCE)}</p>
+    </div>
 
     <div class="footer">
       <a href="${STORE_SITE_URL}">🌐 ${STORE_SITE_URL.replace(/^https?:\/\//, "")}</a>

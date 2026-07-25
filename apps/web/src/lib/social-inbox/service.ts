@@ -368,3 +368,19 @@ export async function updateSocialThread(
   thread.updatedAt = new Date().toISOString();
   return thread;
 }
+
+export async function deleteSocialThread(threadId: string): Promise<boolean> {
+  if (isDbConfigured()) {
+    return dbLayer.deleteThreadDb(threadId);
+  }
+  const idx = demoSocialThreads.findIndex((t) => t.id === threadId);
+  if (idx < 0) return false;
+  demoSocialThreads.splice(idx, 1);
+  for (let i = demoSocialMessages.length - 1; i >= 0; i--) {
+    if (demoSocialMessages[i].threadId === threadId) demoSocialMessages.splice(i, 1);
+  }
+  for (let i = demoNotifications.length - 1; i >= 0; i--) {
+    if (demoNotifications[i].threadId === threadId) demoNotifications.splice(i, 1);
+  }
+  return true;
+}

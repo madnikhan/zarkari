@@ -91,6 +91,13 @@ export async function updateBlogPostDb(
   return row ? mapPost(row) : null;
 }
 
+export async function deleteBlogPostDb(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const deleted = await db.delete(schema.blogPosts).where(eq(schema.blogPosts.id, id)).returning({ id: schema.blogPosts.id });
+  return deleted.length > 0;
+}
+
 export async function countBlogPostsDb(): Promise<number> {
   const db = getDb();
   if (!db) return 0;

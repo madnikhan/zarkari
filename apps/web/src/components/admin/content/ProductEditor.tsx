@@ -93,6 +93,37 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
     }
   }
 
+  async function remove() {
+    if (
+      !confirm(
+        `Delete “${product.title}”? If it has retail order history it will be unpublished instead.`
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(product.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Delete failed");
+      if (data.soft) {
+        setError(data.message ?? "Product unpublished because it has order history");
+        setForm((f) => ({ ...f, published: false }));
+        router.refresh();
+        return;
+      }
+      router.refresh();
+      router.push("/admin/content/products");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const totalStock = STANDARD_SIZES.reduce((sum, s) => sum + form.sizeStock[s], 0);
 
   return (
@@ -180,9 +211,25 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
         Published on storefront
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={loading || !isOwner} className="boms-btn-primary px-5 py-2 rounded-lg text-sm disabled:opacity-50">
-        {loading ? "Saving…" : "Save product"}
-      </button>
+      <div className="flex flex-wrap gap-3 items-center">
+        <button
+          type="submit"
+          disabled={loading || !isOwner}
+          className="boms-btn-primary px-5 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? "Saving…" : "Save product"}
+        </button>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => void remove()}
+            disabled={loading}
+            className="px-5 py-2 rounded-lg text-sm text-red-600 border border-red-200 disabled:opacity-50"
+          >
+            Delete
+          </button>
+        )}
+      </div>
     </form>
   );
 }
