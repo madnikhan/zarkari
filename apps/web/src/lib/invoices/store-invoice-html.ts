@@ -55,8 +55,8 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
     : `<div class="desc-line"><span>—</span><span></span></div>`;
 
   const termsItems = BRIDAL_TERMS_CLAUSES.map(
-    (c, i) =>
-      `<li><strong>${i + 1}. ${escapeHtml(c.title)}:</strong> ${escapeHtml(c.body)}</li>`
+    (c) =>
+      `<li><strong>${escapeHtml(c.title)}:</strong> ${escapeHtml(c.body)}</li>`
   ).join("");
 
   return `<!DOCTYPE html>
