@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { BomsActionButton } from "@/components/boms/BomsActionButton";
 import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 
-const DELETABLE_STATUSES = ["order_created", "cancelled", "refunded"];
-
 interface Props {
   orderId: string;
   status: string;
@@ -55,7 +53,7 @@ export function OrderActionButtons({
   }
 
   const showOwnerActions = canOwnerActions && !["collected", "cancelled", "refunded"].includes(status);
-  const showDelete = canDelete && DELETABLE_STATUSES.includes(status);
+  const showDelete = canDelete;
 
   async function hardDelete() {
     setLoading("delete");

@@ -125,8 +125,7 @@ export async function DELETE(_request: Request, { params }: Props) {
   if (!canHardDeleteBridalOrder(order.status)) {
     return NextResponse.json(
       {
-        error:
-          "Cancel the order first before deleting. Delete is only allowed for order created, cancelled, or refunded.",
+        error: "This order cannot be deleted in its current status.",
       },
       { status: 400 }
     );

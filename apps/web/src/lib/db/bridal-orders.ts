@@ -1091,14 +1091,9 @@ export async function deleteCustomerDb(id: string): Promise<boolean> {
   return (result as { rowCount?: number }).rowCount !== 0;
 }
 
-export const BRIDAL_HARD_DELETE_STATUSES: BridalStatus[] = [
-  "order_created",
-  "cancelled",
-  "refunded",
-];
-
-export function canHardDeleteBridalOrder(status: string): boolean {
-  return BRIDAL_HARD_DELETE_STATUSES.includes(status as BridalStatus);
+/** Owners may hard-delete bridal orders in any status (UI is owner-gated via canDeleteRecords). */
+export function canHardDeleteBridalOrder(_status: string): boolean {
+  return true;
 }
 
 /** Permanently remove a bridal order and related rows. Caller must enforce status/auth. */
