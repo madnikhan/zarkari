@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 type Props = {
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   variant?: "dark" | "light";
   suffix?: string;
   className?: string;
@@ -11,6 +11,7 @@ const sizeClasses = {
   sm: "text-sm tracking-[0.4em]",
   md: "text-xl tracking-[0.42em]",
   lg: "text-2xl tracking-[0.48em]",
+  xl: "text-4xl md:text-6xl tracking-[0.5em]",
 };
 
 const variantClasses = {

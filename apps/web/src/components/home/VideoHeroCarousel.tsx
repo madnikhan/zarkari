@@ -217,7 +217,7 @@ export function VideoHeroCarousel({ videos, tagline, headline }: VideoHeroCarous
 
       <div className="relative z-10 flex min-h-[90vh] flex-col justify-end px-4 pb-16 pt-24 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl">
-          <ZarkariLogo size="lg" variant="light" className="mb-4" />
+          <ZarkariLogo size="xl" variant="light" className="mb-4" />
           {headline && !isBrandHeadline(headline) && (
             <h1 className="font-display text-3xl md:text-5xl text-cream mb-4 tracking-wide">{headline}</h1>
           )}

@@ -72,6 +72,7 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; background: #f5f5f5; }
   .sheet { max-width: 520px; margin: 24px auto; background: #fff; border: 1px solid #ddd; padding: 28px 28px 0; }
+  .sheet.terms-page { padding-bottom: 28px; }
   .brand { text-align: center; font-family: Montserrat, ui-sans-serif, sans-serif; font-size: 28px; letter-spacing: 0.42em; font-weight: 100; text-transform: uppercase; margin: 0 0 8px; line-height: 1; }
   .contact { text-align: center; font-family: system-ui, sans-serif; font-size: 12px; color: #444; line-height: 1.5; margin-bottom: 16px; }
   .wave { height: 10px; background: linear-gradient(90deg, #1a1a1a 0%, #c4a574 50%, #1a1a1a 100%); border-radius: 2px; margin: 12px 0 20px; }
@@ -90,12 +91,12 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   .pay-row > span { font-weight: 600; min-width: 120px; }
   .pay { display: inline-flex; align-items: center; gap: 6px; }
   .pay .box { display: inline-flex; width: 16px; height: 16px; border: 1px solid #333; align-items: center; justify-content: center; font-size: 11px; }
-  .terms { margin: 20px 0 8px; padding-top: 12px; border-top: 1px solid #ddd; font-family: system-ui, sans-serif; }
-  .terms h2 { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 8px; color: #333; }
-  .terms ol { margin: 0; padding-left: 1.1rem; font-size: 8px; line-height: 1.35; color: #444; }
-  .terms li { margin-bottom: 3px; }
+  .terms { font-family: system-ui, sans-serif; }
+  .terms h2 { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 14px; color: #333; }
+  .terms ol { margin: 0; padding-left: 1.25rem; font-size: 9px; line-height: 1.4; color: #444; }
+  .terms li { margin-bottom: 6px; }
   .terms li strong { color: #222; }
-  .terms .accept { margin-top: 8px; font-size: 8px; font-style: italic; color: #333; line-height: 1.35; }
+  .terms .accept { margin-top: 14px; font-size: 9px; font-style: italic; color: #333; line-height: 1.4; }
   .footer { margin: 28px -28px 0; background: #1a1a1a; color: #f5f0e8; text-align: center; padding: 12px; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 0.04em; }
   .footer a { color: #f5f0e8; text-decoration: none; }
   .actions { max-width: 520px; margin: 12px auto 32px; display: flex; gap: 8px; justify-content: center; font-family: system-ui, sans-serif; }
@@ -104,6 +105,12 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   @media print {
     body { background: #fff; }
     .sheet { border: none; margin: 0; max-width: none; padding: 12px 14px 0; }
+    .sheet.terms-page {
+      page-break-before: always;
+      break-before: page;
+      padding: 16px 14px 20px;
+      min-height: auto;
+    }
     .brand { font-size: 22px; margin-bottom: 4px; letter-spacing: 0.42em; font-weight: 100; }
     .contact { font-size: 10px; line-height: 1.35; margin-bottom: 8px; }
     .wave { height: 6px; margin: 6px 0 10px; }
@@ -117,25 +124,23 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
     .money .box strong { font-size: 12px; margin-top: 2px; }
     .pay-row { margin: 8px 0; font-size: 11px; gap: 14px; }
     .pay-row > span { min-width: 100px; }
-    .terms { margin: 8px 0 4px; padding-top: 6px; }
-    .terms h2 { font-size: 7px; margin: 0 0 4px; letter-spacing: 0.1em; }
+    .terms h2 { font-size: 11px; margin: 0 0 12px; letter-spacing: 0.12em; }
     .terms ol {
       margin: 0;
-      padding-left: 0.9rem;
-      font-size: 6.5px;
-      line-height: 1.2;
-      columns: 2;
-      column-gap: 10px;
+      padding-left: 1.2rem;
+      font-size: 9px;
+      line-height: 1.4;
+      columns: auto;
     }
-    .terms li { margin-bottom: 1px; break-inside: avoid; }
-    .terms .accept { margin-top: 4px; font-size: 6px; line-height: 1.2; }
+    .terms li { margin-bottom: 5px; }
+    .terms .accept { margin-top: 12px; font-size: 9px; line-height: 1.4; }
     .footer { margin: 10px -14px 0; padding: 6px; font-size: 10px; }
     .actions { display: none !important; }
   }
 </style>
 </head>
 <body>
-  <div class="sheet">
+  <div class="sheet front">
     <h1 class="brand" aria-label="ZARKARI">ZΛRKΛRI</h1>
     <div class="contact">
       ${STORE_ADDRESS_LINES.map((l) => escapeHtml(l)).join("<br/>")}<br/>
@@ -171,16 +176,19 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
     <div class="row"><label>Customer Contact #</label><div class="val">${escapeHtml(data.customerPhone ?? "—")}</div></div>
     <div class="row"><label>Signature</label><div class="val"></div></div>
 
+    <div class="footer">
+      <a href="${STORE_SITE_URL}">🌐 ${STORE_SITE_URL.replace(/^https?:\/\//, "")}</a>
+    </div>
+  </div>
+
+  <div class="sheet terms-page">
     <div class="terms">
       <h2>Terms &amp; Conditions</h2>
       <ol>${termsItems}</ol>
       <p class="accept">${escapeHtml(BRIDAL_TERMS_ACCEPTANCE)}</p>
     </div>
-
-    <div class="footer">
-      <a href="${STORE_SITE_URL}">🌐 ${STORE_SITE_URL.replace(/^https?:\/\//, "")}</a>
-    </div>
   </div>
+
   <div class="actions">
     <button type="button" onclick="window.print()">Print</button>
   </div>
