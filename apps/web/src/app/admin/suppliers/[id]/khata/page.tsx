@@ -1,22 +1,31 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getSupplier } from "@/lib/data";
 import { listSupplierLedger, computeRunningBalances } from "@/lib/supplier-ledger/service";
 import { formatPrice } from "@/lib/utils";
 import { AddKhataEntryForm } from "@/components/admin/suppliers/AddKhataEntryForm";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
+import { resolveSearchDateBounds } from "@/lib/admin/date-range";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; to?: string; preset?: string }>;
 }
 
 const numCell = "px-3 py-2 text-right tabular-nums whitespace-nowrap";
 
-export default async function SupplierKhataPage({ params }: Props) {
+export default async function SupplierKhataPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { from, to, preset } = await searchParams;
   const supplier = await getSupplier(id);
   if (!supplier) notFound();
 
-  const entries = await listSupplierLedger(id);
+  const bounds = resolveSearchDateBounds({ from, to, preset });
+  const entries = await listSupplierLedger(
+    id,
+    bounds.from && bounds.to ? { from: bounds.from, to: bounds.to } : undefined
+  );
   const withRunning = computeRunningBalances(entries).reverse();
 
   const totalBillsGbp = entries
@@ -42,6 +51,12 @@ export default async function SupplierKhataPage({ params }: Props) {
         Balance: {formatPrice(String(totalBillsGbp - totalPaymentsGbp))} · Rs{" "}
         <span className="font-semibold">{(totalBillsPkr - totalPaymentsPkr).toLocaleString("en-GB")}</span>
       </p>
+
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={[]} />
+        </Suspense>
+      </div>
 
       <div className="space-y-6 mb-8">
         <AddKhataEntryForm supplierId={id} />

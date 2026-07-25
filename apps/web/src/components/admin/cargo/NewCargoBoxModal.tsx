@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import type { CargoBox, CargoCompany } from "@/lib/cargo/demo-store";
 import type { Supplier } from "@/lib/data/seed";
 import { parseJsonResponse } from "@/lib/upload/parse-json";
+import { CargoCompanySelect, resolveCargoCompanyId } from "./CargoCompanySelect";
 
 interface Props {
   companies: CargoCompany[];
@@ -16,6 +17,7 @@ interface Props {
 export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: Props) {
   const today = new Date().toISOString().slice(0, 10);
   const [cargoCompanyId, setCargoCompanyId] = useState(companies[0]?.id ?? "");
+  const [customCompanyName, setCustomCompanyName] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [receivedDate, setReceivedDate] = useState(today);
@@ -31,11 +33,12 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
     setSaving(true);
     setError("");
     try {
+      const { id: resolvedCompanyId } = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
       const res = await fetch("/api/cargo/boxes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cargoCompanyId,
+          cargoCompanyId: resolvedCompanyId,
           trackingNumber,
           supplierId,
           receivedDate,
@@ -92,21 +95,13 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs text-slate-500 uppercase">Cargo company</label>
-            <select
-              required
-              value={cargoCompanyId}
-              onChange={(e) => setCargoCompanyId(e.target.value)}
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            >
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CargoCompanySelect
+            companies={companies}
+            value={cargoCompanyId}
+            onChange={setCargoCompanyId}
+            customName={customCompanyName}
+            onCustomNameChange={setCustomCompanyName}
+          />
           <div>
             <label className="text-xs text-slate-500 uppercase">Tracking number</label>
             <input

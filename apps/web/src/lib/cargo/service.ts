@@ -35,6 +35,9 @@ export async function listCargoCompanies(): Promise<CargoCompany[]> {
     const { listCargoCompaniesDb } = await import("@/lib/db/cargo-boxes");
     return listCargoCompaniesDb();
   }
+  if (!demoCargoCompanies.some((c) => c.name.toLowerCase() === "skynet")) {
+    demoCargoCompanies.push({ id: "cc-skynet", name: "Skynet", active: true });
+  }
   return demoCargoCompanies.filter((c) => c.active);
 }
 
@@ -48,15 +51,23 @@ export async function createCargoCompany(name: string): Promise<CargoCompany | n
   return company;
 }
 
-export async function listCargoBoxes(search?: string): Promise<CargoBox[]> {
+export async function listCargoBoxes(opts?: {
+  search?: string;
+  from?: string;
+  to?: string;
+}): Promise<CargoBox[]> {
   if (isDbConfigured()) {
     const { listCargoBoxesDb } = await import("@/lib/db/cargo-boxes");
-    return listCargoBoxesDb(search);
+    return listCargoBoxesDb(opts);
   }
-  const q = search?.trim().toLowerCase();
+  const q = opts?.search?.trim().toLowerCase();
+  const from = opts?.from?.slice(0, 10);
+  const to = opts?.to?.slice(0, 10);
   return demoCargoBoxes
     .map(enrichDemoBox)
     .filter((b) => {
+      if (from && b.receivedDate < from) return false;
+      if (to && b.receivedDate > to) return false;
       if (!q) return true;
       return (
         b.boxNumber.toLowerCase().includes(q) ||
@@ -256,7 +267,7 @@ export async function postBoxToKhata(boxId: string): Promise<CargoBox | null> {
 }
 
 export async function seedCargoCompanies(): Promise<void> {
-  const names = ["DHL Cargo", "FedEx", "UPS", "Leopards Cargo"];
+  const names = ["DHL Cargo", "FedEx", "UPS", "Leopards Cargo", "Skynet"];
   if (isDbConfigured()) {
     const { seedCargoCompaniesDb } = await import("@/lib/db/cargo-boxes");
     await seedCargoCompaniesDb(names.map((name) => ({ name })));

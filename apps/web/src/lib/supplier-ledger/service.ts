@@ -38,22 +38,43 @@ function computeBalances(entries: SupplierLedgerEntry[]): Map<string, SupplierLe
   return map;
 }
 
-export async function listSupplierLedger(supplierId: string): Promise<SupplierLedgerEntry[]> {
+export async function listSupplierLedger(
+  supplierId: string,
+  opts?: { from?: string; to?: string }
+): Promise<SupplierLedgerEntry[]> {
   if (isDbConfigured()) {
     const { listSupplierLedgerDb } = await import("@/lib/db/supplier-ledger");
-    return listSupplierLedgerDb(supplierId);
+    return listSupplierLedgerDb(supplierId, opts);
   }
   return demoSupplierLedger
-    .filter((e) => e.supplierId === supplierId)
+    .filter((e) => {
+      if (e.supplierId !== supplierId) return false;
+      if (opts?.from && e.businessDate < opts.from.slice(0, 10)) return false;
+      if (opts?.to && e.businessDate > opts.to.slice(0, 10)) return false;
+      return true;
+    })
     .sort((a, b) => b.businessDate.localeCompare(a.businessDate));
 }
 
-export async function getSupplierLedgerBalances(): Promise<SupplierLedgerBalance[]> {
+export async function getSupplierLedgerBalances(opts?: {
+  from?: string;
+  to?: string;
+}): Promise<SupplierLedgerBalance[]> {
   if (isDbConfigured()) {
     const { getSupplierLedgerBalancesDb } = await import("@/lib/db/supplier-ledger");
-    return getSupplierLedgerBalancesDb();
+    return getSupplierLedgerBalancesDb(opts);
   }
-  const balances = computeBalances(demoSupplierLedger);
+  let entries = demoSupplierLedger;
+  if (opts?.from || opts?.to) {
+    const from = opts.from?.slice(0, 10);
+    const to = opts.to?.slice(0, 10);
+    entries = entries.filter((e) => {
+      if (from && e.businessDate < from) return false;
+      if (to && e.businessDate > to) return false;
+      return true;
+    });
+  }
+  const balances = computeBalances(entries);
   for (const s of demoSuppliers) {
     if (!balances.has(s.id)) {
       balances.set(s.id, {

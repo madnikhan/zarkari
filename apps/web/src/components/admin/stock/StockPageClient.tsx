@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AlertTriangle, History } from "lucide-react";
@@ -18,9 +18,10 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 interface Props {
   products: StockOverviewRow[];
+  dateQuery?: Record<string, string | undefined>;
 }
 
-export function StockPageClient({ products: initial }: Props) {
+export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
   const [products, setProducts] = useState(initial);
   const [adjustProduct, setAdjustProduct] = useState<StockOverviewRow | null>(null);
   const [historyProduct, setHistoryProduct] = useState<StockOverviewRow | null>(null);
@@ -36,6 +37,10 @@ export function StockPageClient({ products: initial }: Props) {
   >([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  useEffect(() => {
+    setProducts(initial);
+  }, [initial]);
+
   async function refresh() {
     const res = await fetch("/api/stock");
     const data = await res.json();
@@ -46,7 +51,12 @@ export function StockPageClient({ products: initial }: Props) {
     setHistoryProduct(product);
     setLoadingHistory(true);
     try {
-      const res = await fetch(`/api/stock/${product.id}/movements`);
+      const params = new URLSearchParams();
+      if (dateQuery.from) params.set("from", dateQuery.from);
+      if (dateQuery.to) params.set("to", dateQuery.to);
+      if (dateQuery.preset) params.set("preset", dateQuery.preset);
+      const qs = params.toString();
+      const res = await fetch(`/api/stock/${product.id}/movements${qs ? `?${qs}` : ""}`);
       const data = await res.json();
       setMovements(data.movements ?? []);
     } finally {

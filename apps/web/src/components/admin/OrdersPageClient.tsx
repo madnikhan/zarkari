@@ -9,6 +9,7 @@ import { WalkInSaleForm } from "@/components/admin/WalkInSaleForm";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminTableSearch } from "@/components/admin/AdminTableSearch";
 import { AdminTableShell } from "@/components/admin/AdminTableShell";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -19,9 +20,19 @@ interface Props {
   typeFilter: string;
   tab: string;
   q?: string;
+  dateQuery?: Record<string, string | undefined>;
 }
 
-export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, tab, q = "" }: Props) {
+export function OrdersPageClient({
+  orders,
+  total,
+  page,
+  totalPages,
+  typeFilter,
+  tab,
+  q = "",
+  dateQuery = {},
+}: Props) {
   const router = useRouter();
   const [walkInOpen, setWalkInOpen] = useState(false);
 
@@ -67,6 +78,9 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
     params.set("type", next.type ?? typeFilter);
     params.set("tab", next.tab ?? tab);
     if (q) params.set("q", q);
+    for (const [k, v] of Object.entries(dateQuery)) {
+      if (v) params.set(k, v);
+    }
     if (next.page && next.page > 1) params.set("page", String(next.page));
     return `/admin/orders?${params.toString()}`;
   }
@@ -87,6 +101,12 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
             New custom order
           </Link>
         </div>
+      </div>
+
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={["type", "tab", "q", "page"]} />
+        </Suspense>
       </div>
 
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
@@ -137,7 +157,7 @@ export function OrdersPageClient({ orders, total, page, totalPages, typeFilter, 
         totalItems={total}
         pageSize={20}
         basePath="/admin/orders"
-        query={{ type: typeFilter, tab, q: q || undefined }}
+        query={{ type: typeFilter, tab, q: q || undefined, ...dateQuery }}
       />
 
       <WalkInSaleForm

@@ -1,22 +1,35 @@
+import { Suspense } from "react";
 import { isDbConfigured } from "@/lib/db";
 import { MarkNotificationsRead } from "@/components/boms/MarkNotificationsRead";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminTableShell } from "@/components/admin/AdminTableShell";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import Link from "next/link";
 import { notificationHref } from "@/lib/notification-link";
 import { getNotifications } from "@/lib/data";
+import { dateSearchQuery, resolveSearchDateBounds } from "@/lib/admin/date-range";
 
 const PAGE_SIZE = 20;
 
 interface Props {
-  searchParams: Promise<{ page?: string; filter?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    filter?: string;
+    from?: string;
+    to?: string;
+    preset?: string;
+  }>;
 }
 
 export default async function AdminNotificationsPage({ searchParams }: Props) {
-  const { page: pageStr = "1", filter = "all" } = await searchParams;
+  const { page: pageStr = "1", filter = "all", from, to, preset } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const unreadOnly = filter === "unread";
+  const bounds = resolveSearchDateBounds({ from, to, preset });
+  const dateQuery = dateSearchQuery({ from, to, preset });
+  const dateRange =
+    bounds.from && bounds.to ? { from: bounds.from, to: bounds.to } : undefined;
 
   let notifications: Awaited<ReturnType<typeof getNotifications>> = [];
   let total = 0;
@@ -24,16 +37,34 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
   if (isDbConfigured()) {
     const { listStaffNotificationsDb, countStaffNotificationsDb } = await import("@/lib/db/notifications");
     [notifications, total] = await Promise.all([
-      listStaffNotificationsDb(undefined, PAGE_SIZE, offset, unreadOnly),
-      countStaffNotificationsDb(undefined, unreadOnly),
+      listStaffNotificationsDb(undefined, PAGE_SIZE, offset, unreadOnly, dateRange),
+      countStaffNotificationsDb(undefined, unreadOnly, dateRange),
     ]);
   } else {
     notifications = await getNotifications(unreadOnly);
+    if (dateRange) {
+      const fromMs = new Date(`${dateRange.from}T00:00:00.000Z`).getTime();
+      const toMs = new Date(`${dateRange.to}T23:59:59.999Z`).getTime();
+      notifications = notifications.filter((n) => {
+        const t = new Date(n.createdAt).getTime();
+        return t >= fromMs && t <= toMs;
+      });
+    }
     total = notifications.length;
     notifications = notifications.slice(offset, offset + PAGE_SIZE);
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  function filterHref(key: "all" | "unread") {
+    const qs = new URLSearchParams();
+    if (key === "unread") qs.set("filter", "unread");
+    for (const [k, v] of Object.entries(dateQuery)) {
+      if (v) qs.set(k, v);
+    }
+    const s = qs.toString();
+    return s ? `/admin/notifications?${s}` : "/admin/notifications";
+  }
 
   return (
     <div className="p-4 lg:p-8">
@@ -41,15 +72,20 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold text-slate-900">Notifications</h1>
         <MarkNotificationsRead />
       </div>
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={["filter", "page"]} />
+        </Suspense>
+      </div>
       <div className="flex gap-2 mb-6">
         <Link
-          href="/admin/notifications?filter=all"
+          href={filterHref("all")}
           className={`px-3 py-1.5 rounded-full text-sm ${!unreadOnly ? "bg-slate-900 text-white" : "border border-slate-200"}`}
         >
           All
         </Link>
         <Link
-          href="/admin/notifications?filter=unread"
+          href={filterHref("unread")}
           className={`px-3 py-1.5 rounded-full text-sm ${unreadOnly ? "bg-slate-900 text-white" : "border border-slate-200"}`}
         >
           Unread
@@ -85,7 +121,10 @@ export default async function AdminNotificationsPage({ searchParams }: Props) {
         totalItems={total}
         pageSize={PAGE_SIZE}
         basePath="/admin/notifications"
-        query={unreadOnly ? { filter: "unread" } : undefined}
+        query={{
+          ...(unreadOnly ? { filter: "unread" } : {}),
+          ...dateQuery,
+        }}
       />
     </div>
   );

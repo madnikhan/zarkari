@@ -47,6 +47,7 @@ export let demoCargoCompanies: CargoCompany[] = [
   { id: "cc-fedex", name: "FedEx", active: true },
   { id: "cc-ups", name: "UPS", active: true },
   { id: "cc-leopards", name: "Leopards Cargo", active: true },
+  { id: "cc-skynet", name: "Skynet", active: true },
 ];
 
 export let demoCargoBoxes: CargoBox[] = [

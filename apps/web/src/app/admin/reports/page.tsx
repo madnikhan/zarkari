@@ -4,12 +4,20 @@ import { redirect } from "next/navigation";
 import { getReportsData, getFinanceSummary } from "@/lib/data";
 import { formatPrice } from "@/lib/utils";
 import { getSession } from "@/lib/auth/session";
+import { resolveSearchDateBounds } from "@/lib/admin/date-range";
 import { ReportsPrintView } from "@/components/admin/ReportsPrintView";
 import { CashAnalyticsCharts } from "@/components/admin/cash/CashAnalyticsCharts";
 import { ProfitLossReport } from "@/components/admin/ProfitLossReport";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 
 interface Props {
-  searchParams: Promise<{ period?: string; tab?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    tab?: string;
+    from?: string;
+    to?: string;
+    preset?: string;
+  }>;
 }
 
 const TABS: { key: string; label: string; ownerOnly?: boolean }[] = [
@@ -21,7 +29,8 @@ const TABS: { key: string; label: string; ownerOnly?: boolean }[] = [
 
 export default async function AdminReportsPage({ searchParams }: Props) {
   const session = await getSession();
-  const { period = "monthly", tab = "overview" } = await searchParams;
+  const params = await searchParams;
+  const { period = "monthly", tab = "overview", from, to, preset } = params;
   const isOwner = session?.role === "owner";
 
   const tabKey = TABS.some((t) => t.key === tab) ? tab : "overview";
@@ -29,36 +38,55 @@ export default async function AdminReportsPage({ searchParams }: Props) {
     redirect("/admin/reports?tab=overview");
   }
 
+  const dateBounds = resolveSearchDateBounds({ from, to, preset });
+  const range =
+    dateBounds.from && dateBounds.to
+      ? { from: dateBounds.from, to: dateBounds.to }
+      : undefined;
+
   const p = (["daily", "weekly", "monthly", "yearly"].includes(period) ? period : "monthly") as
     | "daily"
     | "weekly"
     | "monthly"
     | "yearly";
 
-  const data = await getReportsData(p);
-  const finance = tabKey === "finance" && isOwner ? await getFinanceSummary() : null;
+  const data = tabKey === "overview" ? await getReportsData(p, range) : null;
+  const finance = tabKey === "finance" && isOwner ? await getFinanceSummary(range) : null;
 
-  const stats = [
-    { label: "Orders", value: data.orderCount },
-    { label: "Revenue (deposits)", value: formatPrice(String(data.revenue)) },
-    { label: "Outstanding", value: formatPrice(String(data.outstanding)) },
-    { label: "Late deliveries", value: data.late },
-    { label: "Refunds", value: data.refunds },
-    { label: "Cancellations", value: data.cancellations },
-    { label: "Redesigns", value: data.redesigns },
-  ];
+  const stats = data
+    ? [
+        { label: "Orders", value: data.orderCount },
+        { label: "Revenue (deposits)", value: formatPrice(String(data.revenue)) },
+        { label: "Outstanding", value: formatPrice(String(data.outstanding)) },
+        { label: "Late deliveries", value: data.late },
+        { label: "Refunds", value: data.refunds },
+        { label: "Cancellations", value: data.cancellations },
+        { label: "Redesigns", value: data.redesigns },
+      ]
+    : [];
+
+  const tabHref = (key: string) => {
+    const qs = new URLSearchParams({ tab: key });
+    if (key === "overview" && !range) qs.set("period", p);
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    if (preset) qs.set("preset", preset);
+    return `/admin/reports?${qs.toString()}`;
+  };
 
   return (
     <>
-      {tabKey === "overview" && <ReportsPrintView title="Reports" period={p} stats={stats} />}
+      {tabKey === "overview" && data && (
+        <ReportsPrintView title="Reports" period={p} stats={stats} />
+      )}
       <div className="px-6 lg:px-10 pb-8 print:hidden">
         <h1 className="text-2xl font-semibold text-slate-900 mb-4">Reports</h1>
 
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-4">
           {TABS.filter((t) => !t.ownerOnly || isOwner).map((t) => (
             <Link
               key={t.key}
-              href={`/admin/reports?tab=${t.key}${t.key === "overview" ? `&period=${p}` : ""}`}
+              href={tabHref(t.key)}
               className={`px-3 py-1.5 text-xs uppercase tracking-wide rounded border ${
                 tabKey === t.key ? "bg-charcoal text-cream border-charcoal" : "border-sand hover:bg-sand/30"
               }`}
@@ -68,25 +96,33 @@ export default async function AdminReportsPage({ searchParams }: Props) {
           ))}
         </div>
 
-        {tabKey === "overview" && (
+        <div className="mb-6">
+          <Suspense fallback={null}>
+            <AdminDateRangeFilter preserveKeys={["tab", "q", "type", "page"]} />
+          </Suspense>
+        </div>
+
+        {tabKey === "overview" && data && (
           <>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {(["daily", "weekly", "monthly", "yearly"] as const).map((t) => (
-                <Link
-                  key={t}
-                  href={`/admin/reports?tab=overview&period=${t}`}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-wide rounded border ${p === t ? "bg-charcoal text-cream border-charcoal" : "border-sand"}`}
+            {!range && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {(["daily", "weekly", "monthly", "yearly"] as const).map((t) => (
+                  <Link
+                    key={t}
+                    href={`/admin/reports?tab=overview&period=${t}`}
+                    className={`px-3 py-1.5 text-xs uppercase tracking-wide rounded border ${p === t ? "bg-charcoal text-cream border-charcoal" : "border-sand"}`}
+                  >
+                    {t}
+                  </Link>
+                ))}
+                <a
+                  href={`/api/reports/export?period=${p}`}
+                  className="px-3 py-1.5 text-xs uppercase tracking-wide rounded bg-gold text-charcoal"
                 >
-                  {t}
-                </Link>
-              ))}
-              <a
-                href={`/api/reports/export?period=${p}`}
-                className="px-3 py-1.5 text-xs uppercase tracking-wide rounded bg-gold text-charcoal"
-              >
-                Export CSV
-              </a>
-            </div>
+                  Export CSV
+                </a>
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {stats.map((s) => (
                 <div key={s.label} className="boms-card p-5">

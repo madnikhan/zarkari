@@ -21,6 +21,7 @@ import type { Supplier } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
 import { parseJsonResponse } from "@/lib/upload/parse-json";
 import { AddCargoBoxItemModal } from "./AddCargoBoxItemModal";
+import { CargoCompanySelect, resolveCargoCompanyId } from "./CargoCompanySelect";
 
 interface Props {
   box: CargoBox;
@@ -55,6 +56,7 @@ function InfoField({
 export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted }: Props) {
   const [editing, setEditing] = useState(false);
   const [cargoCompanyId, setCargoCompanyId] = useState(box.cargoCompanyId);
+  const [customCompanyName, setCustomCompanyName] = useState("");
   const [trackingNumber, setTrackingNumber] = useState(box.trackingNumber);
   const [supplierId, setSupplierId] = useState(box.supplierId);
   const [receivedDate, setReceivedDate] = useState(box.receivedDate);
@@ -101,11 +103,12 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     setSaving(true);
     setError("");
     try {
+      const { id: resolvedCompanyId } = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
       const res = await fetch(`/api/cargo/boxes/${box.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cargoCompanyId,
+          cargoCompanyId: resolvedCompanyId,
           trackingNumber,
           supplierId,
           receivedDate,
@@ -117,6 +120,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
       const data = await parseJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
       setEditing(false);
+      setCustomCompanyName("");
       onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -316,20 +320,14 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                 className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
               />
             </div>
-            <div>
-              <label className="text-xs text-slate-500">Cargo Company</label>
-              <select
-                value={cargoCompanyId}
-                onChange={(e) => setCargoCompanyId(e.target.value)}
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CargoCompanySelect
+              companies={companies}
+              value={cargoCompanyId}
+              onChange={setCargoCompanyId}
+              customName={customCompanyName}
+              onCustomNameChange={setCustomCompanyName}
+              label="Cargo Company"
+            />
             <div>
               <label className="text-xs text-slate-500">Tracking Number</label>
               <input

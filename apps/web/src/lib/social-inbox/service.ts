@@ -37,6 +37,8 @@ function listDemoThreads(filters?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): { threads: SocialThread[]; total: number } {
   let list = [...demoSocialThreads];
   if (filters?.platform) list = list.filter((t) => t.platform === filters.platform);
@@ -50,6 +52,20 @@ function listDemoThreads(filters?: {
         t.lastMessagePreview?.toLowerCase().includes(q) ||
         t.contactHandle?.toLowerCase().includes(q)
     );
+  }
+  if (filters?.from || filters?.to) {
+    const fromMs = filters.from
+      ? new Date(`${filters.from.slice(0, 10)}T00:00:00.000Z`).getTime()
+      : undefined;
+    const toMs = filters.to
+      ? new Date(`${filters.to.slice(0, 10)}T23:59:59.999Z`).getTime()
+      : undefined;
+    list = list.filter((t) => {
+      const ms = new Date(t.lastMessageAt).getTime();
+      if (fromMs !== undefined && ms < fromMs) return false;
+      if (toMs !== undefined && ms > toMs) return false;
+      return true;
+    });
   }
   list.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
   const total = list.length;
@@ -84,6 +100,8 @@ export async function listSocialThreads(filters?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): Promise<{ threads: SocialThread[]; total: number }> {
   if (isDbConfigured()) {
     const result = await dbLayer.listSocialThreadsDb(filters);

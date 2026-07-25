@@ -129,7 +129,7 @@ async function seedSettings(db: ReturnType<typeof drizzle<typeof schema>>) {
   }
 }
 
-const CARGO_COMPANIES = ["DHL Cargo", "FedEx", "UPS", "Leopards Cargo"];
+const CARGO_COMPANIES = ["DHL Cargo", "FedEx", "UPS", "Leopards Cargo", "Skynet"];
 
 async function seedCargo(db: ReturnType<typeof drizzle<typeof schema>>, supplierId: string) {
   const existing = await db.select().from(schema.cargoCompanies).limit(1);
