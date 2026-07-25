@@ -11,7 +11,7 @@ interface Props {
   companies: CargoCompany[];
   suppliers: Supplier[];
   onClose: () => void;
-  onCreated: (box: CargoBox) => void;
+  onCreated: (box: CargoBox, newCompany?: CargoCompany) => void;
 }
 
 export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: Props) {
@@ -33,12 +33,12 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
     setSaving(true);
     setError("");
     try {
-      const { id: resolvedCompanyId } = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
+      const resolved = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
       const res = await fetch("/api/cargo/boxes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cargoCompanyId: resolvedCompanyId,
+          cargoCompanyId: resolved.id,
           trackingNumber,
           supplierId,
           receivedDate,
@@ -51,7 +51,7 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
       const data = await parseJsonResponse<{ box?: CargoBox; error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed to create box");
       if (!data.box) throw new Error("Failed to create box");
-      onCreated(data.box);
+      onCreated(data.box, resolved.company);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create box");
     } finally {

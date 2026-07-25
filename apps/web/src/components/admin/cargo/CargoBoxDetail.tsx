@@ -103,12 +103,12 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
     setSaving(true);
     setError("");
     try {
-      const { id: resolvedCompanyId } = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
+      const resolved = await resolveCargoCompanyId(cargoCompanyId, customCompanyName);
       const res = await fetch(`/api/cargo/boxes/${box.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cargoCompanyId: resolvedCompanyId,
+          cargoCompanyId: resolved.id,
           trackingNumber,
           supplierId,
           receivedDate,
@@ -121,6 +121,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
       setEditing(false);
       setCustomCompanyName("");
+      if (resolved.company) setCargoCompanyId(resolved.id);
       onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");

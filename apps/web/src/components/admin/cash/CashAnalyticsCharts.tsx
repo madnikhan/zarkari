@@ -74,6 +74,7 @@ export function CashAnalyticsCharts() {
   const searchParams = useSearchParams();
   const [analytics, setAnalytics] = useState<CashAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pinnedExpense, setPinnedExpense] = useState<{ name: string; total: number } | null>(null);
 
   const fromParam = searchParams.get("from") ?? "";
   const toParam = searchParams.get("to") ?? "";
@@ -254,19 +255,55 @@ export function CashAnalyticsCharts() {
           </div>
         </div>
 
-        <div className="boms-card p-5">
+        <div className="boms-card p-5 overflow-visible">
           <h2 className="text-sm font-semibold text-slate-900 mb-4">Expense breakdown</h2>
-          <div className="h-64">
+          <p className="text-xs text-slate-500 mb-3">Hover or tap a bar for category details</p>
+          <div className="h-64 overflow-visible">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={expenseData} layout="vertical">
+              <BarChart data={expenseData} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} />
-                <Tooltip content={<ChartTooltipContent percentOf={expenseTotal} />} />
-                <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                <Tooltip
+                  content={<ChartTooltipContent percentOf={expenseTotal} />}
+                  cursor={{ fill: "rgba(239, 68, 68, 0.08)" }}
+                  wrapperStyle={{ zIndex: 50, outline: "none" }}
+                />
+                <Bar
+                  dataKey="total"
+                  fill="#ef4444"
+                  radius={[0, 4, 4, 0]}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    const payload = data as { name?: string; total?: number };
+                    if (payload?.name != null && payload.total != null) {
+                      setPinnedExpense({ name: String(payload.name), total: Number(payload.total) });
+                    }
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {pinnedExpense && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm text-sm flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-slate-900">{pinnedExpense.name}</p>
+                <p className="text-red-600 mt-0.5">total : {formatPrice(String(pinnedExpense.total))}</p>
+                {expenseTotal > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {((pinnedExpense.total / expenseTotal) * 100).toFixed(1)}% of expenses
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPinnedExpense(null)}
+                className="text-xs text-slate-400 hover:text-slate-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

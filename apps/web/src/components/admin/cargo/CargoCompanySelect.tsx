@@ -12,6 +12,8 @@ interface Props {
   onCustomNameChange: (name: string) => void;
   label?: string;
   className?: string;
+  /** Called when a new company is created via Other… (so parent can refresh lists). */
+  onCompanyCreated?: (company: CargoCompany) => void;
 }
 
 export function CargoCompanySelect({
@@ -27,28 +29,47 @@ export function CargoCompanySelect({
 
   return (
     <div className={className}>
-      <label className="text-xs text-slate-500 uppercase">{label}</label>
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs text-slate-500 uppercase">{label}</label>
+        <button
+          type="button"
+          onClick={() => {
+            onChange(CUSTOM_COMPANY_VALUE);
+            onCustomNameChange("");
+          }}
+          className="text-xs font-medium text-[#4C3BCF] hover:underline"
+        >
+          + Add custom company
+        </button>
+      </div>
       <select
-        required
-        value={value}
+        required={!isCustom}
+        value={isCustom ? CUSTOM_COMPANY_VALUE : value}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
       >
+        <option value={CUSTOM_COMPANY_VALUE}>Other… (type a custom name)</option>
         {companies.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
           </option>
         ))}
-        <option value={CUSTOM_COMPANY_VALUE}>Other… (custom name)</option>
       </select>
       {isCustom && (
-        <input
-          required
-          value={customName}
-          onChange={(e) => onCustomNameChange(e.target.value)}
-          placeholder="Enter cargo company name"
-          className="mt-2 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-        />
+        <div className="mt-2 rounded-lg border border-[#4C3BCF]/30 bg-[#4C3BCF]/5 p-3 space-y-1.5">
+          <label className="text-xs font-medium text-slate-700">New company name</label>
+          <input
+            required
+            autoFocus
+            value={customName}
+            onChange={(e) => onCustomNameChange(e.target.value)}
+            placeholder="e.g. Skynet Express"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <p className="text-[11px] text-slate-500">
+            Saved when you create/update the box — appears in the list next time.
+          </p>
+        </div>
       )}
     </div>
   );

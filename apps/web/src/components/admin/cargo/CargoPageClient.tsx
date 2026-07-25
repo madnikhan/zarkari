@@ -126,12 +126,26 @@ export function CargoPageClient() {
   }
 
   async function refreshAll() {
+    const companiesRes = await fetch("/api/cargo/companies");
+    const companiesData = await companiesRes.json();
+    if (companiesRes.ok) setCompanies(companiesData.companies ?? []);
     await loadBoxes(search || undefined);
     if (selectedId) await loadBox(selectedId);
   }
 
-  async function handleBoxCreated(box: CargoBox) {
+  async function handleBoxCreated(box: CargoBox, newCompany?: CargoCompany) {
     setShowNewBox(false);
+    if (newCompany) {
+      setCompanies((prev) =>
+        prev.some((c) => c.id === newCompany.id)
+          ? prev
+          : [...prev, newCompany].sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } else {
+      const companiesRes = await fetch("/api/cargo/companies");
+      const companiesData = await companiesRes.json();
+      if (companiesRes.ok) setCompanies(companiesData.companies ?? []);
+    }
     await loadBoxes(search || undefined);
     setSelectedId(box.id);
     setSelectedBox(box);
@@ -220,7 +234,7 @@ export function CargoPageClient() {
           companies={companies}
           suppliers={suppliers}
           onClose={() => setShowNewBox(false)}
-          onCreated={(box) => void handleBoxCreated(box)}
+          onCreated={(box, company) => void handleBoxCreated(box, company)}
         />
       )}
     </div>
