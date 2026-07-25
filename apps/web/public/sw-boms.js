@@ -36,7 +36,7 @@ self.addEventListener("push", (event) => {
   const payload = event.data?.json?.() ?? {};
   const title = payload.notification?.title ?? payload.data?.title ?? "ZARKARI";
   const body = payload.notification?.body ?? payload.data?.body ?? "";
-  const href = payload.data?.href ?? (payload.data?.orderId ? `/admin/orders/${payload.data.orderId}` : "/");
+  const href = payload.data?.href ?? (payload.data?.orderId ? `/admin/orders/${payload.data.orderId}` : "/admin/dashboard");
   const urgent = payload.data?.urgent === "1" || payload.data?.urgent === true;
   const tag = payload.data?.orderId ? `order-${payload.data.orderId}` : "zarkari-alert";
 
@@ -56,7 +56,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const href = event.notification.data?.href ?? "/";
+  const href = event.notification.data?.href ?? "/admin/dashboard";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

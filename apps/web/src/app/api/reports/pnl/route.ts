@@ -9,11 +9,27 @@ import {
   shiftDate,
   startOfMonthFor,
   todayDateString,
+  type CashPeriodPreset,
 } from "@/lib/cash/labels";
 
-type PnLPreset = "week" | "month" | "year";
+type PnLPreset = "week" | "month" | "year" | "custom";
 
 function previousPeriodBounds(preset: PnLPreset, currentStart: string, currentEnd: string) {
+  if (preset === "custom") {
+    const days =
+      Math.round(
+        (new Date(`${currentEnd}T12:00:00Z`).getTime() -
+          new Date(`${currentStart}T12:00:00Z`).getTime()) /
+          86400000
+      ) + 1;
+    const end = shiftDate(currentStart, -1);
+    const start = shiftDate(end, -(days - 1));
+    return {
+      start,
+      end,
+      label: `Previous period · ${formatPeriodLabel(start, end)}`,
+    };
+  }
   if (preset === "week") {
     const start = shiftDate(currentStart, -7);
     const end = shiftDate(currentEnd, -7);
@@ -50,10 +66,22 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const from = searchParams.get("from") ?? undefined;
+  const to = searchParams.get("to") ?? undefined;
   const presetParam = searchParams.get("preset");
-  const preset: PnLPreset =
-    presetParam === "month" ? "month" : presetParam === "year" ? "year" : "week";
-  const bounds = resolvePeriodBounds(preset, undefined, undefined, todayDateString());
+
+  let preset: PnLPreset;
+  let bounds: ReturnType<typeof resolvePeriodBounds>;
+
+  if (from && to) {
+    preset = "custom";
+    bounds = resolvePeriodBounds("custom", from, to, todayDateString());
+  } else {
+    preset =
+      presetParam === "month" ? "month" : presetParam === "year" ? "year" : "week";
+    bounds = resolvePeriodBounds(preset as CashPeriodPreset, undefined, undefined, todayDateString());
+  }
+
   const previous = previousPeriodBounds(preset, bounds.start, bounds.end);
 
   const [report, orderMargins] = await Promise.all([

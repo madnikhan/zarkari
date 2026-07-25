@@ -162,6 +162,8 @@ export async function listBridalOrdersWithRelationsDb(filters: {
   offset?: number;
   activeOnly?: boolean;
   q?: string;
+  from?: string;
+  to?: string;
 }): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
   const db = getDb();
   if (!db) return { orders: [], total: 0 };
@@ -176,6 +178,12 @@ export async function listBridalOrdersWithRelationsDb(filters: {
     conditions.push(
       or(ilike(schema.bridalOrders.orderNumber, pat), ilike(schema.customers.name, pat))
     );
+  }
+  if (filters.from) {
+    conditions.push(gte(schema.bridalOrders.bookingDate, new Date(`${filters.from.slice(0, 10)}T00:00:00.000Z`)));
+  }
+  if (filters.to) {
+    conditions.push(lte(schema.bridalOrders.bookingDate, new Date(`${filters.to.slice(0, 10)}T23:59:59.999Z`)));
   }
 
   const whereClause = conditions.length ? and(...conditions) : undefined;
@@ -305,10 +313,18 @@ export async function getBridalDashboardStatsDb() {
   };
 }
 
-export async function getFinanceSummaryDb() {
+export async function getFinanceSummaryDb(range?: { from?: string; to?: string }) {
   const db = getDb();
   if (!db) {
     return { totalDeposits: 0, totalOutstanding: 0, refundedCount: 0 };
+  }
+
+  const conditions = [];
+  if (range?.from) {
+    conditions.push(gte(schema.bridalOrders.bookingDate, new Date(`${range.from}T00:00:00.000Z`)));
+  }
+  if (range?.to) {
+    conditions.push(lte(schema.bridalOrders.bookingDate, new Date(`${range.to}T23:59:59.999Z`)));
   }
 
   const [row] = await db
@@ -317,7 +333,8 @@ export async function getFinanceSummaryDb() {
       totalOutstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
       refundedCount: sql<number>`count(*) filter (where ${schema.bridalOrders.status} = 'refunded')`,
     })
-    .from(schema.bridalOrders);
+    .from(schema.bridalOrders)
+    .where(conditions.length ? and(...conditions) : undefined);
 
   return {
     totalDeposits: Number(row?.totalDeposits ?? 0),
@@ -456,7 +473,10 @@ export async function listCustomerOrderLinksForCustomersDb(customerIds: string[]
   return rows;
 }
 
-export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | "yearly") {
+export async function getReportsDataDb(
+  period: "daily" | "weekly" | "monthly" | "yearly",
+  range?: { from?: string; to?: string }
+) {
   const db = getDb();
   if (!db) {
     return {
@@ -472,11 +492,22 @@ export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | 
   }
 
   const now = new Date();
-  const start = new Date(now);
-  if (period === "daily") start.setDate(start.getDate() - 1);
-  else if (period === "weekly") start.setDate(start.getDate() - 7);
-  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
-  else start.setFullYear(start.getFullYear() - 1);
+  let start: Date;
+  let end: Date | undefined;
+  if (range?.from && range?.to) {
+    start = new Date(`${range.from}T00:00:00.000Z`);
+    end = new Date(`${range.to}T23:59:59.999Z`);
+  } else {
+    start = new Date(now);
+    if (period === "daily") start.setDate(start.getDate() - 1);
+    else if (period === "weekly") start.setDate(start.getDate() - 7);
+    else if (period === "monthly") start.setMonth(start.getMonth() - 1);
+    else start.setFullYear(start.getFullYear() - 1);
+  }
+
+  const bookingRange = end
+    ? and(gte(schema.bridalOrders.bookingDate, start), lte(schema.bridalOrders.bookingDate, end))
+    : gte(schema.bridalOrders.bookingDate, start);
 
   const [orderStats] = await db
     .select({
@@ -485,33 +516,45 @@ export async function getReportsDataDb(period: "daily" | "weekly" | "monthly" | 
       outstanding: sql<number>`coalesce(sum(${schema.bridalOrders.remainingBalance}::numeric) filter (where ${schema.bridalOrders.status} not in ('cancelled', 'refunded', 'collected')), 0)`,
     })
     .from(schema.bridalOrders)
-    .where(gte(schema.bridalOrders.bookingDate, start));
+    .where(bookingRange);
 
   const [lateRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.bridalOrders)
     .where(
       and(
-        gte(schema.bridalOrders.bookingDate, start),
+        bookingRange,
         lt(schema.bridalOrders.deliveryDate, now),
         notInArray(schema.bridalOrders.status, ["collected"])
       )
     );
 
+  const eventRange = end
+    ? and(gte(schema.orderRefunds.createdAt, start), lte(schema.orderRefunds.createdAt, end))
+    : gte(schema.orderRefunds.createdAt, start);
+
   const [refundCount] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.orderRefunds)
-    .where(gte(schema.orderRefunds.createdAt, start));
+    .where(eventRange);
+
+  const cancelRange = end
+    ? and(gte(schema.orderCancellations.createdAt, start), lte(schema.orderCancellations.createdAt, end))
+    : gte(schema.orderCancellations.createdAt, start);
 
   const [cancelCount] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.orderCancellations)
-    .where(gte(schema.orderCancellations.createdAt, start));
+    .where(cancelRange);
+
+  const redesignRange = end
+    ? and(gte(schema.orderRedesigns.createdAt, start), lte(schema.orderRedesigns.createdAt, end))
+    : gte(schema.orderRedesigns.createdAt, start);
 
   const [redesignCount] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.orderRedesigns)
-    .where(gte(schema.orderRedesigns.createdAt, start));
+    .where(redesignRange);
 
   return {
     period,
@@ -979,6 +1022,8 @@ export async function listCustomersPagedDb(opts?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): Promise<{ customers: Customer[]; total: number }> {
   const db = getDb();
   if (!db) return { customers: [], total: 0 };
@@ -994,6 +1039,12 @@ export async function listCustomersPagedDb(opts?: {
         ilike(schema.customers.email, pat)
       )
     );
+  }
+  if (opts?.from) {
+    conditions.push(gte(schema.customers.createdAt, new Date(`${opts.from.slice(0, 10)}T00:00:00.000Z`)));
+  }
+  if (opts?.to) {
+    conditions.push(lte(schema.customers.createdAt, new Date(`${opts.to.slice(0, 10)}T23:59:59.999Z`)));
   }
   const whereClause = conditions.length ? and(...conditions) : undefined;
   const [countRow] = await db

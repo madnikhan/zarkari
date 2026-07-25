@@ -120,8 +120,10 @@ export async function getUnifiedOrders(params: {
   limit?: number;
   offset?: number;
   q?: string;
+  from?: string;
+  to?: string;
 }): Promise<{ orders: UnifiedOrder[]; total: number }> {
-  const { type = "all", tab = "recent", limit = 20, offset = 0, q } = params;
+  const { type = "all", tab = "recent", limit = 20, offset = 0, q, from, to } = params;
 
   const includeCustom = type === "all" || type === "custom";
   const includeOnline = type === "all" || type === "online";
@@ -180,9 +182,19 @@ export async function getUnifiedOrders(params: {
   unified.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   let filtered = unified;
+  if (from || to) {
+    const fromMs = from ? new Date(`${from.slice(0, 10)}T00:00:00.000Z`).getTime() : undefined;
+    const toMs = to ? new Date(`${to.slice(0, 10)}T23:59:59.999Z`).getTime() : undefined;
+    filtered = filtered.filter((o) => {
+      const t = new Date(o.createdAt).getTime();
+      if (fromMs !== undefined && t < fromMs) return false;
+      if (toMs !== undefined && t > toMs) return false;
+      return true;
+    });
+  }
   if (q?.trim()) {
     const needle = q.trim().toLowerCase();
-    filtered = unified.filter(
+    filtered = filtered.filter(
       (o) =>
         o.orderNumber.toLowerCase().includes(needle) ||
         o.customerLabel.toLowerCase().includes(needle) ||

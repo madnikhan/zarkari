@@ -3,14 +3,25 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { isUuid } from "@/lib/db";
 import { createCargoBox, listCargoBoxes } from "@/lib/cargo/service";
+import { resolveSearchDateBounds } from "@/lib/admin/date-range";
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session || !["owner", "staff"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const q = new URL(request.url).searchParams.get("q") ?? undefined;
-  const boxes = await listCargoBoxes(q);
+  const sp = new URL(request.url).searchParams;
+  const q = sp.get("q") ?? undefined;
+  const bounds = resolveSearchDateBounds({
+    from: sp.get("from") ?? undefined,
+    to: sp.get("to") ?? undefined,
+    preset: sp.get("preset") ?? undefined,
+  });
+  const boxes = await listCargoBoxes({
+    search: q,
+    from: bounds.from,
+    to: bounds.to,
+  });
   return NextResponse.json({ boxes, total: boxes.length });
 }
 

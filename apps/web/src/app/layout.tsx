@@ -29,7 +29,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(`${siteUrl}/`),
   title: { default: DEFAULT_TITLE, template: "%s | ZARKARI" },
   description: DEFAULT_DESCRIPTION,
-  manifest: "/manifest.json",
   appleWebApp: { capable: true, title: SITE_NAME },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

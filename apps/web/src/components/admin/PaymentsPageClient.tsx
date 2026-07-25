@@ -7,6 +7,7 @@ import { RecordPaymentForm } from "@/components/boms/RecordPaymentForm";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminTableSearch } from "@/components/admin/AdminTableSearch";
 import { AdminTableShell } from "@/components/admin/AdminTableShell";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import type { BridalOrderWithRelations } from "@/lib/data";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
   total: number;
   q: string;
   paymentCountByOrder: Record<string, number>;
+  dateQuery?: Record<string, string | undefined>;
 }
 
 export function PaymentsPageClient({
@@ -27,10 +29,17 @@ export function PaymentsPageClient({
   total,
   q,
   paymentCountByOrder,
+  dateQuery = {},
 }: Props) {
   return (
     <div className="p-4 lg:p-8">
       <h1 className="text-2xl font-semibold text-slate-900 mb-6">Payments</h1>
+
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={["q", "page"]} />
+        </Suspense>
+      </div>
 
       <div className="grid sm:grid-cols-2 gap-4 mb-8">
         <div className="boms-card p-6">
@@ -92,7 +101,7 @@ export function PaymentsPageClient({
         totalItems={total}
         pageSize={50}
         basePath="/admin/payments"
-        query={{ q: q || undefined }}
+        query={{ q: q || undefined, ...dateQuery }}
       />
     </div>
   );

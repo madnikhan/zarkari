@@ -25,9 +25,10 @@ interface Props {
   balances: BalanceRow[];
   q: string;
   page: number;
+  dateQuery?: Record<string, string | undefined>;
 }
 
-export function SupplierPaymentsPageClient({ balances, q, page }: Props) {
+export function SupplierPaymentsPageClient({ balances, q, page, dateQuery = {} }: Props) {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return balances;
@@ -97,7 +98,7 @@ export function SupplierPaymentsPageClient({ balances, q, page }: Props) {
         totalItems={filtered.length}
         pageSize={PAGE_SIZE}
         basePath="/admin/suppliers/payments"
-        query={{ q: q || undefined }}
+        query={{ q: q || undefined, ...dateQuery }}
       />
     </>
   );

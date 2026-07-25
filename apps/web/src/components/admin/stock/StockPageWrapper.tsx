@@ -12,9 +12,10 @@ interface Props {
   totalPages: number;
   total: number;
   q: string;
+  dateQuery?: Record<string, string | undefined>;
 }
 
-export function StockPageWrapper({ products, page, totalPages, total, q }: Props) {
+export function StockPageWrapper({ products, page, totalPages, total, q, dateQuery = {} }: Props) {
   return (
     <>
       <div className="mb-4">
@@ -22,8 +23,15 @@ export function StockPageWrapper({ products, page, totalPages, total, q }: Props
           <AdminTableSearch placeholder="Search product name…" defaultValue={q} />
         </Suspense>
       </div>
-      <StockPageClient products={products} />
-      <AdminPagination page={page} totalPages={totalPages} totalItems={total} pageSize={20} basePath="/admin/stock" query={{ q: q || undefined }} />
+      <StockPageClient products={products} dateQuery={dateQuery} />
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        pageSize={20}
+        basePath="/admin/stock"
+        query={{ q: q || undefined, ...dateQuery }}
+      />
     </>
   );
 }

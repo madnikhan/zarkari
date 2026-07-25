@@ -25,6 +25,42 @@ import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
 
 const PIE_COLORS = ["#4C3BCF", "#10b981"];
 
+function ChartTooltipContent({
+  active,
+  payload,
+  label,
+  percentOf,
+}: {
+  active?: boolean;
+  payload?: { name?: string; value?: number; color?: string; dataKey?: string; payload?: { name?: string; total?: number } }[];
+  label?: string;
+  percentOf?: number;
+}) {
+  if (!active || !payload?.length) return null;
+  const primary = payload[0];
+  const title =
+    label ||
+    primary?.payload?.name ||
+    primary?.name ||
+    String(primary?.dataKey ?? "");
+  const value = Number(primary?.value ?? 0);
+  const pct =
+    percentOf && percentOf > 0 ? ((value / percentOf) * 100).toFixed(1) : null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-sm">
+      <p className="font-medium text-slate-900">{title}</p>
+      {payload.map((row, i) => (
+        <p key={i} className="mt-0.5" style={{ color: row.color ?? "#ef4444" }}>
+          {row.name && row.name !== title ? `${row.name}: ` : "total : "}
+          {formatPrice(String(row.value ?? 0))}
+        </p>
+      ))}
+      {pct && <p className="text-xs text-slate-500 mt-1">{pct}% of expenses</p>}
+    </div>
+  );
+}
+
 const PRESET_BUTTONS: { id: CashPeriodPreset; label: string }[] = [
   { id: "7d", label: "7 days" },
   { id: "30d", label: "30 days" },
@@ -38,6 +74,7 @@ export function CashAnalyticsCharts() {
   const searchParams = useSearchParams();
   const [analytics, setAnalytics] = useState<CashAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pinnedExpense, setPinnedExpense] = useState<{ name: string; total: number } | null>(null);
 
   const fromParam = searchParams.get("from") ?? "";
   const toParam = searchParams.get("to") ?? "";
@@ -68,12 +105,12 @@ export function CashAnalyticsCharts() {
   }, [loadAnalytics]);
 
   function selectPreset(preset: CashPeriodPreset) {
-    router.push(`/admin/cash/analytics?preset=${preset}`);
+    router.push(`/admin/reports?tab=cash&preset=${preset}`);
   }
 
   function applyCustom() {
     if (!customFrom || !customTo) return;
-    router.push(`/admin/cash/analytics?from=${customFrom}&to=${customTo}`);
+    router.push(`/admin/reports?tab=cash&from=${customFrom}&to=${customTo}`);
   }
 
   if (loading) {
@@ -99,6 +136,8 @@ export function CashAnalyticsCharts() {
     cumulative += d.net;
     return { date: d.date.slice(5), net: d.net, cumulative };
   });
+
+  const expenseTotal = expenseData.reduce((s, e) => s + e.total, 0);
 
   const bounds = resolvePeriodBounds(
     activePreset,
@@ -190,7 +229,7 @@ export function CashAnalyticsCharts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => String(v).slice(5)} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => formatPrice(String(v))} />
+              <Tooltip content={<ChartTooltipContent />} />
               <Legend />
               <Bar dataKey="cashIn" name="Cash In" fill="#10b981" radius={[4, 4, 0, 0]} />
               <Bar dataKey="cashOut" name="Cash Out" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -210,25 +249,61 @@ export function CashAnalyticsCharts() {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => formatPrice(String(v))} />
+                <Tooltip content={<ChartTooltipContent />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="boms-card p-5">
+        <div className="boms-card p-5 overflow-visible">
           <h2 className="text-sm font-semibold text-slate-900 mb-4">Expense breakdown</h2>
-          <div className="h-64">
+          <p className="text-xs text-slate-500 mb-3">Hover or tap a bar for category details</p>
+          <div className="h-64 overflow-visible">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={expenseData} layout="vertical">
+              <BarChart data={expenseData} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v) => formatPrice(String(v))} />
-                <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                <Tooltip
+                  content={<ChartTooltipContent percentOf={expenseTotal} />}
+                  cursor={{ fill: "rgba(239, 68, 68, 0.08)" }}
+                  wrapperStyle={{ zIndex: 50, outline: "none" }}
+                />
+                <Bar
+                  dataKey="total"
+                  fill="#ef4444"
+                  radius={[0, 4, 4, 0]}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    const payload = data as { name?: string; total?: number };
+                    if (payload?.name != null && payload.total != null) {
+                      setPinnedExpense({ name: String(payload.name), total: Number(payload.total) });
+                    }
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {pinnedExpense && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm text-sm flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-slate-900">{pinnedExpense.name}</p>
+                <p className="text-red-600 mt-0.5">total : {formatPrice(String(pinnedExpense.total))}</p>
+                {expenseTotal > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {((pinnedExpense.total / expenseTotal) * 100).toFixed(1)}% of expenses
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPinnedExpense(null)}
+                className="text-xs text-slate-400 hover:text-slate-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -240,8 +315,8 @@ export function CashAnalyticsCharts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => formatPrice(String(v))} />
-              <Line type="monotone" dataKey="cumulative" stroke="#4C3BCF" strokeWidth={2} dot={false} />
+              <Tooltip content={<ChartTooltipContent />} />
+              <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="#4C3BCF" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

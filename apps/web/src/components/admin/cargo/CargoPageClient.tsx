@@ -1,14 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import type { CargoBox, CargoCompany } from "@/lib/cargo/demo-store";
 import type { Supplier } from "@/lib/data/seed";
+import { resolveSearchDateBounds } from "@/lib/admin/date-range";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { CargoBoxDetail } from "./CargoBoxDetail";
 import { CargoBoxList } from "./CargoBoxList";
 import { NewCargoBoxModal } from "./NewCargoBoxModal";
 
+function buildBoxesQuery(search: string, searchParams: URLSearchParams): string {
+  const params = new URLSearchParams();
+  if (search.trim()) params.set("q", search.trim());
+  const bounds = resolveSearchDateBounds({
+    from: searchParams.get("from") ?? undefined,
+    to: searchParams.get("to") ?? undefined,
+    preset: searchParams.get("preset") ?? undefined,
+  });
+  if (bounds.from) params.set("from", bounds.from);
+  if (bounds.to) params.set("to", bounds.to);
+  // Keep preset so filter UI stays in sync when navigating
+  const preset = searchParams.get("preset");
+  if (preset && !searchParams.get("from")) params.set("preset", preset);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
 export function CargoPageClient() {
+  const searchParams = useSearchParams();
   const [boxes, setBoxes] = useState<CargoBox[]>([]);
   const [companies, setCompanies] = useState<CargoCompany[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -19,13 +40,18 @@ export function CargoPageClient() {
   const [showNewBox, setShowNewBox] = useState(false);
   const [error, setError] = useState("");
 
-  const loadBoxes = useCallback(async (q?: string) => {
-    const res = await fetch(`/api/cargo/boxes${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to load boxes");
-    setBoxes(data.boxes ?? []);
-    return data.boxes as CargoBox[];
-  }, []);
+  const dateKey = `${searchParams.get("from") ?? ""}|${searchParams.get("to") ?? ""}|${searchParams.get("preset") ?? ""}`;
+
+  const loadBoxes = useCallback(
+    async (q?: string) => {
+      const res = await fetch(`/api/cargo/boxes${buildBoxesQuery(q ?? "", searchParams)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to load boxes");
+      setBoxes(data.boxes ?? []);
+      return data.boxes as CargoBox[];
+    },
+    [searchParams]
+  );
 
   const loadBox = useCallback(async (id: string) => {
     const res = await fetch(`/api/cargo/boxes/${id}`);
@@ -48,10 +74,18 @@ export function CargoPageClient() {
         const suppliersData = await suppliersRes.json();
         setCompanies(companiesData.companies ?? []);
         setSuppliers(suppliersData.suppliers ?? []);
-        const list = await loadBoxes();
+        const list = await loadBoxes(search || undefined);
         if (list.length && !selectedId) {
           setSelectedId(list[0].id);
           await loadBox(list[0].id);
+        } else if (selectedId && !list.some((b) => b.id === selectedId)) {
+          if (list[0]) {
+            setSelectedId(list[0].id);
+            await loadBox(list[0].id);
+          } else {
+            setSelectedId(null);
+            setSelectedBox(null);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load cargo data");
@@ -60,8 +94,9 @@ export function CargoPageClient() {
       }
     }
     void init();
+    // Reload when date range query changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dateKey]);
 
   async function handleSearch(q: string) {
     setSearch(q);
@@ -91,12 +126,26 @@ export function CargoPageClient() {
   }
 
   async function refreshAll() {
+    const companiesRes = await fetch("/api/cargo/companies");
+    const companiesData = await companiesRes.json();
+    if (companiesRes.ok) setCompanies(companiesData.companies ?? []);
     await loadBoxes(search || undefined);
     if (selectedId) await loadBox(selectedId);
   }
 
-  async function handleBoxCreated(box: CargoBox) {
+  async function handleBoxCreated(box: CargoBox, newCompany?: CargoCompany) {
     setShowNewBox(false);
+    if (newCompany) {
+      setCompanies((prev) =>
+        prev.some((c) => c.id === newCompany.id)
+          ? prev
+          : [...prev, newCompany].sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } else {
+      const companiesRes = await fetch("/api/cargo/companies");
+      const companiesData = await companiesRes.json();
+      if (companiesRes.ok) setCompanies(companiesData.companies ?? []);
+    }
     await loadBoxes(search || undefined);
     setSelectedId(box.id);
     setSelectedBox(box);
@@ -121,6 +170,12 @@ export function CargoPageClient() {
         >
           + Add New Box Entry
         </button>
+      </div>
+
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={[]} />
+        </Suspense>
       </div>
 
       {error && (
@@ -179,7 +234,7 @@ export function CargoPageClient() {
           companies={companies}
           suppliers={suppliers}
           onClose={() => setShowNewBox(false)}
-          onCreated={(box) => void handleBoxCreated(box)}
+          onCreated={(box, company) => void handleBoxCreated(box, company)}
         />
       )}
     </div>

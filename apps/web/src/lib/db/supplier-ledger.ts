@@ -1,4 +1,4 @@
-import { desc, eq, isNull, and, sql } from "drizzle-orm";
+import { desc, eq, isNull, and, sql, gte, lte } from "drizzle-orm";
 import { getDb, schema } from "./index";
 import type { SupplierLedgerBalance, SupplierLedgerEntry } from "@/lib/supplier-ledger/demo-store";
 
@@ -19,13 +19,19 @@ function mapRow(row: typeof schema.supplierLedgerEntries.$inferSelect): Supplier
   };
 }
 
-export async function listSupplierLedgerDb(supplierId: string): Promise<SupplierLedgerEntry[]> {
+export async function listSupplierLedgerDb(
+  supplierId: string,
+  opts?: { from?: string; to?: string }
+): Promise<SupplierLedgerEntry[]> {
   const db = getDb();
   if (!db) return [];
+  const conditions = [eq(schema.supplierLedgerEntries.supplierId, supplierId)];
+  if (opts?.from) conditions.push(gte(schema.supplierLedgerEntries.businessDate, opts.from.slice(0, 10)));
+  if (opts?.to) conditions.push(lte(schema.supplierLedgerEntries.businessDate, opts.to.slice(0, 10)));
   const rows = await db
     .select()
     .from(schema.supplierLedgerEntries)
-    .where(eq(schema.supplierLedgerEntries.supplierId, supplierId))
+    .where(and(...conditions))
     .orderBy(desc(schema.supplierLedgerEntries.businessDate), desc(schema.supplierLedgerEntries.createdAt));
   return rows.map(mapRow);
 }
@@ -84,11 +90,19 @@ export async function updateSupplierLedgerEntryDb(
   return row ? mapRow(row) : null;
 }
 
-export async function getSupplierLedgerBalancesDb(): Promise<SupplierLedgerBalance[]> {
+export async function getSupplierLedgerBalancesDb(opts?: {
+  from?: string;
+  to?: string;
+}): Promise<SupplierLedgerBalance[]> {
   const db = getDb();
   if (!db) return [];
 
   const supplierRows = await db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers);
+  const dateConditions = [];
+  if (opts?.from) dateConditions.push(gte(schema.supplierLedgerEntries.businessDate, opts.from.slice(0, 10)));
+  if (opts?.to) dateConditions.push(lte(schema.supplierLedgerEntries.businessDate, opts.to.slice(0, 10)));
+  const whereClause = dateConditions.length ? and(...dateConditions) : undefined;
+
   const entryRows = await db
     .select({
       supplierId: schema.supplierLedgerEntries.supplierId,
@@ -98,6 +112,7 @@ export async function getSupplierLedgerBalancesDb(): Promise<SupplierLedgerBalan
       paymentsPkr: sql<number>`coalesce(sum(${schema.supplierLedgerEntries.amountPkr}::numeric) filter (where ${schema.supplierLedgerEntries.type} = 'payment'), 0)`,
     })
     .from(schema.supplierLedgerEntries)
+    .where(whereClause)
     .groupBy(schema.supplierLedgerEntries.supplierId);
 
   const entryMap = new Map(entryRows.map((r) => [r.supplierId, r]));

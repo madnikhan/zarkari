@@ -1,15 +1,34 @@
 import { getUnifiedOrders } from "@/lib/db/unified-orders";
 import { OrdersPageClient } from "@/components/admin/OrdersPageClient";
+import { dateSearchQuery, resolveSearchDateBounds } from "@/lib/admin/date-range";
 
 const PAGE_SIZE = 20;
 
 interface Props {
-  searchParams: Promise<{ type?: string; tab?: string; page?: string; q?: string }>;
+  searchParams: Promise<{
+    type?: string;
+    tab?: string;
+    page?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+    preset?: string;
+  }>;
 }
 
 export default async function AdminOrdersPage({ searchParams }: Props) {
-  const { type = "all", tab = "recent", page: pageStr = "1", q = "" } = await searchParams;
+  const {
+    type = "all",
+    tab = "recent",
+    page: pageStr = "1",
+    q = "",
+    from,
+    to,
+    preset,
+  } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
+  const bounds = resolveSearchDateBounds({ from, to, preset });
+  const dateQuery = dateSearchQuery({ from, to, preset });
 
   const typeFilter = ["all", "custom", "online", "walk_in"].includes(type) ? type : "all";
 
@@ -28,6 +47,8 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
     q: q.trim() || undefined,
+    from: bounds.from,
+    to: bounds.to,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -41,6 +62,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
       typeFilter={typeFilter}
       tab={tabKey}
       q={q.trim()}
+      dateQuery={dateQuery}
     />
   );
 }

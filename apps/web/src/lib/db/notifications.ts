@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { AppNotification } from "@/lib/data/seed";
 import { getDb, schema } from "./index";
 import { incrementStaffUnread } from "@/lib/firebase/sync";
@@ -14,15 +14,25 @@ function staffUnreadWhere(staffUserId?: string) {
   return and(eq(schema.notifications.read, false), staffWhere(staffUserId));
 }
 
+function dateRangeWhere(from?: string, to?: string) {
+  const parts = [];
+  if (from) parts.push(gte(schema.notifications.createdAt, new Date(`${from.slice(0, 10)}T00:00:00.000Z`)));
+  if (to) parts.push(lte(schema.notifications.createdAt, new Date(`${to.slice(0, 10)}T23:59:59.999Z`)));
+  return parts.length ? and(...parts) : undefined;
+}
+
 export async function listStaffNotificationsDb(
   staffUserId?: string,
   limit = 50,
   offset = 0,
-  unreadOnly = false
+  unreadOnly = false,
+  dateRange?: { from?: string; to?: string }
 ): Promise<AppNotification[]> {
   const db = getDb();
   if (!db) return [];
-  const where = unreadOnly ? staffUnreadWhere(staffUserId) : staffWhere(staffUserId);
+  const base = unreadOnly ? staffUnreadWhere(staffUserId) : staffWhere(staffUserId);
+  const range = dateRangeWhere(dateRange?.from, dateRange?.to);
+  const where = range ? and(base, range) : base;
   const rows = await db
     .select()
     .from(schema.notifications)
@@ -217,11 +227,14 @@ export async function markAllSupplierNotificationsReadDb(supplierId: string): Pr
 
 export async function countStaffNotificationsDb(
   staffUserId?: string,
-  unreadOnly = false
+  unreadOnly = false,
+  dateRange?: { from?: string; to?: string }
 ): Promise<number> {
   const db = getDb();
   if (!db) return 0;
-  const where = unreadOnly ? staffUnreadWhere(staffUserId) : staffWhere(staffUserId);
+  const base = unreadOnly ? staffUnreadWhere(staffUserId) : staffWhere(staffUserId);
+  const range = dateRangeWhere(dateRange?.from, dateRange?.to);
+  const where = range ? and(base, range) : base;
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.notifications)

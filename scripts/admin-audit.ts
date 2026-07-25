@@ -94,9 +94,16 @@ async function customerSession(orderNumber: string, phone: string): Promise<stri
 async function main() {
   console.log(`Auditing ${BASE}...\n`);
 
-  const ownerCookie = await login("owner@zarkari.co.uk", "demo123");
-  const staffCookie = await login("staff@zarkari.co.uk", "demo123");
-  const supplierCookie = await login("supplier@zarkari.co.uk", "demo123");
+  const ownerEmail = process.env.AUDIT_OWNER_EMAIL || "owner@zarkari.co.uk";
+  const ownerPassword = process.env.AUDIT_OWNER_PASSWORD || "demo123";
+  const staffEmail = process.env.AUDIT_STAFF_EMAIL || "staff@zarkari.co.uk";
+  const staffPassword = process.env.AUDIT_STAFF_PASSWORD || "demo123";
+  const supplierEmail = process.env.AUDIT_SUPPLIER_EMAIL || "supplier@zarkari.co.uk";
+  const supplierPassword = process.env.AUDIT_SUPPLIER_PASSWORD || "demo123";
+
+  const ownerCookie = await login(ownerEmail, ownerPassword);
+  const staffCookie = await login(staffEmail, staffPassword);
+  const supplierCookie = await login(supplierEmail, supplierPassword);
 
   if (!ownerCookie) {
     fail("Setup", "Owner login", "Could not authenticate owner");
@@ -544,10 +551,10 @@ async function main() {
     pass("Login", "No demo credentials in HTML");
   } else fail("Login", "No demo credentials in HTML", "Demo hint still present");
 
-  // 23 Customer portal
-  const myOrderPage = await fetch(`${BASE}/my-order`);
-  if (myOrderPage.status === 200) pass("Customer Portal", "my-order page loads");
-  else fail("Customer Portal", "my-order page loads", `status ${myOrderPage.status}`);
+  // 23 Customer portal (status check; HTML already audited above)
+  const myOrderStatus = await fetch(`${BASE}/my-order`);
+  if (myOrderStatus.status === 200) pass("Customer Portal", "my-order page loads");
+  else fail("Customer Portal", "my-order page loads", `status ${myOrderStatus.status}`);
 
   // 24 Supplier portal
   if (supplierCookie) {

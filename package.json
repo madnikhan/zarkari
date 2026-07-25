@@ -16,6 +16,7 @@
     "db:clear-sample": "tsx scripts/clear-sample-data.ts",
     "db:wipe-ops": "tsx scripts/wipe-ops-data.ts",
     "test:r2": "tsx scripts/test-r2.ts",
-    "audit:admin": "tsx scripts/admin-audit.ts"
+    "audit:admin": "tsx scripts/admin-audit.ts",
+    "audit:smoke": "tsx scripts/prod-readiness-smoke.ts"
   }
 }

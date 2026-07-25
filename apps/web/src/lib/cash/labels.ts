@@ -149,7 +149,7 @@ export function resolvePeriodBounds(
 }
 
 export function parseCashPeriodPreset(value: string | null | undefined): CashPeriodPreset {
-  const allowed: CashPeriodPreset[] = ["today", "week", "month", "7d", "30d", "90d", "custom"];
+  const allowed: CashPeriodPreset[] = ["today", "week", "month", "year", "7d", "30d", "90d", "custom"];
   if (value && allowed.includes(value as CashPeriodPreset)) return value as CashPeriodPreset;
   return "today";
 }

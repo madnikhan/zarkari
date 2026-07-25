@@ -357,6 +357,8 @@ export async function getBridalOrdersWithRelations(filters: {
   offset?: number;
   activeOnly?: boolean;
   q?: string;
+  from?: string;
+  to?: string;
 }): Promise<{ orders: BridalOrderWithRelations[]; total: number }> {
   if (isDbConfigured()) {
     const { listBridalOrdersWithRelationsDb } = await import("@/lib/db/bridal-orders");
@@ -374,6 +376,16 @@ export async function getBridalOrdersWithRelations(filters: {
         o.orderNumber.toLowerCase().includes(q) ||
         (customer?.name?.toLowerCase().includes(q) ?? false)
       );
+    });
+  }
+  if (filters.from || filters.to) {
+    const from = filters.from?.slice(0, 10);
+    const to = filters.to?.slice(0, 10);
+    orders = orders.filter((o) => {
+      const d = o.bookingDate.slice(0, 10);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
     });
   }
   if (filters.supplierTab === "new") orders = orders.filter((o) => o.status === "sent_to_supplier");
@@ -440,12 +452,18 @@ export async function getSupplierTabCounts(supplierId: string): Promise<{
   };
 }
 
-export async function getFinanceSummary() {
+export async function getFinanceSummary(range?: { from?: string; to?: string }) {
   if (isDbConfigured()) {
     const { getFinanceSummaryDb } = await import("@/lib/db/bridal-orders");
-    return getFinanceSummaryDb();
+    return getFinanceSummaryDb(range);
   }
-  const orders = demoBridalOrders;
+  const orders = demoBridalOrders.filter((o) => {
+    if (!range?.from && !range?.to) return true;
+    const d = o.bookingDate.slice(0, 10);
+    if (range.from && d < range.from) return false;
+    if (range.to && d > range.to) return false;
+    return true;
+  });
   return {
     totalDeposits: orders.reduce((s, o) => s + parseFloat(o.depositPaid), 0),
     totalOutstanding: orders
@@ -495,6 +513,8 @@ export async function getCustomersWithOrders(params?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): Promise<{
   customers: (Customer & { orders: { id: string; orderNumber: string }[] })[];
   total: number;
@@ -529,6 +549,7 @@ export async function getCustomersWithOrders(params?: {
         (c.email?.toLowerCase().includes(q) ?? false)
     );
   }
+  // Demo customers lack createdAt — date filter is a no-op in demo mode.
   const total = customers.length;
   const offset = params?.offset ?? 0;
   const limit = params?.limit ?? total;
@@ -565,21 +586,36 @@ async function loadAllBridalOrders(): Promise<BridalOrder[]> {
   return [...demoBridalOrders];
 }
 
-export async function getReportsData(period: "daily" | "weekly" | "monthly" | "yearly" = "monthly") {
+export async function getReportsData(
+  period: "daily" | "weekly" | "monthly" | "yearly" = "monthly",
+  range?: { from?: string; to?: string }
+) {
   if (isDbConfigured()) {
     const { getReportsDataDb } = await import("@/lib/db/bridal-orders");
-    return getReportsDataDb(period);
+    return getReportsDataDb(period, range);
   }
 
   const now = new Date();
-  const start = new Date(now);
-  if (period === "daily") start.setDate(start.getDate() - 1);
-  else if (period === "weekly") start.setDate(start.getDate() - 7);
-  else if (period === "monthly") start.setMonth(start.getMonth() - 1);
-  else start.setFullYear(start.getFullYear() - 1);
+  let start: Date;
+  let end: Date | undefined;
+  if (range?.from && range?.to) {
+    start = new Date(`${range.from}T00:00:00.000Z`);
+    end = new Date(`${range.to}T23:59:59.999Z`);
+  } else {
+    start = new Date(now);
+    if (period === "daily") start.setDate(start.getDate() - 1);
+    else if (period === "weekly") start.setDate(start.getDate() - 7);
+    else if (period === "monthly") start.setMonth(start.getMonth() - 1);
+    else start.setFullYear(start.getFullYear() - 1);
+  }
 
   const allOrders = await loadAllBridalOrders();
-  const orders = allOrders.filter((o) => new Date(o.bookingDate) >= start);
+  const orders = allOrders.filter((o) => {
+    const t = new Date(o.bookingDate).getTime();
+    if (t < start.getTime()) return false;
+    if (end && t > end.getTime()) return false;
+    return true;
+  });
   const revenue = orders.reduce((s, o) => s + parseFloat(o.depositPaid), 0);
   const outstanding = orders
     .filter((o) => !["cancelled", "refunded", "collected"].includes(o.status))
@@ -588,14 +624,21 @@ export async function getReportsData(period: "daily" | "weekly" | "monthly" | "y
   const refunds = await getRefunds();
   const cancellations = await getCancellations();
 
+  const inRange = (iso: string) => {
+    const t = new Date(iso).getTime();
+    if (t < start.getTime()) return false;
+    if (end && t > end.getTime()) return false;
+    return true;
+  };
+
   return {
     period,
     orderCount: orders.length,
     revenue,
     outstanding,
-    refunds: refunds.filter((r) => new Date(r.createdAt) >= start).length,
-    cancellations: cancellations.filter((c) => new Date(c.createdAt) >= start).length,
-    redesigns: demoRedesigns.filter((r) => new Date(r.createdAt) >= start).length,
+    refunds: refunds.filter((r) => inRange(r.createdAt)).length,
+    cancellations: cancellations.filter((c) => inRange(c.createdAt)).length,
+    redesigns: demoRedesigns.filter((r) => inRange(r.createdAt)).length,
     late: orders.filter((o) => new Date(o.deliveryDate) < now && o.status !== "collected").length,
   };
 }

@@ -1,4 +1,4 @@
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { getDb, isUuid, schema } from "./index";
 import type { CargoBox, CargoBoxItem, CargoCompany } from "@/lib/cargo/demo-store";
 
@@ -61,9 +61,26 @@ function mapBox(
   };
 }
 
+/** Ensure well-known carriers exist on live DBs without a full re-seed. */
+export async function ensureDefaultCargoCompaniesDb(): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  for (const name of ["Skynet"]) {
+    const existing = await db
+      .select({ id: schema.cargoCompanies.id })
+      .from(schema.cargoCompanies)
+      .where(ilike(schema.cargoCompanies.name, name))
+      .limit(1);
+    if (!existing.length) {
+      await db.insert(schema.cargoCompanies).values({ name });
+    }
+  }
+}
+
 export async function listCargoCompaniesDb(): Promise<CargoCompany[]> {
   const db = getDb();
   if (!db) return [];
+  await ensureDefaultCargoCompaniesDb();
   const rows = await db
     .select()
     .from(schema.cargoCompanies)
@@ -99,19 +116,29 @@ export async function nextBoxNumberDb(): Promise<string> {
   return `${prefix}${String(next).padStart(4, "0")}`;
 }
 
-export async function listCargoBoxesDb(search?: string): Promise<CargoBox[]> {
+export async function listCargoBoxesDb(opts?: {
+  search?: string;
+  from?: string;
+  to?: string;
+}): Promise<CargoBox[]> {
   const db = getDb();
   if (!db) return [];
 
-  const q = search?.trim();
-  const conditions = q
-    ? or(
+  const q = opts?.search?.trim();
+  const conditions = [];
+  if (q) {
+    conditions.push(
+      or(
         ilike(schema.cargoBoxes.boxNumber, `%${q}%`),
         ilike(schema.cargoBoxes.trackingNumber, `%${q}%`),
         ilike(schema.suppliers.name, `%${q}%`),
         ilike(schema.cargoCompanies.name, `%${q}%`)
       )
-    : undefined;
+    );
+  }
+  if (opts?.from) conditions.push(gte(schema.cargoBoxes.receivedDate, opts.from.slice(0, 10)));
+  if (opts?.to) conditions.push(lte(schema.cargoBoxes.receivedDate, opts.to.slice(0, 10)));
+  const whereClause = conditions.length ? and(...conditions) : undefined;
 
   const rows = await db
     .select({
@@ -126,7 +153,7 @@ export async function listCargoBoxesDb(search?: string): Promise<CargoBox[]> {
     .innerJoin(schema.cargoCompanies, eq(schema.cargoBoxes.cargoCompanyId, schema.cargoCompanies.id))
     .innerJoin(schema.suppliers, eq(schema.cargoBoxes.supplierId, schema.suppliers.id))
     .leftJoin(schema.cargoBoxItems, eq(schema.cargoBoxItems.boxId, schema.cargoBoxes.id))
-    .where(conditions)
+    .where(whereClause)
     .groupBy(schema.cargoBoxes.id, schema.cargoCompanies.name, schema.suppliers.name)
     .orderBy(desc(schema.cargoBoxes.receivedDate), desc(schema.cargoBoxes.createdAt));
 

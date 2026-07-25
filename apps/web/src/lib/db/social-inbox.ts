@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import type {
   SocialInboxStats,
   SocialMessage,
@@ -47,6 +47,8 @@ export async function listSocialThreadsDb(filters?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): Promise<{ threads: SocialThread[]; total: number }> {
   const db = getDb();
   if (!db) return { threads: [], total: 0 };
@@ -63,6 +65,16 @@ export async function listSocialThreadsDb(filters?: {
         ilike(schema.socialThreads.lastMessagePreview, pat),
         ilike(schema.socialThreads.contactHandle, pat)
       )
+    );
+  }
+  if (filters?.from) {
+    conditions.push(
+      gte(schema.socialThreads.lastMessageAt, new Date(`${filters.from.slice(0, 10)}T00:00:00.000Z`))
+    );
+  }
+  if (filters?.to) {
+    conditions.push(
+      lte(schema.socialThreads.lastMessageAt, new Date(`${filters.to.slice(0, 10)}T23:59:59.999Z`))
     );
   }
   const whereClause = conditions.length ? and(...conditions) : undefined;

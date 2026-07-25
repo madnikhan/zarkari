@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm";
 import type { Product } from "@/lib/data/seed";
 import { STANDARD_SIZES, type StandardSizeKey } from "@/lib/sizing";
 import { getDb, isUuid, schema } from "./index";
@@ -340,6 +340,8 @@ export async function listStockOverviewDb(opts?: {
   q?: string;
   limit?: number;
   offset?: number;
+  from?: string;
+  to?: string;
 }): Promise<{ products: StockOverviewRow[]; total: number }> {
   const db = getDb();
   if (!db) return { products: [], total: 0 };
@@ -348,6 +350,28 @@ export async function listStockOverviewDb(opts?: {
   const offset = opts?.offset ?? 0;
   const conditions = [];
   if (opts?.q?.trim()) conditions.push(ilike(schema.products.title, `%${opts.q.trim()}%`));
+
+  if (opts?.from || opts?.to) {
+    const movementConditions = [];
+    if (opts.from) {
+      movementConditions.push(
+        gte(schema.stockMovements.createdAt, new Date(`${opts.from.slice(0, 10)}T00:00:00.000Z`))
+      );
+    }
+    if (opts.to) {
+      movementConditions.push(
+        lte(schema.stockMovements.createdAt, new Date(`${opts.to.slice(0, 10)}T23:59:59.999Z`))
+      );
+    }
+    const moved = await db
+      .selectDistinct({ productId: schema.stockMovements.productId })
+      .from(schema.stockMovements)
+      .where(and(...movementConditions));
+    const ids = moved.map((r) => r.productId);
+    if (!ids.length) return { products: [], total: 0 };
+    conditions.push(inArray(schema.products.id, ids));
+  }
+
   const whereClause = conditions.length ? and(...conditions) : undefined;
 
   const [countRow] = await db
@@ -410,14 +434,30 @@ export async function listStockOverviewDb(opts?: {
   return { products: rows, total: Number(countRow?.count ?? 0) };
 }
 
-export async function listStockMovementsDb(productId: string, limit = 50) {
+export async function listStockMovementsDb(
+  productId: string,
+  opts?: { limit?: number; from?: string; to?: string }
+) {
   const db = getDb();
   if (!db || !isUuid(productId)) return [];
+
+  const limit = opts?.limit ?? 50;
+  const conditions = [eq(schema.stockMovements.productId, productId)];
+  if (opts?.from) {
+    conditions.push(
+      gte(schema.stockMovements.createdAt, new Date(`${opts.from.slice(0, 10)}T00:00:00.000Z`))
+    );
+  }
+  if (opts?.to) {
+    conditions.push(
+      lte(schema.stockMovements.createdAt, new Date(`${opts.to.slice(0, 10)}T23:59:59.999Z`))
+    );
+  }
 
   return db
     .select()
     .from(schema.stockMovements)
-    .where(eq(schema.stockMovements.productId, productId))
+    .where(and(...conditions))
     .orderBy(desc(schema.stockMovements.createdAt))
     .limit(limit);
 }

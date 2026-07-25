@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -18,17 +19,56 @@ import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
 
 type PnLPreset = "week" | "month" | "year";
 
+function PnlTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { name?: string; value?: number; color?: string }[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-sm">
+      {label && <p className="font-medium text-slate-900 mb-1">{label}</p>}
+      {payload.map((row, i) => (
+        <p key={i} style={{ color: row.color ?? "#334155" }}>
+          {row.name}: {formatPrice(String(row.value ?? 0))}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function ProfitLossReport() {
-  const [preset, setPreset] = useState<PnLPreset>("week");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromParam = searchParams.get("from") ?? "";
+  const toParam = searchParams.get("to") ?? "";
+  const presetParam = searchParams.get("preset");
+
+  const [preset, setPresetState] = useState<PnLPreset>(
+    presetParam === "month" || presetParam === "year" ? presetParam : "week"
+  );
   const [report, setReport] = useState<ProfitAndLossReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const setPreset = (next: PnLPreset) => {
+    setPresetState(next);
+    router.push(`/admin/reports?tab=pnl&preset=${next}`);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/reports/pnl?preset=${preset}`);
+      const query =
+        fromParam && toParam
+          ? `from=${fromParam}&to=${toParam}`
+          : `preset=${presetParam === "month" || presetParam === "year" || presetParam === "week" ? presetParam : preset}`;
+      const res = await fetch(`/api/reports/pnl?${query}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load profit & loss");
       setReport(data.report ?? null);
@@ -38,7 +78,7 @@ export function ProfitLossReport() {
     } finally {
       setLoading(false);
     }
-  }, [preset]);
+  }, [preset, fromParam, toParam, presetParam]);
 
   useEffect(() => {
     void load();
@@ -71,6 +111,8 @@ export function ProfitLossReport() {
     ? report.netProfit - report.previousPeriod.netProfit
     : null;
 
+  const activePreset = fromParam && toParam ? "custom" : preset;
+
   return (
     <div id="pnl-export" className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -81,13 +123,13 @@ export function ProfitLossReport() {
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportToolbar
             targetId="pnl-export"
-            filename={`zarkari-pnl-${preset}-${new Date().toISOString().slice(0, 10)}.pdf`}
+            filename={`zarkari-pnl-${activePreset}-${new Date().toISOString().slice(0, 10)}.pdf`}
           />
           <button
             type="button"
             onClick={() => setPreset("week")}
             className={`px-3 py-1.5 text-xs rounded-lg border ${
-              preset === "week" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
+              activePreset === "week" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
             }`}
           >
             Weekly report
@@ -96,7 +138,7 @@ export function ProfitLossReport() {
             type="button"
             onClick={() => setPreset("month")}
             className={`px-3 py-1.5 text-xs rounded-lg border ${
-              preset === "month" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
+              activePreset === "month" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
             }`}
           >
             Monthly report
@@ -105,7 +147,7 @@ export function ProfitLossReport() {
             type="button"
             onClick={() => setPreset("year")}
             className={`px-3 py-1.5 text-xs rounded-lg border ${
-              preset === "year" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
+              activePreset === "year" ? "bg-charcoal text-cream border-charcoal" : "border-slate-200"
             }`}
           >
             Annual report
@@ -180,7 +222,7 @@ export function ProfitLossReport() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value) => formatPrice(String(Number(value ?? 0).toFixed(2)))} />
+              <Tooltip content={<PnlTooltip />} />
               <Legend />
               <Bar dataKey="income" name="Income" fill="#10b981" />
               <Bar dataKey="costs" name="Costs" fill="#ef4444" />

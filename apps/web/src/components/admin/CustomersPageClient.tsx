@@ -20,9 +20,10 @@ interface Props {
   totalPages: number;
   total: number;
   q: string;
+  dateQuery?: Record<string, string | undefined>;
 }
 
-export function CustomersPageClient({ customers, page, totalPages, total, q }: Props) {
+export function CustomersPageClient({ customers, page, totalPages, total, q, dateQuery = {} }: Props) {
   return (
     <>
       <div className="mb-4">
@@ -78,7 +79,7 @@ export function CustomersPageClient({ customers, page, totalPages, total, q }: P
         totalItems={total}
         pageSize={20}
         basePath="/admin/customers"
-        query={{ q: q || undefined }}
+        query={{ q: q || undefined, ...dateQuery }}
       />
     </>
   );

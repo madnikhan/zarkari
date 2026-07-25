@@ -9,6 +9,7 @@ import { ManualInquiryForm } from "@/components/admin/inbox/ManualInquiryForm";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminTableSearch } from "@/components/admin/AdminTableSearch";
 import { AdminTableShell } from "@/components/admin/AdminTableShell";
+import { AdminDateRangeFilter } from "@/components/admin/AdminDateRangeFilter";
 import { cn } from "@/lib/utils";
 
 const FILTERS: Array<{ key: string; label: string; platform?: SocialPlatform; unread?: boolean }> = [
@@ -28,6 +29,16 @@ interface InboxPageClientProps {
   totalPages: number;
   total: number;
   q: string;
+  dateQuery?: Record<string, string | undefined>;
+}
+
+function withDateQuery(base: string, dateQuery: Record<string, string | undefined>): string {
+  const url = new URL(base, "http://local");
+  for (const [k, v] of Object.entries(dateQuery)) {
+    if (v) url.searchParams.set(k, v);
+  }
+  const qs = url.searchParams.toString();
+  return qs ? `${url.pathname}?${qs}` : url.pathname;
 }
 
 export function InboxPageClient({
@@ -37,10 +48,11 @@ export function InboxPageClient({
   totalPages,
   total,
   q,
+  dateQuery = {},
 }: InboxPageClientProps) {
   const [showManual, setShowManual] = useState(false);
 
-  const paginationQuery: Record<string, string | undefined> = {};
+  const paginationQuery: Record<string, string | undefined> = { ...dateQuery };
   if (activeFilter === "unread") paginationQuery.unread = "1";
   else if (activeFilter !== "all") {
     const f = FILTERS.find((x) => x.key === activeFilter);
@@ -67,14 +79,22 @@ export function InboxPageClient({
         </button>
       </div>
 
+      <div className="mb-4">
+        <Suspense fallback={null}>
+          <AdminDateRangeFilter preserveKeys={["platform", "unread", "q", "page"]} />
+        </Suspense>
+      </div>
+
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
         {FILTERS.map((f) => {
-          const href =
+          const href = withDateQuery(
             f.key === "all"
               ? "/admin/inbox"
               : f.unread
                 ? "/admin/inbox?unread=1"
-                : `/admin/inbox?platform=${f.platform}`;
+                : `/admin/inbox?platform=${f.platform}`,
+            dateQuery
+          );
           const active = activeFilter === f.key;
           return (
             <Link
