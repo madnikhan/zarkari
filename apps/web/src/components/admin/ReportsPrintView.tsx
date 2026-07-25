@@ -1,6 +1,7 @@
 "use client";
 
 import { ReportExportToolbar } from "@/components/admin/ReportExportToolbar";
+import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 
 interface Stat {
   label: string;
@@ -28,7 +29,10 @@ export function ReportsPrintView({ title, period, stats }: Props) {
 
       <div id="reports-export-area" className="space-y-6">
         <div className="border-b border-slate-200 pb-4">
-          <h1 className="text-2xl font-semibold text-slate-900 hidden print:block">ZARKARI — {title}</h1>
+          <div className="hidden print:flex flex-wrap items-baseline gap-2">
+            <ZarkariLogo size="md" className="text-slate-900" />
+            <span className="text-2xl font-semibold text-slate-900">— {title}</span>
+          </div>
           <p className="text-sm text-slate-500 mt-1">
             Period: <span className="capitalize font-medium">{period}</span> · Generated {date}
           </p>
@@ -43,8 +47,9 @@ export function ReportsPrintView({ title, period, stats }: Props) {
           ))}
         </div>
 
-        <div className="hidden print:block mt-8 text-xs text-slate-400">
-          ZARKARI Bridal Order Management System · Confidential
+        <div className="hidden print:flex print:items-baseline print:gap-2 mt-8 text-xs text-slate-400">
+          <ZarkariLogo size="sm" className="text-slate-400" />
+          <span>Bridal Order Management System · Confidential</span>
         </div>
       </div>
     </div>

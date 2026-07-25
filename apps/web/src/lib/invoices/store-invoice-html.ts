@@ -65,11 +65,14 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Invoice ${escapeHtml(data.orderNumber)} — Zarkari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100&display=swap" rel="stylesheet"/>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; background: #f5f5f5; }
   .sheet { max-width: 520px; margin: 24px auto; background: #fff; border: 1px solid #ddd; padding: 28px 28px 0; }
-  .brand { text-align: center; font-family: system-ui, sans-serif; font-size: 28px; letter-spacing: 0.35em; font-weight: 600; text-transform: uppercase; margin: 0 0 8px; }
+  .brand { text-align: center; font-family: Montserrat, ui-sans-serif, sans-serif; font-size: 28px; letter-spacing: 0.42em; font-weight: 100; text-transform: uppercase; margin: 0 0 8px; line-height: 1; }
   .contact { text-align: center; font-family: system-ui, sans-serif; font-size: 12px; color: #444; line-height: 1.5; margin-bottom: 16px; }
   .wave { height: 10px; background: linear-gradient(90deg, #1a1a1a 0%, #c4a574 50%, #1a1a1a 100%); border-radius: 2px; margin: 12px 0 20px; }
   .title { text-align: center; background: #ececec; font-family: system-ui, sans-serif; font-weight: 700; letter-spacing: 0.25em; padding: 8px; margin-bottom: 18px; }
@@ -101,7 +104,7 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   @media print {
     body { background: #fff; }
     .sheet { border: none; margin: 0; max-width: none; padding: 12px 14px 0; }
-    .brand { font-size: 22px; margin-bottom: 4px; letter-spacing: 0.3em; }
+    .brand { font-size: 22px; margin-bottom: 4px; letter-spacing: 0.42em; font-weight: 100; }
     .contact { font-size: 10px; line-height: 1.35; margin-bottom: 8px; }
     .wave { height: 6px; margin: 6px 0 10px; }
     .title { padding: 5px; margin-bottom: 10px; font-size: 12px; letter-spacing: 0.2em; }
@@ -133,7 +136,7 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
 </head>
 <body>
   <div class="sheet">
-    <h1 class="brand">Zarkari</h1>
+    <h1 class="brand" aria-label="ZARKARI">ZΛRKΛRI</h1>
     <div class="contact">
       ${STORE_ADDRESS_LINES.map((l) => escapeHtml(l)).join("<br/>")}<br/>
       ☎ ${escapeHtml(STORE_PHONE_DISPLAY)}

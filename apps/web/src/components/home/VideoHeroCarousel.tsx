@@ -9,6 +9,16 @@ import { cn } from "@/lib/utils";
 
 const MIN_CLIP_MS = 10000;
 
+function isBrandHeadline(headline: string): boolean {
+  const normalized = headline
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/λ/g, "a")
+    .replace(/Λ/g, "a");
+  return normalized === "zarkari";
+}
+
 interface VideoHeroCarouselProps {
   videos: HeroVideo[];
   tagline: string;
@@ -207,10 +217,9 @@ export function VideoHeroCarousel({ videos, tagline, headline }: VideoHeroCarous
 
       <div className="relative z-10 flex min-h-[90vh] flex-col justify-end px-4 pb-16 pt-24 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl">
-          {headline ? (
-            <h1 className="font-display text-4xl md:text-6xl text-cream mb-4 tracking-wide">{headline}</h1>
-          ) : (
-            <ZarkariLogo size="lg" variant="light" className="mb-4" />
+          <ZarkariLogo size="lg" variant="light" className="mb-4" />
+          {headline && !isBrandHeadline(headline) && (
+            <h1 className="font-display text-3xl md:text-5xl text-cream mb-4 tracking-wide">{headline}</h1>
           )}
           <p className="mb-8 max-w-md text-sm leading-relaxed text-cream/80 md:text-base">{tagline}</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

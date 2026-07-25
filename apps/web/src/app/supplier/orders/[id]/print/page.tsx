@@ -5,6 +5,7 @@ import { getCountdown } from "@/lib/orders/status-machine";
 import { getCustomerStatusLabel } from "@/lib/orders/status-machine";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 import { PrintSupplierOrderClient } from "@/components/supplier/PrintSupplierOrderClient";
+import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -32,7 +33,10 @@ export default async function SupplierOrderPrintPage({ params }: Props) {
       <PrintSupplierOrderClient />
 
       <header className="mb-6 border-b border-slate-200 pb-4">
-        <p className="text-xs uppercase tracking-widest text-slate-400">ZARKARI — Supplier order sheet</p>
+        <div className="flex flex-wrap items-baseline gap-2 text-xs uppercase tracking-widest text-slate-400">
+          <ZarkariLogo size="sm" className="text-slate-900" />
+          <span>— Supplier order sheet</span>
+        </div>
         <h1 className="text-2xl font-semibold font-mono text-[#4C3BCF] mt-1">{order.orderNumber}</h1>
         <p className="text-sm text-slate-600 mt-1">{customer?.name ?? "Customer"}</p>
         <p className="text-xs text-slate-500 mt-1">Printed {new Date().toLocaleDateString("en-GB")}</p>
