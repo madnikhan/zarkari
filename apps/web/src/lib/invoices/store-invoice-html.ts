@@ -97,11 +97,37 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
   .footer a { color: #f5f0e8; text-decoration: none; }
   .actions { max-width: 520px; margin: 12px auto 32px; display: flex; gap: 8px; justify-content: center; font-family: system-ui, sans-serif; }
   .actions button { border: 1px solid #ccc; background: #fff; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  @page { size: A4; margin: 8mm; }
   @media print {
     body { background: #fff; }
-    .sheet { border: none; margin: 0; max-width: none; }
+    .sheet { border: none; margin: 0; max-width: none; padding: 12px 14px 0; }
+    .brand { font-size: 22px; margin-bottom: 4px; letter-spacing: 0.3em; }
+    .contact { font-size: 10px; line-height: 1.35; margin-bottom: 8px; }
+    .wave { height: 6px; margin: 6px 0 10px; }
+    .title { padding: 5px; margin-bottom: 10px; font-size: 12px; letter-spacing: 0.2em; }
+    .row { margin-bottom: 6px; font-size: 11px; gap: 8px; }
+    .row label { min-width: 100px; }
+    .desc-block { margin: 4px 0 8px; font-size: 11px; }
+    .desc-line { padding: 3px 0; }
+    .money { gap: 6px; margin: 8px 0; font-size: 10px; }
+    .money .box { padding: 6px 4px; }
+    .money .box strong { font-size: 12px; margin-top: 2px; }
+    .pay-row { margin: 8px 0; font-size: 11px; gap: 14px; }
+    .pay-row > span { min-width: 100px; }
+    .terms { margin: 8px 0 4px; padding-top: 6px; }
+    .terms h2 { font-size: 7px; margin: 0 0 4px; letter-spacing: 0.1em; }
+    .terms ol {
+      margin: 0;
+      padding-left: 0.9rem;
+      font-size: 6.5px;
+      line-height: 1.2;
+      columns: 2;
+      column-gap: 10px;
+    }
+    .terms li { margin-bottom: 1px; break-inside: avoid; }
+    .terms .accept { margin-top: 4px; font-size: 6px; line-height: 1.2; }
+    .footer { margin: 10px -14px 0; padding: 6px; font-size: 10px; }
     .actions { display: none !important; }
-    .terms { page-break-inside: avoid; }
   }
 </style>
 </head>
