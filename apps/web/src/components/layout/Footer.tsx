@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
 import { SocialIconLinks } from "@/components/brand/SocialIcons";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 import {
   STORE_ADDRESS_ONE_LINE,
   STORE_PHONE_DISPLAY,
   STORE_SITE_URL,
-  getPublicWhatsAppDigits,
 } from "@/lib/brand/store-contact";
 
 const footerLinks = {
@@ -23,8 +21,6 @@ const footerLinks = {
 };
 
 export function Footer() {
-  const whatsapp = getPublicWhatsAppDigits();
-
   return (
     <footer className="bg-charcoal text-cream mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -51,17 +47,6 @@ export function Footer() {
             >
               {STORE_SITE_URL.replace(/^https?:\/\//, "")}
             </a>
-            {whatsapp && (
-              <a
-                href={`https://wa.me/${whatsapp}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-cream/60 hover:text-gold transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                WhatsApp
-              </a>
-            )}
             <SocialIconLinks />
           </div>
 
