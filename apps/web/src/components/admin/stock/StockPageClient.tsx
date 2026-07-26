@@ -14,6 +14,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
   sale: "Sold",
   adjustment: "Adjusted",
   return: "Returned",
+  transfer: "Transfer",
 };
 
 interface Props {
@@ -29,6 +30,7 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
     {
       id: string;
       type: string;
+      location?: string | null;
       quantityDelta: number;
       quantityAfter: number;
       notes: string | null;
@@ -71,21 +73,31 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
       {lowStockCount > 0 && (
         <div className="mb-4 flex items-center gap-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          {lowStockCount} product{lowStockCount === 1 ? "" : "s"} with low stock
+          {lowStockCount} product{lowStockCount === 1 ? "" : "s"} with low{" "}
+          <strong className="font-semibold">shop</strong> stock
         </div>
       )}
 
+      <p className="text-xs text-slate-500 mb-3">
+        Each size shows <span className="font-medium text-slate-700">internal / shop</span>. Online and
+        walk-in sales use shop stock only.
+      </p>
+
       <AdminTableShell>
-        <table className="w-full text-sm min-w-[800px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead className="sticky top-0 bg-slate-50/95 z-10">
             <tr className="border-b border-slate-100">
               <th className="text-left px-4 py-3 font-medium text-slate-500">Product</th>
               {STANDARD_SIZES.map((s) => (
                 <th key={s} className="text-center px-2 py-3 font-medium text-slate-500">
                   {s}
+                  <span className="block text-[9px] font-normal text-slate-400 normal-case">I / S</span>
                 </th>
               ))}
-              <th className="text-center px-3 py-3 font-medium text-slate-500">Total</th>
+              <th className="text-center px-3 py-3 font-medium text-slate-500">
+                Total
+                <span className="block text-[9px] font-normal text-slate-400">I+S</span>
+              </th>
               <th className="text-left px-4 py-3 font-medium text-slate-500" />
             </tr>
           </thead>
@@ -101,26 +113,35 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
                     )}
                     <div>
                       <p className="font-medium text-slate-900">{p.title}</p>
+                      <p className="text-[10px] text-slate-400">
+                        Shop {p.totalStorefront ?? p.totalStock} · Internal {p.totalInternal ?? 0}
+                      </p>
                       {p.lowStock && (
                         <span className="text-[10px] uppercase tracking-wide text-amber-700 font-semibold">
-                          Low stock
+                          Low shop stock
                         </span>
                       )}
                     </div>
                   </div>
                 </td>
                 {STANDARD_SIZES.map((s) => {
-                  const qty = p.sizeStock[s as StandardSizeKey];
+                  const shop = p.sizeStock[s as StandardSizeKey] ?? 0;
+                  const internal = p.internalStock?.[s as StandardSizeKey] ?? 0;
                   const variant = p.variants.find((v) => v.size === s);
-                  const threshold = variant?.lowStockThreshold ?? 2;
-                  const isLow = qty > 0 && qty <= threshold;
+                  const threshold = variant?.lowStockThreshold ?? 3;
+                  const isLow = shop > 0 && shop < threshold;
                   return (
-                    <td key={s} className={`text-center px-2 py-3 font-mono ${isLow ? "text-amber-700 font-semibold" : ""}`}>
-                      {qty}
+                    <td
+                      key={s}
+                      className={`text-center px-2 py-3 font-mono text-xs ${isLow ? "text-amber-700 font-semibold" : ""}`}
+                    >
+                      {internal}/{shop}
                     </td>
                   );
                 })}
-                <td className="text-center px-3 py-3 font-semibold">{p.totalStock}</td>
+                <td className="text-center px-3 py-3 font-semibold text-xs">
+                  {(p.totalInternal ?? 0) + (p.totalStorefront ?? p.totalStock)}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button
@@ -128,7 +149,7 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
                       onClick={() => setAdjustProduct(p)}
                       className="text-xs text-[#4C3BCF] hover:underline"
                     >
-                      Adjust
+                      Manage
                     </button>
                     <button
                       type="button"
@@ -157,6 +178,10 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
           productId={adjustProduct.id}
           productTitle={adjustProduct.title}
           sizeStock={adjustProduct.sizeStock}
+          internalStock={
+            adjustProduct.internalStock ??
+            (Object.fromEntries(STANDARD_SIZES.map((s) => [s, 0])) as Record<StandardSizeKey, number>)
+          }
           onClose={() => setAdjustProduct(null)}
           onSaved={refresh}
         />
@@ -179,7 +204,14 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
                   {movements.map((m) => (
                     <li key={m.id} className="text-sm border-b border-slate-100 pb-3 last:border-0">
                       <div className="flex justify-between">
-                        <span className="font-medium">{MOVEMENT_LABELS[m.type] ?? m.type}</span>
+                        <span className="font-medium">
+                          {MOVEMENT_LABELS[m.type] ?? m.type}
+                          {m.location ? (
+                            <span className="ml-1 text-xs font-normal text-slate-400">
+                              ({m.location === "storefront" ? "shop" : m.location})
+                            </span>
+                          ) : null}
+                        </span>
                         <span className={m.quantityDelta < 0 ? "text-red-600" : "text-emerald-600"}>
                           {m.quantityDelta > 0 ? "+" : ""}
                           {m.quantityDelta}

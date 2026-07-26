@@ -26,7 +26,7 @@ export default async function ContentProductsPage() {
               <th className="p-4">Product</th>
               <th className="p-4 hidden sm:table-cell">Handle</th>
               <th className="p-4">Price</th>
-              <th className="p-4 hidden md:table-cell">Stock</th>
+              <th className="p-4 hidden md:table-cell">Shop stock</th>
               <th className="p-4" />
             </tr>
           </thead>

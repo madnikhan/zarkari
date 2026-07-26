@@ -6,7 +6,8 @@ export const stockMovements = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id").notNull(),
     variantId: uuid("variant_id").notNull(),
-    type: text("type").notNull(), // receive | sale | adjustment | return
+    type: text("type").notNull(), // receive | sale | adjustment | return | transfer
+    location: text("location").default("storefront").notNull(), // internal | storefront
     quantityDelta: integer("quantity_delta").notNull(),
     quantityAfter: integer("quantity_after").notNull(),
     referenceType: text("reference_type"),

@@ -1,7 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
-export type StockMovementType = "receive" | "sale" | "adjustment" | "return";
+export type StockMovementType = "receive" | "sale" | "adjustment" | "return" | "transfer";
+export type StockLocation = "internal" | "storefront";
 
 export class StockError extends Error {
   constructor(message: string) {
@@ -10,6 +11,14 @@ export class StockError extends Error {
   }
 }
 
+function qtyForLocation(
+  variant: { inventoryQty: number; internalQty: number },
+  location: StockLocation
+): number {
+  return location === "internal" ? variant.internalQty : variant.inventoryQty;
+}
+
+/** Storefront (sellable) quantity only. */
 export async function getVariantStock(variantId: string): Promise<number | null> {
   const db = getDb();
   if (!db) return null;
@@ -26,13 +35,17 @@ export async function adjustStock(input: {
   productId: string;
   quantityDelta: number;
   type: StockMovementType;
+  location?: StockLocation;
   referenceType?: string;
   referenceId?: string;
   notes?: string;
   createdByUserId?: string;
-}): Promise<{ quantityAfter: number } | null> {
+}): Promise<{ quantityAfter: number; location: StockLocation } | null> {
   const db = getDb();
   if (!db) return null;
+
+  const location: StockLocation =
+    input.location ?? (input.type === "receive" ? "internal" : "storefront");
 
   return db.transaction(async (tx) => {
     const [variant] = await tx
@@ -43,20 +56,22 @@ export async function adjustStock(input: {
 
     if (!variant) throw new StockError("Variant not found");
 
-    const nextQty = variant.inventoryQty + input.quantityDelta;
+    const current = qtyForLocation(variant, location);
+    const nextQty = current + input.quantityDelta;
     if (nextQty < 0) {
-      throw new StockError(`Insufficient stock for ${variant.title}`);
+      throw new StockError(`Insufficient ${location} stock for ${variant.title}`);
     }
 
     await tx
       .update(schema.productVariants)
-      .set({ inventoryQty: nextQty })
+      .set(location === "internal" ? { internalQty: nextQty } : { inventoryQty: nextQty })
       .where(eq(schema.productVariants.id, input.variantId));
 
     await tx.insert(schema.stockMovements).values({
       productId: input.productId,
       variantId: input.variantId,
       type: input.type,
+      location,
       quantityDelta: input.quantityDelta,
       quantityAfter: nextQty,
       referenceType: input.referenceType ?? null,
@@ -65,7 +80,87 @@ export async function adjustStock(input: {
       createdByUserId: input.createdByUserId ?? null,
     });
 
-    return { quantityAfter: nextQty };
+    return { quantityAfter: nextQty, location };
+  });
+}
+
+/** Move units between internal and storefront in one transaction. */
+export async function transferStock(input: {
+  variantId: string;
+  productId: string;
+  quantity: number;
+  direction: "to_storefront" | "to_internal";
+  notes?: string;
+  createdByUserId?: string;
+}): Promise<{ internalQty: number; storefrontQty: number } | null> {
+  const db = getDb();
+  if (!db) return null;
+  if (input.quantity <= 0) throw new StockError("Transfer quantity must be positive");
+
+  return db.transaction(async (tx) => {
+    const [variant] = await tx
+      .select()
+      .from(schema.productVariants)
+      .where(eq(schema.productVariants.id, input.variantId))
+      .limit(1);
+
+    if (!variant) throw new StockError("Variant not found");
+
+    const from: StockLocation = input.direction === "to_storefront" ? "internal" : "storefront";
+    const to: StockLocation = input.direction === "to_storefront" ? "storefront" : "internal";
+    const fromQty = qtyForLocation(variant, from);
+    const toQty = qtyForLocation(variant, to);
+
+    if (fromQty < input.quantity) {
+      throw new StockError(`Insufficient ${from} stock (have ${fromQty})`);
+    }
+
+    const nextFrom = fromQty - input.quantity;
+    const nextTo = toQty + input.quantity;
+
+    await tx
+      .update(schema.productVariants)
+      .set({
+        internalQty: from === "internal" ? nextFrom : nextTo,
+        inventoryQty: from === "storefront" ? nextFrom : nextTo,
+      })
+      .where(eq(schema.productVariants.id, input.variantId));
+
+    const note =
+      input.notes ??
+      (input.direction === "to_storefront"
+        ? `Transfer to shop (${input.quantity})`
+        : `Transfer to internal (${input.quantity})`);
+
+    await tx.insert(schema.stockMovements).values([
+      {
+        productId: input.productId,
+        variantId: input.variantId,
+        type: "transfer",
+        location: from,
+        quantityDelta: -input.quantity,
+        quantityAfter: nextFrom,
+        referenceType: "transfer",
+        notes: note,
+        createdByUserId: input.createdByUserId ?? null,
+      },
+      {
+        productId: input.productId,
+        variantId: input.variantId,
+        type: "transfer",
+        location: to,
+        quantityDelta: input.quantity,
+        quantityAfter: nextTo,
+        referenceType: "transfer",
+        notes: note,
+        createdByUserId: input.createdByUserId ?? null,
+      },
+    ]);
+
+    return {
+      internalQty: from === "internal" ? nextFrom : nextTo,
+      storefrontQty: from === "storefront" ? nextFrom : nextTo,
+    };
   });
 }
 
@@ -88,6 +183,7 @@ export async function deductForRetailOrder(
       productId: item.productId,
       quantityDelta: -item.quantity,
       type: "sale",
+      location: "storefront",
       referenceType: "retail_order",
       referenceId: orderId,
       notes: item.title,
@@ -112,6 +208,7 @@ export async function restoreForCancelledOrder(orderId: string, createdByUserId?
       productId: item.productId,
       quantityDelta: item.quantity,
       type: "return",
+      location: "storefront",
       referenceType: "retail_order",
       referenceId: orderId,
       notes: `Restored: ${item.title}`,
@@ -138,6 +235,7 @@ export async function validateStockAvailability(
   return { ok: true };
 }
 
+/** Low stock is storefront-only. */
 export async function countLowStockVariants(): Promise<number> {
   const db = getDb();
   if (!db) return 0;

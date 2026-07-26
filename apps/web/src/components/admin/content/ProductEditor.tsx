@@ -141,7 +141,7 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
       ))}
       <div>
         <label className="text-xs text-slate-500 uppercase block mb-2">
-          Stock by size (total: {totalStock})
+          Storefront stock by size (total: {totalStock})
         </label>
         <div className="grid grid-cols-5 gap-2">
           {STANDARD_SIZES.map((size) => (
@@ -158,7 +158,8 @@ export function ProductEditor({ product, collections, isOwner = true }: Props) {
           ))}
         </div>
         <p className="text-xs text-slate-400 mt-2">
-          For detailed receive/adjust history use the{" "}
+          These quantities are <span className="font-medium text-slate-600">shop / storefront</span>{" "}
+          stock (what the website sells). Receive into internal and transfer to shop on the{" "}
           <a href="/admin/stock" className="text-[#4C3BCF] hover:underline">
             Stock page
           </a>

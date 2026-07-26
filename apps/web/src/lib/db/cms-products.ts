@@ -379,10 +379,21 @@ export type StockOverviewRow = {
   title: string;
   handle: string;
   featuredImageUrl?: string;
+  /** Storefront (sellable) qty by size */
   sizeStock: Record<StandardSizeKey, number>;
+  /** Internal (warehouse) qty by size */
+  internalStock: Record<StandardSizeKey, number>;
+  totalStorefront: number;
+  totalInternal: number;
   totalStock: number;
   lowStock: boolean;
-  variants: { id: string; size: StandardSizeKey; inventoryQty: number; lowStockThreshold?: number }[];
+  variants: {
+    id: string;
+    size: StandardSizeKey;
+    inventoryQty: number;
+    internalQty: number;
+    lowStockThreshold?: number;
+  }[];
 };
 
 export async function listStockOverviewDb(opts?: {
@@ -446,6 +457,10 @@ export async function listStockOverviewDb(opts?: {
   const rows = products.map((p) => {
     const pVariants = variants.filter((v) => v.productId === p.id);
     const sizeStock = Object.fromEntries(STANDARD_SIZES.map((s) => [s, 0])) as Record<StandardSizeKey, number>;
+    const internalStock = Object.fromEntries(STANDARD_SIZES.map((s) => [s, 0])) as Record<
+      StandardSizeKey,
+      number
+    >;
     const variantRows: StockOverviewRow["variants"] = [];
 
     for (const v of pVariants) {
@@ -453,17 +468,21 @@ export async function listStockOverviewDb(opts?: {
       const size = (sizeOpt?.value ?? v.title) as StandardSizeKey;
       if (STANDARD_SIZES.includes(size)) {
         sizeStock[size] = v.inventoryQty;
+        internalStock[size] = v.internalQty ?? 0;
         const threshold = v.lowStockThreshold ?? 3;
         variantRows.push({
           id: v.id,
           size,
           inventoryQty: v.inventoryQty,
+          internalQty: v.internalQty ?? 0,
           lowStockThreshold: threshold,
         });
       }
     }
 
-    const totalStock = Object.values(sizeStock).reduce((a, b) => a + b, 0);
+    const totalStorefront = Object.values(sizeStock).reduce((a, b) => a + b, 0);
+    const totalInternal = Object.values(internalStock).reduce((a, b) => a + b, 0);
+    const totalStock = totalStorefront + totalInternal;
     const lowStock = variantRows.some(
       (v) => v.inventoryQty > 0 && v.inventoryQty < (v.lowStockThreshold ?? 3)
     );
@@ -474,6 +493,9 @@ export async function listStockOverviewDb(opts?: {
       handle: p.handle,
       featuredImageUrl: p.featuredImageUrl ?? undefined,
       sizeStock,
+      internalStock,
+      totalStorefront,
+      totalInternal,
       totalStock,
       lowStock,
       variants: variantRows,

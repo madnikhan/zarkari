@@ -50,6 +50,7 @@ export const productVariants = pgTable("product_variants", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   inventoryQty: integer("inventory_qty").default(0).notNull(),
+  internalQty: integer("internal_qty").default(0).notNull(),
   lowStockThreshold: integer("low_stock_threshold"),
   options: jsonb("options").$type<{ name: string; value: string }[]>(),
 });

@@ -36,7 +36,9 @@ export default async function StockPage({ searchParams }: Props) {
     <div className="p-4 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Stock</h1>
-        <p className="text-sm text-slate-500 mt-1">Ready-made inventory by size (S–XXL)</p>
+        <p className="text-sm text-slate-500 mt-1">
+          Internal warehouse and shop (storefront) inventory by size — website sells shop stock only
+        </p>
       </div>
       <div className="mb-4">
         <Suspense fallback={null}>
