@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
+import { SocialIconLinks } from "@/components/brand/SocialIcons";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 import {
   STORE_ADDRESS_ONE_LINE,
@@ -61,6 +62,7 @@ export function Footer() {
                 WhatsApp
               </a>
             )}
+            <SocialIconLinks />
           </div>
 
           {Object.entries(footerLinks).map(([title, links]) => (

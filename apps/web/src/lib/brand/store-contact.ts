@@ -19,6 +19,13 @@ export const STORE_SITE_URL = "https://zarkari.co.uk";
 
 export const STORE_EMAIL = "hello@zarkari.co.uk";
 
+export const STORE_SOCIAL_LINKS = [
+  { id: "instagram", label: "Instagram", href: "https://www.instagram.com/zargar_uk" },
+  { id: "facebook", label: "Facebook", href: "https://www.facebook.com/share/1CZqxQgQHk/" },
+  { id: "tiktok", label: "TikTok", href: "https://www.tiktok.com/@zargar_uk" },
+  { id: "pinterest", label: "Pinterest", href: "https://pin.it/1gO2A87vr" },
+] as const;
+
 export function getPublicWhatsAppDigits(): string {
   const fromEnv = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "");
   return fromEnv || STORE_WHATSAPP_DIGITS;
