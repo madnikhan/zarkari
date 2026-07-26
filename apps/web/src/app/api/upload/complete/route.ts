@@ -23,13 +23,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: publicUrl, fileName, category, demo: true });
   }
 
-  const asset = await createMediaDb({
-    fileName,
-    url: publicUrl,
-    mimeType: contentType,
-    category,
-    uploadedByUserId: session.id,
-  });
+  try {
+    const asset = await createMediaDb({
+      fileName,
+      url: publicUrl,
+      mimeType: contentType,
+      category,
+      uploadedByUserId: session.id,
+    });
 
-  return NextResponse.json({ url: publicUrl, fileName, category, asset });
+    return NextResponse.json({ url: publicUrl, fileName, category, asset });
+  } catch (err) {
+    console.error("Upload complete media insert failed:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not save media asset" },
+      { status: 500 }
+    );
+  }
 }

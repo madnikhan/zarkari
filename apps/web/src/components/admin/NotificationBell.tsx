@@ -80,9 +80,14 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
       void load();
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
+        const panelWidth = Math.min(320, window.innerWidth - 32);
+        let right = Math.max(16, window.innerWidth - rect.right);
+        // Keep left edge of panel inside the viewport
+        right = Math.min(right, window.innerWidth - panelWidth - 16);
+        right = Math.max(16, right);
         setDropdownPos({
           top: rect.bottom + 8,
-          right: Math.max(16, window.innerWidth - rect.right),
+          right,
         });
       }
     }
@@ -161,90 +166,98 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
   }
 
   const dropdown = open ? (
-    <div
-      className="fixed z-[60] w-[min(20rem,calc(100vw-2rem))] bg-white border border-slate-200 rounded-lg shadow-xl max-h-96 overflow-y-auto text-slate-900"
-      style={{ top: dropdownPos.top, right: dropdownPos.right }}
-    >
-      <div className="p-3 border-b border-slate-100 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Notifications</p>
-        {notifications.length > 0 && (
-          <button type="button" onClick={markAllRead} className="text-xs text-[#4C3BCF] hover:underline">
-            Mark all read
-          </button>
-        )}
-      </div>
-      {fetchError ? (
-        <p className="p-4 text-sm text-red-600">{fetchError}</p>
-      ) : notifications.length ? (
-        notifications.map((n) => {
-          const href = notificationHref(n);
-          const content = (
-            <>
-              <p className="font-medium text-slate-900 pr-6">{n.title}</p>
-              {n.body && <p className="text-slate-600 text-xs mt-0.5 pr-6">{n.body}</p>}
-            </>
-          );
-          const dismissBtn = (
-            <button
-              type="button"
-              onClick={(e) => void dismiss(n.id, e)}
-              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500"
-              aria-label="Dismiss notification"
-            >
-              ×
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[55] cursor-default"
+        aria-label="Close notifications"
+        onClick={() => setOpen(false)}
+      />
+      <div
+        className="fixed z-[60] w-[min(20rem,calc(100vw-2rem))] bg-white border border-slate-200 rounded-lg shadow-xl max-h-96 overflow-y-auto text-slate-900"
+        style={{ top: dropdownPos.top, right: dropdownPos.right }}
+      >
+        <div className="p-3 border-b border-slate-100 flex items-center justify-between">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Notifications</p>
+          {notifications.length > 0 && (
+            <button type="button" onClick={markAllRead} className="text-xs text-[#4C3BCF] hover:underline">
+              Mark all read
             </button>
-          );
-          const className =
-            "relative block p-3 border-b border-slate-100 text-sm hover:bg-slate-50 text-slate-900";
-          if (href) {
+          )}
+        </div>
+        {fetchError ? (
+          <p className="p-4 text-sm text-red-600">{fetchError}</p>
+        ) : notifications.length ? (
+          notifications.map((n) => {
+            const href = notificationHref(n);
+            const content = (
+              <>
+                <p className="font-medium text-slate-900 pr-6">{n.title}</p>
+                {n.body && <p className="text-slate-600 text-xs mt-0.5 pr-6">{n.body}</p>}
+              </>
+            );
+            const dismissBtn = (
+              <button
+                type="button"
+                onClick={(e) => void dismiss(n.id, e)}
+                className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500"
+                aria-label="Dismiss notification"
+              >
+                ×
+              </button>
+            );
+            const className =
+              "relative block p-3 border-b border-slate-100 text-sm hover:bg-slate-50 text-slate-900";
+            if (href) {
+              return (
+                <Link
+                  key={n.id}
+                  href={href}
+                  onClick={() => {
+                    void markRead(n.id);
+                    setOpen(false);
+                    stopNotificationAlert();
+                  }}
+                  className={className}
+                >
+                  {content}
+                  {dismissBtn}
+                </Link>
+              );
+            }
             return (
-              <Link
+              <div
                 key={n.id}
-                href={href}
+                className={className}
                 onClick={() => {
                   void markRead(n.id);
-                  setOpen(false);
                   stopNotificationAlert();
                 }}
-                className={className}
+                onKeyDown={() => {}}
+                role="button"
+                tabIndex={0}
               >
                 {content}
                 {dismissBtn}
-              </Link>
+              </div>
             );
-          }
-          return (
-            <div
-              key={n.id}
-              className={className}
-              onClick={() => {
-                void markRead(n.id);
-                stopNotificationAlert();
-              }}
-              onKeyDown={() => {}}
-              role="button"
-              tabIndex={0}
+          })
+        ) : (
+          <p className="p-4 text-sm text-slate-500">No notifications</p>
+        )}
+        {!isSupplier && (
+          <div className="p-3 border-t border-slate-100">
+            <Link
+              href="/admin/notifications"
+              onClick={() => setOpen(false)}
+              className="text-xs text-[#4C3BCF] hover:underline"
             >
-              {content}
-              {dismissBtn}
-            </div>
-          );
-        })
-      ) : (
-        <p className="p-4 text-sm text-slate-500">No notifications</p>
-      )}
-      {!isSupplier && (
-        <div className="p-3 border-t border-slate-100">
-          <Link
-            href="/admin/notifications"
-            onClick={() => setOpen(false)}
-            className="text-xs text-[#4C3BCF] hover:underline"
-          >
-            View all notifications
-          </Link>
-        </div>
-      )}
-    </div>
+              View all notifications
+            </Link>
+          </div>
+        )}
+      </div>
+    </>
   ) : null;
 
   return (
@@ -274,14 +287,6 @@ export function NotificationBell({ role = "admin", supplierId }: Props) {
         )}
       </button>
       {mounted && dropdown ? createPortal(dropdown, document.body) : null}
-      {open && mounted ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-[55] cursor-default"
-          aria-label="Close notifications"
-          onClick={() => setOpen(false)}
-        />
-      ) : null}
     </div>
   );
 }

@@ -44,20 +44,25 @@ export async function POST(request: Request) {
 
     await completeMultipartUpload(key, uploadId, normalizedParts);
 
-    const asset = await createMediaDb({
-      fileName,
-      url: publicUrl,
-      mimeType: contentType,
-      category,
-      uploadedByUserId: session.id,
-    });
+    try {
+      const asset = await createMediaDb({
+        fileName,
+        url: publicUrl,
+        mimeType: contentType,
+        category,
+        uploadedByUserId: session.id,
+      });
 
-    return NextResponse.json({ url: publicUrl, fileName, category, mimeType: contentType, asset });
+      return NextResponse.json({ url: publicUrl, fileName, category, mimeType: contentType, asset });
+    } catch (err) {
+      console.error("Multipart media insert failed:", err);
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Could not save media asset" },
+        { status: 500 }
+      );
+    }
   } catch (err) {
     console.error("Multipart complete failed:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Could not finalize video upload" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Could not finalize video upload" }, { status: 500 });
   }
 }

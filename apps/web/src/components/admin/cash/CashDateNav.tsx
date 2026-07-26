@@ -27,9 +27,20 @@ export function CashDateNav({ date, showPrint = true }: Props) {
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
-      <div className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium min-w-[180px] text-center">
-        {formatBusinessDate(date)}
-      </div>
+      <label className="sr-only" htmlFor="cash-date-picker">
+        Select date
+      </label>
+      <input
+        id="cash-date-picker"
+        type="date"
+        value={date}
+        onChange={(e) => {
+          if (e.target.value) go(e.target.value);
+        }}
+        className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium min-w-[160px] bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#4C3BCF]/30"
+        aria-label={formatBusinessDate(date)}
+        title={formatBusinessDate(date)}
+      />
       <button
         type="button"
         onClick={() => go(shiftDate(date, 1))}

@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { getMediaKind, type MediaKind } from "@/lib/upload/mime";
-import { getDb, schema } from "./index";
+import { getDb, isUuid, schema } from "./index";
 
 export interface MediaAsset {
   id: string;
@@ -89,15 +89,21 @@ export async function createMediaDb(input: {
 }): Promise<MediaAsset | null> {
   const db = getDb();
   if (!db) return null;
-  const [row] = await db
-    .insert(schema.mediaAssets)
-    .values({
-      fileName: input.fileName,
-      url: input.url,
-      mimeType: input.mimeType ?? null,
-      category: input.category ?? "general",
-      uploadedByUserId: input.uploadedByUserId ?? null,
-    })
-    .returning();
-  return mapRow(row);
+  try {
+    const [row] = await db
+      .insert(schema.mediaAssets)
+      .values({
+        fileName: input.fileName,
+        url: input.url,
+        mimeType: input.mimeType ?? null,
+        category: input.category ?? "general",
+        uploadedByUserId:
+          input.uploadedByUserId && isUuid(input.uploadedByUserId) ? input.uploadedByUserId : null,
+      })
+      .returning();
+    return mapRow(row);
+  } catch (err) {
+    console.error("createMediaDb failed:", err);
+    throw new Error("Could not save media asset");
+  }
 }

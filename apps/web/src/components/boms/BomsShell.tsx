@@ -253,30 +253,33 @@ export function BomsShell({
               }}
             />
           </div>
+          <div className="flex-1 md:hidden" aria-hidden />
 
-          <span className="hidden sm:block text-xs text-slate-500">{today}</span>
-          {role === "admin" && (
-            <Link
-              href="/admin/training"
-              className="p-2 text-slate-500 hover:text-[#4C3BCF] rounded-lg hover:bg-slate-50"
-              aria-label="Help and training"
-              title="Help & Training"
-            >
-              <HelpCircle className="h-5 w-5" />
-            </Link>
-          )}
-          <NotificationBell role={role} supplierId={supplierId} />
-          {userName && (
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="h-8 w-8 rounded-full bg-[#4C3BCF] text-white text-xs flex items-center justify-center font-medium">
-                {userName.charAt(0).toUpperCase()}
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <span className="hidden sm:block text-xs text-slate-500">{today}</span>
+            {role === "admin" && (
+              <Link
+                href="/admin/training"
+                className="p-2 text-slate-500 hover:text-[#4C3BCF] rounded-lg hover:bg-slate-50"
+                aria-label="Help and training"
+                title="Help & Training"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </Link>
+            )}
+            <NotificationBell role={role} supplierId={supplierId} />
+            {userName && (
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+                <div className="h-8 w-8 rounded-full bg-[#4C3BCF] text-white text-xs flex items-center justify-center font-medium">
+                  {userName.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium leading-none">{userName}</p>
+                  <p className="text-xs text-slate-400 capitalize">{userRole ?? "staff"}</p>
+                </div>
               </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium leading-none">{userName}</p>
-                <p className="text-xs text-slate-400 capitalize">{userRole ?? "staff"}</p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </header>
 
         <main className="flex-1 pb-20 lg:pb-8">{children}</main>
