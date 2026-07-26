@@ -6,21 +6,30 @@ export const DEFAULT_TITLE = "ZARKARI | Designer Formal Wear UK";
 export const DEFAULT_DESCRIPTION =
   "Designer formal wear from the ZARKARI catalogue — hand-finished pieces for weddings and celebrations.";
 
-/** Canonical public site URL — no trailing slash. Used for OG/Twitter absolute image URLs. */
+const PRODUCTION_SITE_URL = "https://www.zarkari.co.uk";
+
+/** Canonical public site URL — no trailing slash. Used for metadataBase / OG. */
 export function getSiteUrl() {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
-  return raw.replace(/\/+$/, "");
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const isProd =
+    process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+
+  // Never bake localhost into production builds (common Vercel misconfig).
+  if (raw && !(isProd && /localhost|127\.0\.0\.1/i.test(raw))) {
+    return raw.replace(/\/+$/, "");
+  }
+  if (isProd) return PRODUCTION_SITE_URL;
+  return "http://localhost:3000";
 }
 
 /** Static brand card — reliable for WhatsApp/Meta crawlers (avoids dynamic /opengraph-image). */
 export const OG_IMAGE_PATH = "/og-image.png?v=2";
 
+/** Relative paths — resolved against metadataBase. */
 export function getOgImageUrls() {
-  const base = getSiteUrl();
-  const image = `${base}${OG_IMAGE_PATH}`;
   return {
-    openGraph: image,
-    twitter: image,
+    openGraph: OG_IMAGE_PATH,
+    twitter: OG_IMAGE_PATH,
   };
 }
 
@@ -42,8 +51,8 @@ export function pageMetadata(title: string, description?: string): Metadata {
       url: base,
       images: [
         {
-          url: `${base}${OG_IMAGE_PATH}`,
-          secureUrl: `${base}${OG_IMAGE_PATH}`,
+          url: OG_IMAGE_PATH,
+          secureUrl: OG_IMAGE_PATH,
           width: OG_SIZE.width,
           height: OG_SIZE.height,
           alt: OG_ALT,
@@ -55,7 +64,7 @@ export function pageMetadata(title: string, description?: string): Metadata {
       card: "summary_large_image",
       title: fullTitle,
       description: desc,
-      images: [`${base}${OG_IMAGE_PATH}`],
+      images: [OG_IMAGE_PATH],
     },
   };
 }
