@@ -1,7 +1,11 @@
+import type { ReactElement, ReactNode } from "react";
 import { ImageResponse } from "next/og";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_ALT = "ZARKARI — Designer Formal Wear UK";
+
+export const LOGO_SQUARE_SIZE = { width: 1080, height: 1080 };
+export const SOCIAL_BANNER_SIZE = { width: 1500, height: 500 };
 
 async function loadMontserratThin(): Promise<ArrayBuffer | null> {
   try {
@@ -19,7 +23,13 @@ async function loadMontserratThin(): Promise<ArrayBuffer | null> {
   }
 }
 
-export function BrandOgCard({ fontFamily }: { fontFamily: string }) {
+function BrandShell({
+  children,
+  barHeight = 4,
+}: {
+  children: ReactNode;
+  barHeight?: number;
+}) {
   return (
     <div
       style={{
@@ -39,10 +49,18 @@ export function BrandOgCard({ fontFamily }: { fontFamily: string }) {
           top: 0,
           left: 0,
           right: 0,
-          height: 4,
+          height: barHeight,
           background: "#c9a962",
         }}
       />
+      {children}
+    </div>
+  );
+}
+
+export function BrandOgCard({ fontFamily }: { fontFamily: string }) {
+  return (
+    <BrandShell>
       <span
         style={{
           fontSize: 96,
@@ -69,18 +87,91 @@ export function BrandOgCard({ fontFamily }: { fontFamily: string }) {
       >
         Designer Formal Wear UK
       </span>
-    </div>
+    </BrandShell>
   );
 }
 
-export async function generateBrandOgImage() {
+export function BrandLogoSquareCard({ fontFamily }: { fontFamily: string }) {
+  return (
+    <BrandShell barHeight={8}>
+      <span
+        style={{
+          fontSize: 120,
+          fontWeight: 100,
+          letterSpacing: "0.22em",
+          color: "#1a1814",
+          fontFamily,
+          marginLeft: "0.22em",
+        }}
+      >
+        ZΛRKΛRI
+      </span>
+    </BrandShell>
+  );
+}
+
+export function BrandSocialBannerCard({ fontFamily }: { fontFamily: string }) {
+  return (
+    <BrandShell barHeight={6}>
+      <span
+        style={{
+          fontSize: 72,
+          fontWeight: 100,
+          letterSpacing: "0.22em",
+          color: "#1a1814",
+          fontFamily,
+          marginLeft: "0.22em",
+        }}
+      >
+        ZΛRKΛRI
+      </span>
+      <span
+        style={{
+          fontSize: 22,
+          fontWeight: 400,
+          letterSpacing: "0.35em",
+          color: "#1a1814",
+          opacity: 0.55,
+          fontFamily,
+          marginTop: 18,
+          textTransform: "uppercase",
+        }}
+      >
+        Designer Formal Wear UK
+      </span>
+    </BrandShell>
+  );
+}
+
+async function withBrandFont(
+  element: (fontFamily: string) => ReactElement,
+  size: { width: number; height: number }
+) {
   const fontData = await loadMontserratThin();
   const fontFamily = fontData ? "Montserrat" : "ui-sans-serif, system-ui, sans-serif";
 
-  return new ImageResponse(<BrandOgCard fontFamily={fontFamily} />, {
-    ...OG_SIZE,
+  return new ImageResponse(element(fontFamily), {
+    ...size,
     ...(fontData
       ? { fonts: [{ name: "Montserrat", data: fontData, style: "normal" as const, weight: 100 }] }
       : {}),
   });
+}
+
+export async function generateBrandOgImage() {
+  return withBrandFont((fontFamily) => <BrandOgCard fontFamily={fontFamily} />, OG_SIZE);
+}
+
+export async function generateBrandLogoSquareImage() {
+  return withBrandFont(
+    (fontFamily) => <BrandLogoSquareCard fontFamily={fontFamily} />,
+    LOGO_SQUARE_SIZE
+  );
+}
+
+export async function generateBrandSocialBannerImage() {
+  return withBrandFont(
+    (fontFamily) => <BrandSocialBannerCard fontFamily={fontFamily} />,
+    SOCIAL_BANNER_SIZE
+  );
 }
