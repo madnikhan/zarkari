@@ -221,6 +221,20 @@ export function emptyCustomMeasurements(): Partial<Record<MeasurementKey, string
   >;
 }
 
+export function validateCustomField(
+  key: MeasurementKey,
+  raw: string
+): string | null {
+  const field = MEASUREMENT_FIELDS.find((f) => f.key === key);
+  if (!field) return "Invalid field";
+  const value = raw.trim();
+  if (!value) return null; // empty while typing — don't nag until confirm
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return "Enter a valid number";
+  if (num < field.min || num > field.max) return `${field.min}–${field.max}"`;
+  return null;
+}
+
 export function parseCustomMeasurements(
   raw: Partial<Record<MeasurementKey, string>>
 ): { ok: true; measurements: Measurements } | { ok: false; errors: Partial<Record<MeasurementKey, string>> } {

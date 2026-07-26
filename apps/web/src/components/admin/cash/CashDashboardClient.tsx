@@ -77,7 +77,7 @@ export function CashDashboardClient(props: Props) {
         <CashSummaryCards summary={summary} viewMode="day" />
         <CashQuickActions date={date} />
 
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4" data-tour="cash-tables">
           <SearchableCashTransactionTable
             title="Today's Cash In Transactions"
             accent="in"

@@ -212,10 +212,10 @@ export async function getSupplier(id: string): Promise<Supplier | null> {
   return demoSuppliers.find((s) => s.id === id) ?? null;
 }
 
-export async function getSuppliers(): Promise<Supplier[]> {
+export async function getSuppliers(includeInactive = false): Promise<Supplier[]> {
   if (isDbConfigured()) {
     const { listSuppliersDb } = await import("@/lib/db/bridal-orders");
-    return listSuppliersDb();
+    return listSuppliersDb(includeInactive);
   }
   return demoSuppliers;
 }

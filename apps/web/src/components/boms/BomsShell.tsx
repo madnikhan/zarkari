@@ -25,9 +25,11 @@ import {
   HelpCircle,
   Package,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
 import { NotificationBell } from "@/components/admin/NotificationBell";
+import { maybeResumeTrainingTour } from "@/components/admin/training/TrainingTour";
+import { TRAINING_SECTIONS } from "@/lib/training/training-content";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -122,6 +124,10 @@ export function BomsShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isOwner = userRole === "owner";
 
+  useEffect(() => {
+    maybeResumeTrainingTour(TRAINING_SECTIONS);
+  }, [pathname]);
+
   const supplierNav: NavItem[] = [
     { label: "Order history", href: "/supplier", icon: LayoutDashboard },
     { label: "Orders", href: "/supplier", icon: ShoppingBag },
@@ -163,8 +169,10 @@ export function BomsShell({
 
       <aside
         className={cn(
-          "boms-sidebar fixed lg:static inset-y-0 left-0 z-50 w-64 text-white flex flex-col transition-transform lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "boms-sidebar z-50 w-64 text-white flex flex-col h-screen transition-transform",
+          "max-lg:fixed max-lg:inset-y-0 max-lg:left-0",
+          "lg:sticky lg:top-0 lg:self-start lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "max-lg:-translate-x-full"
         )}
       >
         <div className="p-6 border-b border-white/10">
@@ -211,7 +219,7 @@ export function BomsShell({
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-0">
         <header className="bg-white border-b border-slate-200 px-4 lg:px-8 py-4 flex items-center gap-4 sticky top-0 z-30">
           <button
             type="button"

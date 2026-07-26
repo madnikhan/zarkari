@@ -44,7 +44,7 @@ export function CashSummaryCards({ summary, viewMode = "day" }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="cash-summary">
       {cards.map((card) => (
         <div key={card.label} className="boms-card p-5">
           <div className="flex items-start justify-between gap-2">

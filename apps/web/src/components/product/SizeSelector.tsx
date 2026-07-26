@@ -11,6 +11,7 @@ import {
   formatInches,
   getStandardSize,
   parseCustomMeasurements,
+  validateCustomField,
   type MeasurementKey,
   type SizeSelection,
   type StandardSizeKey,
@@ -57,13 +58,13 @@ export function SizeSelector({ value, onChange, stockBySize, onSizeSelect }: Siz
     setCustomInputs((prev) => ({ ...prev, [key]: val }));
     setCustomConfirmed(false);
     onChange(null);
-    if (customErrors[key]) {
-      setCustomErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
+    const err = validateCustomField(key, val);
+    setCustomErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[key] = err;
+      else delete next[key];
+      return next;
+    });
   }
 
   function confirmCustom() {

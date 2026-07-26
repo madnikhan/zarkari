@@ -24,7 +24,7 @@ export const TRAINING_SECTIONS: TrainingSection[] = [
     href: "/admin/cash",
     summary: "Record money coming in and going out each day. Track opening balance, deposits, and expenses.",
     steps: [
-      { element: "[data-tour='nav-cash']", title: "Daily Cash", description: "Open Daily Cash from the menu to manage today's till." },
+      { element: "[data-tour='nav-daily-cash']", title: "Daily Cash", description: "Open Daily Cash from the menu to manage today's till." },
       { element: "[data-tour='cash-summary']", title: "Today's summary", description: "See opening balance, cash in, cash out, and closing balance for the selected day." },
       { element: "[data-tour='cash-tables']", title: "Transactions", description: "Tap any description to see full details in a popup." },
     ],
@@ -36,7 +36,7 @@ export const TRAINING_SECTIONS: TrainingSection[] = [
     summary: "View and search all bridal orders. Filter by status, supplier, or delivery date.",
     steps: [
       { element: "[data-tour='nav-orders']", title: "Orders list", description: "All bridal orders are listed here with large status badges for easy reading." },
-      { element: "[data-tour='new-order']", title: "New order", description: "Tap New Order to create a booking with WhatsApp number, delivery date, deposit, and photos." },
+      { element: "[data-tour='nav-new-order']", title: "New order", description: "Tap New Order to create a booking with WhatsApp number, delivery date, deposit, and photos." },
     ],
   },
   {

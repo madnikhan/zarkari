@@ -52,12 +52,17 @@ export async function POST(request: Request) {
   }
 
   if (isDbConfigured()) {
+    const role = body.role;
+    const supplierId = role === "supplier" ? body.supplierId : undefined;
+    if (role === "supplier" && !supplierId) {
+      return NextResponse.json({ error: "Supplier account requires a supplier record" }, { status: 400 });
+    }
     const user = await createUserDb({
       email: body.email.trim().toLowerCase(),
       passwordHash: await hashPassword(body.password),
       name: body.name,
       role: body.role,
-      supplierId: body.supplierId,
+      supplierId,
     });
     if (!user) return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } }, { status: 201 });
@@ -70,7 +75,7 @@ export async function POST(request: Request) {
     password: body.password,
     name: body.name,
     role: body.role,
-    supplierId: body.supplierId,
+    supplierId: body.role === "supplier" ? body.supplierId : undefined,
   });
   return NextResponse.json({ user: { id, email: body.email, name: body.name, role: body.role } }, { status: 201 });
 }
@@ -93,7 +98,21 @@ export async function PATCH(request: Request) {
     if (body.name) patch.name = body.name;
     if (body.role) patch.role = body.role;
     if (body.password) patch.passwordHash = await hashPassword(body.password);
-    if (body.supplierId !== undefined) patch.supplierId = body.supplierId || null;
+
+    const nextRole = body.role;
+    if (nextRole && nextRole !== "supplier") {
+      patch.supplierId = null;
+    } else if (nextRole === "supplier") {
+      if (!body.supplierId) {
+        return NextResponse.json({ error: "Supplier account requires a supplier record" }, { status: 400 });
+      }
+      patch.supplierId = body.supplierId;
+    } else if (body.supplierId !== undefined) {
+      // role unchanged — only allow supplierId updates when current role is supplier handled client-side;
+      // still reject attaching supplier to non-supplier by requiring explicit role=supplier above
+      patch.supplierId = body.supplierId || null;
+    }
+
     const user = await updateUserDb(body.id, patch);
     if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
@@ -102,8 +121,12 @@ export async function PATCH(request: Request) {
   const user = demoUsers.find((u) => u.id === body.id);
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (body.name) user.name = body.name;
-  if (body.role) user.role = body.role;
+  if (body.role) {
+    user.role = body.role;
+    if (body.role !== "supplier") user.supplierId = undefined;
+  }
   if (body.password) user.password = body.password;
+  if (body.role === "supplier" && body.supplierId) user.supplierId = body.supplierId;
   return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }
 

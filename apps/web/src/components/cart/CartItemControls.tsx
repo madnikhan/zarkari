@@ -8,21 +8,29 @@ import type { CartItem } from "@/lib/data/seed";
 interface Props {
   lineId: string;
   quantity: number;
+  onCartChange?: (cart: CartItem[]) => void;
 }
 
-export function CartItemControls({ lineId, quantity }: Props) {
+export function CartItemControls({ lineId, quantity, onCartChange }: Props) {
   const [busy, setBusy] = useState(false);
+
+  async function applyResponse(res: Response) {
+    const data = (await res.json().catch(() => ({}))) as { cart?: CartItem[]; error?: string };
+    if (!res.ok) throw new Error(data.error ?? "Cart update failed");
+    if (data.cart) onCartChange?.(data.cart);
+    notifyCartUpdated();
+  }
 
   async function updateQty(newQty: number) {
     if (newQty < 1) return;
     setBusy(true);
     try {
-      await fetch("/api/cart", {
+      const res = await fetch("/api/cart", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lineId, quantity: newQty }),
       });
-      notifyCartUpdated();
+      await applyResponse(res);
     } finally {
       setBusy(false);
     }
@@ -31,8 +39,8 @@ export function CartItemControls({ lineId, quantity }: Props) {
   async function remove() {
     setBusy(true);
     try {
-      await fetch(`/api/cart?lineId=${encodeURIComponent(lineId)}`, { method: "DELETE" });
-      notifyCartUpdated();
+      const res = await fetch(`/api/cart?lineId=${encodeURIComponent(lineId)}`, { method: "DELETE" });
+      await applyResponse(res);
     } finally {
       setBusy(false);
     }

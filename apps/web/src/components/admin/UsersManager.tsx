@@ -77,7 +77,7 @@ export function UsersManager() {
           id: editing.id,
           name: editForm.name,
           role: editForm.role,
-          supplierId: editForm.role === "supplier" ? editForm.supplierId || undefined : undefined,
+          supplierId: editForm.role === "supplier" ? editForm.supplierId || undefined : null,
           ...(editForm.password ? { password: editForm.password } : {}),
         }),
       });

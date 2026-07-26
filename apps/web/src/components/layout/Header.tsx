@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Menu, Search, ShoppingBag, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ZarkariLogo } from "@/components/brand/ZarkariLogo";
-import { CART_UPDATED_EVENT, fetchCartCount } from "@/lib/cart-client";
+import { ShopSearchForm } from "@/components/shop/ShopSearchForm";
+import { fetchCartCount, subscribeCartUpdated } from "@/lib/cart-client";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -26,8 +27,9 @@ export function Header({ cartCount: initialCartCount = 0 }: { cartCount?: number
 
   useEffect(() => {
     refreshCartCount();
-    window.addEventListener(CART_UPDATED_EVENT, refreshCartCount);
-    return () => window.removeEventListener(CART_UPDATED_EVENT, refreshCartCount);
+    return subscribeCartUpdated(() => {
+      void refreshCartCount();
+    });
   }, [refreshCartCount]);
 
   useEffect(() => {
@@ -77,7 +79,8 @@ export function Header({ cartCount: initialCartCount = 0 }: { cartCount?: number
             </nav>
 
             <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/search" className="p-2 text-charcoal hover:text-gold transition-colors" aria-label="Search">
+              <ShopSearchForm variant="header" />
+              <Link href="/search" className="md:hidden p-2 text-charcoal hover:text-gold transition-colors" aria-label="Search">
                 <Search className="w-5 h-5" />
               </Link>
               <Link

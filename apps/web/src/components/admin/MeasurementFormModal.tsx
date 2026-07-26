@@ -11,6 +11,7 @@ import {
   type BridalMeasurements,
   type MeasurementUnit,
 } from "@/lib/measurements/bridal-form";
+import { BRIDAL_MATERIALS } from "@/lib/bridal-options";
 
 interface Props {
   initial?: BridalMeasurements | null;
@@ -35,17 +36,39 @@ function SectionFields({
         {title}
       </h3>
       <div className="grid sm:grid-cols-2 gap-3">
-        {fields.map((key) => (
-          <label key={`${title}-${key}`} className="block text-sm">
-            <span className="text-slate-500 text-xs">{key}</span>
-            <input
-              type="text"
-              value={values[key] ?? ""}
-              onChange={(e) => onChange(key, e.target.value)}
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            />
-          </label>
-        ))}
+        {fields.map((key) => {
+          const isMaterial = key.toLowerCase() === "material";
+          return (
+            <label key={`${title}-${key}`} className="block text-sm">
+              <span className="text-slate-500 text-xs">{key}</span>
+              {isMaterial ? (
+                <select
+                  value={values[key] ?? ""}
+                  onChange={(e) => onChange(key, e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Select material</option>
+                  {BRIDAL_MATERIALS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                  {values[key] &&
+                    !(BRIDAL_MATERIALS as readonly string[]).includes(values[key]) && (
+                      <option value={values[key]}>{values[key]}</option>
+                    )}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={values[key] ?? ""}
+                  onChange={(e) => onChange(key, e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              )}
+            </label>
+          );
+        })}
       </div>
     </section>
   );

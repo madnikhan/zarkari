@@ -1,8 +1,10 @@
+import { getSession } from "@/lib/auth/session";
 import { getSuppliers } from "@/lib/data";
 import { NewOrderForm } from "@/components/admin/NewOrderForm";
 
 export default async function NewOrderPage() {
-  const suppliers = await getSuppliers();
+  const session = await getSession();
+  const suppliers = await getSuppliers(session?.role === "owner");
 
   return (
     <div className="p-4 lg:p-8 max-w-2xl">
