@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZARKARI — How the system works</title>
+  <style>
+    :root {
+      --cream: #faf8f5;
+      --charcoal: #1a1814;
+      --gold: #c9a962;
+      --muted: rgba(250, 248, 245, 0.65);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: var(--charcoal);
+      color: var(--cream);
+      padding: 2rem 1.25rem 3rem;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .brand {
+      text-align: center;
+      letter-spacing: 0.35em;
+      font-weight: 100;
+      font-size: clamp(1.5rem, 4vw, 2.25rem);
+      margin: 0 0 0.5rem;
+    }
+    .purpose {
+      text-align: center;
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 0.95rem;
+      max-width: 36rem;
+      margin: 0 auto 2rem;
+      line-height: 1.5;
+    }
+    .gold-bar {
+      height: 3px;
+      background: var(--gold);
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto 2rem;
+      animation: shimmer 3s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    .hub {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.75rem;
+    }
+
+    .center {
+      background: rgba(250, 248, 245, 0.06);
+      border: 1px solid rgba(201, 169, 98, 0.45);
+      border-radius: 16px;
+      padding: 1.25rem 1.75rem;
+      text-align: center;
+      max-width: 28rem;
+      animation: pulse-glow 4s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(201, 169, 98, 0); }
+      50% { box-shadow: 0 0 24px 2px rgba(201, 169, 98, 0.25); }
+    }
+    .center h2 {
+      margin: 0 0 0.35rem;
+      font-weight: 500;
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    .center p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .lanes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      width: 100%;
+    }
+    @media (max-width: 900px) {
+      .lanes { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .lanes { grid-template-columns: 1fr; }
+    }
+
+    .lane {
+      background: rgba(250, 248, 245, 0.04);
+      border: 1px solid rgba(250, 248, 245, 0.12);
+      border-radius: 14px;
+      padding: 1.1rem 1rem 1.25rem;
+      min-height: 11rem;
+      position: relative;
+      overflow: hidden;
+      animation: rise-in 0.8s ease both;
+    }
+    .lane:nth-child(1) { animation-delay: 0.1s; }
+    .lane:nth-child(2) { animation-delay: 0.25s; }
+    .lane:nth-child(3) { animation-delay: 0.4s; }
+    .lane:nth-child(4) { animation-delay: 0.55s; }
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .lane::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: bar-draw 2.5s ease-in-out infinite;
+    }
+    .lane:nth-child(2)::before { animation-delay: 0.4s; }
+    .lane:nth-child(3)::before { animation-delay: 0.8s; }
+    .lane:nth-child(4)::before { animation-delay: 1.2s; }
+    @keyframes bar-draw {
+      0%, 100% { transform: scaleX(0.2); opacity: 0.5; }
+      50% { transform: scaleX(1); opacity: 1; }
+    }
+    .lane h3 {
+      margin: 0 0 0.35rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    .lane .caption {
+      font-size: 1.05rem;
+      font-weight: 500;
+      margin: 0 0 0.5rem;
+    }
+    .lane ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .flows {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem 0.5rem;
+      margin: 0.75rem 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .flow strong {
+      color: var(--cream);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(250, 248, 245, 0.08);
+      border: 1px solid rgba(250, 248, 245, 0.15);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      white-space: nowrap;
+    }
+    .arrow {
+      color: var(--gold);
+      font-size: 1rem;
+      animation: arrow-pulse 1.6s ease-in-out infinite;
+    }
+    .flow.bridal .arrow { animation-delay: 0s; }
+    .flow.retail .arrow { animation-delay: 0.4s; }
+    @keyframes arrow-pulse {
+      0%, 100% { opacity: 0.35; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(3px); }
+    }
+
+    .legend {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .legend a { color: var(--gold); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="gold-bar" aria-hidden="true"></div>
+    <p class="brand">ZΛRKΛRI</p>
+    <p class="purpose">
+      One platform for the public shop, bridal order management (BOMS), suppliers, and customer tracking —
+      so the team can run dressmaking and retail without losing orders or money in chat threads.
+    </p>
+
+    <div class="hub">
+      <div class="center">
+        <h2>ZARKARI platform</h2>
+        <p>Shop online · Manage bridal ops · Make dresses · Track money &amp; stock</p>
+      </div>
+
+      <div class="lanes" role="list">
+        <article class="lane" role="listitem">
+          <h3>Customer</h3>
+          <p class="caption">Track order</p>
+          <ul>
+            <li>Browse &amp; buy on the shop</li>
+            <li>Bridal progress on /my-order</li>
+            <li>WhatsApp with the shop</li>
+          </ul>
+        </article>
+        <article class="lane" role="listitem">
+          <h3>Staff (BOMS)</h3>
+          <p class="caption">Manage ops</p>
+          <ul>
+            <li>Create bridal &amp; walk-in orders</li>
+            <li>Daily cash &amp; payments</li>
+            <li>Inbox, content, reports</li>
+          </ul>
+        </article>
+        <article class="lane" role="listitem">
+          <h3>Supplier</h3>
+          <p class="caption">Make dresses</p>
+          <ul>
+            <li>Accept or reject work</li>
+            <li>Update production stages</li>
+            <li>Upload completion media</li>
+          </ul>
+        </article>
+        <article class="lane" role="listitem">
+          <h3>Systems</h3>
+          <p class="caption">Money &amp; inventory</p>
+          <ul>
+            <li>Stock (internal ↔ shop)</li>
+            <li>Cargo boxes &amp; khata</li>
+            <li>Cash in / cash out</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="flows">
+        <div class="flow bridal" aria-label="Bridal flow">
+          <strong>Bridal</strong>
+          <span class="chip">New order</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Supplier</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Produce &amp; ship</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Collect + cash</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Customer tracks</span>
+        </div>
+        <div class="flow retail" aria-label="Retail flow">
+          <strong>Retail</strong>
+          <span class="chip">Shop / walk-in</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Storefront stock</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Sale</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="chip">Daily cash</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="legend">
+      Full guide: <a href="employee-handbook.md">employee-handbook.md</a>
+      · PDF: <a href="employee-handbook.pdf">employee-handbook.pdf</a>
+    </p>
+  </div>
+</body>
+</html>
