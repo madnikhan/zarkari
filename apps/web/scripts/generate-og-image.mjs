@@ -15,7 +15,12 @@ const base =
 const jobs = [
   { path: "/opengraph-image", out: join(root, "public/og-image.png") },
   { path: "/brand/logo-square", out: join(root, "public/brand/logo-square.png") },
+  { path: "/brand/logo-square?v=light", out: join(root, "public/brand/logo-square-light.png") },
   { path: "/brand/social-banner", out: join(root, "public/brand/social-banner.png") },
+  {
+    path: "/brand/social-banner?v=light",
+    out: join(root, "public/brand/social-banner-light.png"),
+  },
 ];
 
 mkdirSync(join(root, "public/brand"), { recursive: true });

@@ -33,7 +33,7 @@ export default async function AppleIcon() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#faf8f5",
+          background: "#1a1814",
           position: "relative",
         }}
       >
@@ -51,7 +51,7 @@ export default async function AppleIcon() {
           style={{
             fontSize: 112,
             fontWeight: 100,
-            color: "#1a1814",
+            color: "#faf8f5",
             fontFamily,
             letterSpacing: "0.05em",
           }}

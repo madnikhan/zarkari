@@ -7,10 +7,20 @@ export const OG_ALT = "ZARKARI — Designer Formal Wear UK";
 export const LOGO_SQUARE_SIZE = { width: 1080, height: 1080 };
 export const SOCIAL_BANNER_SIZE = { width: 1500, height: 500 };
 
-async function loadMontserratThin(): Promise<ArrayBuffer | null> {
+export type BrandVariant = "dark" | "light";
+
+const BRAND = {
+  charcoal: "#1a1814",
+  cream: "#faf8f5",
+  gold: "#c9a962",
+} as const;
+
+const TAGLINE = "Designer formal wear — hand-finished pieces from our catalogue.";
+
+async function loadMontserratWeight(weight: 100 | 400): Promise<ArrayBuffer | null> {
   try {
     const css = await fetch(
-      "https://fonts.googleapis.com/css2?family=Montserrat:wght@100&display=swap",
+      `https://fonts.googleapis.com/css2?family=Montserrat:wght@${weight}&display=swap`,
       { next: { revalidate: 86400 } }
     ).then((res) => res.text());
 
@@ -23,13 +33,31 @@ async function loadMontserratThin(): Promise<ArrayBuffer | null> {
   }
 }
 
+function wordmarkColors(variant: BrandVariant) {
+  if (variant === "dark") {
+    return {
+      thin: "rgba(250, 248, 245, 0.7)",
+      bold: BRAND.cream,
+      tagline: "rgba(250, 248, 245, 0.55)",
+    };
+  }
+  return {
+    thin: "rgba(26, 24, 20, 0.65)",
+    bold: BRAND.charcoal,
+    tagline: "rgba(26, 24, 20, 0.55)",
+  };
+}
+
 function BrandShell({
   children,
   barHeight = 4,
+  variant = "dark",
 }: {
   children: ReactNode;
   barHeight?: number;
+  variant?: BrandVariant;
 }) {
+  const isDark = variant === "dark";
   return (
     <div
       style={{
@@ -39,7 +67,7 @@ function BrandShell({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#faf8f5",
+        background: isDark ? BRAND.charcoal : BRAND.cream,
         position: "relative",
       }}
     >
@@ -50,7 +78,7 @@ function BrandShell({
           left: 0,
           right: 0,
           height: barHeight,
-          background: "#c9a962",
+          background: BRAND.gold,
         }}
       />
       {children}
@@ -58,120 +86,158 @@ function BrandShell({
   );
 }
 
-export function BrandOgCard({ fontFamily }: { fontFamily: string }) {
+/** Thin Z/RK/RI + bold barless Λ — matches screenshot wordmark. */
+function BrandWordmark({
+  fontFamily,
+  fontSize,
+  variant,
+}: {
+  fontFamily: string;
+  fontSize: number;
+  variant: BrandVariant;
+}) {
+  const colors = wordmarkColors(variant);
+  const base: React.CSSProperties = {
+    fontFamily,
+    fontSize,
+    lineHeight: 1,
+    display: "flex",
+  };
+
   return (
-    <BrandShell>
-      <span
-        style={{
-          fontSize: 96,
-          fontWeight: 100,
-          letterSpacing: "0.22em",
-          color: "#1a1814",
-          fontFamily,
-          marginLeft: "0.22em",
-        }}
-      >
-        ZΛRKΛRI
-      </span>
-      <span
-        style={{
-          fontSize: 28,
-          fontWeight: 400,
-          letterSpacing: "0.35em",
-          color: "#1a1814",
-          opacity: 0.55,
-          fontFamily,
-          marginTop: 24,
-          textTransform: "uppercase",
-        }}
-      >
-        Designer Formal Wear UK
-      </span>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "baseline",
+        letterSpacing: "0.22em",
+        marginLeft: "0.22em",
+      }}
+    >
+      <span style={{ ...base, fontWeight: 100, color: colors.thin }}>Z</span>
+      <span style={{ ...base, fontWeight: 400, color: colors.bold }}>Λ</span>
+      <span style={{ ...base, fontWeight: 100, color: colors.thin }}>RK</span>
+      <span style={{ ...base, fontWeight: 400, color: colors.bold }}>Λ</span>
+      <span style={{ ...base, fontWeight: 100, color: colors.thin }}>RI</span>
+    </div>
+  );
+}
+
+function BrandTagline({
+  fontFamily,
+  fontSize,
+  variant,
+  marginTop,
+}: {
+  fontFamily: string;
+  fontSize: number;
+  variant: BrandVariant;
+  marginTop: number;
+}) {
+  const colors = wordmarkColors(variant);
+  return (
+    <span
+      style={{
+        fontSize,
+        fontWeight: 100,
+        letterSpacing: "0.12em",
+        color: colors.tagline,
+        fontFamily,
+        marginTop,
+        textAlign: "center",
+        maxWidth: "90%",
+      }}
+    >
+      {TAGLINE}
+    </span>
+  );
+}
+
+export function BrandOgCard({
+  fontFamily,
+  variant = "dark",
+}: {
+  fontFamily: string;
+  variant?: BrandVariant;
+}) {
+  return (
+    <BrandShell variant={variant}>
+      <BrandWordmark fontFamily={fontFamily} fontSize={96} variant={variant} />
+      <BrandTagline fontFamily={fontFamily} fontSize={26} variant={variant} marginTop={28} />
     </BrandShell>
   );
 }
 
-export function BrandLogoSquareCard({ fontFamily }: { fontFamily: string }) {
+export function BrandLogoSquareCard({
+  fontFamily,
+  variant = "dark",
+}: {
+  fontFamily: string;
+  variant?: BrandVariant;
+}) {
   return (
-    <BrandShell barHeight={8}>
-      <span
-        style={{
-          fontSize: 120,
-          fontWeight: 100,
-          letterSpacing: "0.22em",
-          color: "#1a1814",
-          fontFamily,
-          marginLeft: "0.22em",
-        }}
-      >
-        ZΛRKΛRI
-      </span>
+    <BrandShell variant={variant} barHeight={8}>
+      <BrandWordmark fontFamily={fontFamily} fontSize={110} variant={variant} />
     </BrandShell>
   );
 }
 
-export function BrandSocialBannerCard({ fontFamily }: { fontFamily: string }) {
+export function BrandSocialBannerCard({
+  fontFamily,
+  variant = "dark",
+}: {
+  fontFamily: string;
+  variant?: BrandVariant;
+}) {
   return (
-    <BrandShell barHeight={6}>
-      <span
-        style={{
-          fontSize: 72,
-          fontWeight: 100,
-          letterSpacing: "0.22em",
-          color: "#1a1814",
-          fontFamily,
-          marginLeft: "0.22em",
-        }}
-      >
-        ZΛRKΛRI
-      </span>
-      <span
-        style={{
-          fontSize: 22,
-          fontWeight: 400,
-          letterSpacing: "0.35em",
-          color: "#1a1814",
-          opacity: 0.55,
-          fontFamily,
-          marginTop: 18,
-          textTransform: "uppercase",
-        }}
-      >
-        Designer Formal Wear UK
-      </span>
+    <BrandShell variant={variant} barHeight={6}>
+      <BrandWordmark fontFamily={fontFamily} fontSize={72} variant={variant} />
+      <BrandTagline fontFamily={fontFamily} fontSize={20} variant={variant} marginTop={20} />
     </BrandShell>
   );
 }
 
-async function withBrandFont(
+async function withBrandFonts(
   element: (fontFamily: string) => ReactElement,
   size: { width: number; height: number }
 ) {
-  const fontData = await loadMontserratThin();
-  const fontFamily = fontData ? "Montserrat" : "ui-sans-serif, system-ui, sans-serif";
+  const [thin, regular] = await Promise.all([
+    loadMontserratWeight(100),
+    loadMontserratWeight(400),
+  ]);
+  const fontFamily = thin || regular ? "Montserrat" : "ui-sans-serif, system-ui, sans-serif";
+
+  const fonts: { name: string; data: ArrayBuffer; style: "normal"; weight: 100 | 400 }[] = [];
+  if (thin) fonts.push({ name: "Montserrat", data: thin, style: "normal", weight: 100 });
+  if (regular) fonts.push({ name: "Montserrat", data: regular, style: "normal", weight: 400 });
 
   return new ImageResponse(element(fontFamily), {
     ...size,
-    ...(fontData
-      ? { fonts: [{ name: "Montserrat", data: fontData, style: "normal" as const, weight: 100 }] }
-      : {}),
+    ...(fonts.length ? { fonts } : {}),
   });
 }
 
-export async function generateBrandOgImage() {
-  return withBrandFont((fontFamily) => <BrandOgCard fontFamily={fontFamily} />, OG_SIZE);
+export function parseBrandVariant(value: string | null): BrandVariant {
+  return value === "light" ? "light" : "dark";
 }
 
-export async function generateBrandLogoSquareImage() {
-  return withBrandFont(
-    (fontFamily) => <BrandLogoSquareCard fontFamily={fontFamily} />,
+export async function generateBrandOgImage(variant: BrandVariant = "dark") {
+  return withBrandFonts(
+    (fontFamily) => <BrandOgCard fontFamily={fontFamily} variant={variant} />,
+    OG_SIZE
+  );
+}
+
+export async function generateBrandLogoSquareImage(variant: BrandVariant = "dark") {
+  return withBrandFonts(
+    (fontFamily) => <BrandLogoSquareCard fontFamily={fontFamily} variant={variant} />,
     LOGO_SQUARE_SIZE
   );
 }
 
-export async function generateBrandSocialBannerImage() {
-  return withBrandFont(
-    (fontFamily) => <BrandSocialBannerCard fontFamily={fontFamily} />,
+export async function generateBrandSocialBannerImage(variant: BrandVariant = "dark") {
+  return withBrandFonts(
+    (fontFamily) => <BrandSocialBannerCard fontFamily={fontFamily} variant={variant} />,
     SOCIAL_BANNER_SIZE
   );
 }

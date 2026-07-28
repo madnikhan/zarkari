@@ -23,7 +23,7 @@ export function getSiteUrl() {
 }
 
 /** Static brand card — reliable for WhatsApp/Meta crawlers (avoids dynamic /opengraph-image). */
-export const OG_IMAGE_PATH = "/og-image.png?v=2";
+export const OG_IMAGE_PATH = "/og-image.png?v=5";
 
 /** Relative paths — resolved against metadataBase. */
 export function getOgImageUrls() {
