@@ -19,6 +19,7 @@ export const MEASUREMENT_UNITS: { value: MeasurementUnit; label: string }[] = [
 
 /** Field keys match the Zarri Palace paper measurement form. */
 export const TOP_MEASUREMENT_FIELDS = [
+  "Name",
   "Material",
   "Colour",
   "Thread Colour",
@@ -43,6 +44,7 @@ export const TOP_MEASUREMENT_FIELDS = [
 ] as const;
 
 export const BOTTOM_MEASUREMENT_FIELDS = [
+  "Name",
   "Material",
   "Colour",
   "Embroidery Colour",
@@ -58,6 +60,7 @@ export const BOTTOM_MEASUREMENT_FIELDS = [
 ] as const;
 
 export const DUPATTA_MEASUREMENT_FIELDS = [
+  "Name",
   "Material",
   "Colour",
   "Embroidery",
