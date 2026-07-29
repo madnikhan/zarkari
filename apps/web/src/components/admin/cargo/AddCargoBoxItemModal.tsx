@@ -18,14 +18,25 @@ interface OrderResult {
 interface Props {
   boxId: string;
   defaultExchangeRate?: string;
+  /** Box received / start date — used as default for new items */
+  defaultItemDate?: string;
   item?: CargoBoxItem;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function AddCargoBoxItemModal({ boxId, defaultExchangeRate, item, onClose, onSaved }: Props) {
+export function AddCargoBoxItemModal({
+  boxId,
+  defaultExchangeRate,
+  defaultItemDate,
+  item,
+  onClose,
+  onSaved,
+}: Props) {
   const isEdit = Boolean(item);
-  const [itemDate, setItemDate] = useState(item?.itemDate ?? new Date().toISOString().slice(0, 10));
+  const [itemDate, setItemDate] = useState(
+    item?.itemDate ?? defaultItemDate ?? new Date().toISOString().slice(0, 10)
+  );
   const [articleName, setArticleName] = useState(item?.articleName ?? "");
   const [order, setOrder] = useState<OrderResult | null>(
     item?.bridalOrderId && item.orderNumber

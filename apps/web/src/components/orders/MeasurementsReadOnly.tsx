@@ -64,6 +64,12 @@ export function MeasurementsReadOnly({
           Scale: {m.unit}
         </span>
       </div>
+      {m.clothName?.trim() && (
+        <p className="text-sm">
+          <span className="text-slate-500">Cloth name: </span>
+          <span className="font-medium text-slate-900">{m.clothName.trim()}</span>
+        </p>
+      )}
       <Section title="Top" fields={TOP_MEASUREMENT_FIELDS} values={m.top} />
       <Section title="Bottom" fields={BOTTOM_MEASUREMENT_FIELDS} values={m.bottom} />
       <Section title="Dupatta" fields={DUPATTA_MEASUREMENT_FIELDS} values={m.dupatta} />

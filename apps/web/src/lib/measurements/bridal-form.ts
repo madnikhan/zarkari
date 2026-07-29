@@ -2,6 +2,8 @@ export type MeasurementUnit = "cm" | "inches" | "m";
 
 export type BridalMeasurements = {
   unit: MeasurementUnit;
+  /** Free-text name for the outfit piece, e.g. lehnga, choli */
+  clothName?: string;
   top: Record<string, string>;
   bottom: Record<string, string>;
   dupatta: Record<string, string>;
@@ -72,6 +74,7 @@ export function emptyBridalMeasurements(unit: MeasurementUnit = "inches"): Brida
     Object.fromEntries(fields.map((k) => [k, ""])) as Record<string, string>;
   return {
     unit,
+    clothName: "",
     top: empty(TOP_MEASUREMENT_FIELDS),
     bottom: empty(BOTTOM_MEASUREMENT_FIELDS),
     dupatta: empty(DUPATTA_MEASUREMENT_FIELDS),
@@ -86,7 +89,7 @@ export function hasAnyMeasurementValue(m: BridalMeasurements | null | undefined)
   for (const section of sections) {
     if (Object.values(section ?? {}).some((v) => v?.trim())) return true;
   }
-  return Boolean(m.notes?.trim() || m.takenBy?.trim());
+  return Boolean(m.clothName?.trim() || m.notes?.trim() || m.takenBy?.trim());
 }
 
 export function normalizeBridalMeasurements(
@@ -99,6 +102,7 @@ export function normalizeBridalMeasurements(
   const base = emptyBridalMeasurements(unit);
   return {
     unit,
+    clothName: data.clothName ?? "",
     top: { ...base.top, ...(data.top ?? {}) },
     bottom: { ...base.bottom, ...(data.bottom ?? {}) },
     dupatta: { ...base.dupatta, ...(data.dupatta ?? {}) },

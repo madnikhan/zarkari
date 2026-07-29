@@ -11,9 +11,16 @@ interface Props {
   transaction: CashTransaction | null;
   onClose: () => void;
   canDelete?: boolean;
+  /** Open directly in edit mode (e.g. from table pencil) */
+  startInEdit?: boolean;
 }
 
-export function CashTransactionDetailModal({ transaction, onClose, canDelete = false }: Props) {
+export function CashTransactionDetailModal({
+  transaction,
+  onClose,
+  canDelete = false,
+  startInEdit = false,
+}: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState("");
@@ -24,12 +31,12 @@ export function CashTransactionDetailModal({ transaction, onClose, canDelete = f
 
   useEffect(() => {
     if (!transaction) return;
-    setEditing(false);
+    setEditing(startInEdit);
     setAmount(transaction.amount);
     setDescription(transaction.description ?? "");
     setMethod(transaction.method);
     setError("");
-  }, [transaction]);
+  }, [transaction, startInEdit]);
 
   if (!transaction) return null;
 

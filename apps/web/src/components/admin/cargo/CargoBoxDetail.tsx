@@ -614,6 +614,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
         <AddCargoBoxItemModal
           boxId={box.id}
           defaultExchangeRate={box.exchangeRate}
+          defaultItemDate={box.receivedDate}
           item={editItem ?? undefined}
           onClose={() => {
             setShowAddItem(false);

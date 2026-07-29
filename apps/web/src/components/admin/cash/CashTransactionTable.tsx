@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { CASH_TYPE_LABELS, formatBusinessDate } from "@/lib/cash/labels";
 import type { CashTransaction } from "@/lib/db/cash-ledger";
@@ -36,7 +38,9 @@ export function CashTransactionTable({
   scrollable = false,
   canDelete = false,
 }: Props) {
+  const router = useRouter();
   const [selected, setSelected] = useState<CashTransaction | null>(null);
+  const [startInEdit, setStartInEdit] = useState(false);
   const headerClass =
     accent === "in"
       ? "bg-emerald-50 text-emerald-800 border-emerald-100"
@@ -44,16 +48,34 @@ export function CashTransactionTable({
 
   const grouped = groupByDay ? groupTransactions(transactions) : null;
 
+  function openDetail(tx: CashTransaction, edit: boolean) {
+    setStartInEdit(edit);
+    setSelected(tx);
+  }
+
+  async function deleteTx(tx: CashTransaction) {
+    if (tx.source === "auto") return;
+    if (!confirm("Delete this cash transaction? This cannot be undone.")) return;
+    const res = await fetch(`/api/cash/transactions/${tx.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Failed to delete");
+      return;
+    }
+    router.refresh();
+  }
+
   function renderRow(tx: CashTransaction) {
     const typeLabel =
       tx.type === "business_expense" && tx.expenseCategory
         ? `${CASH_TYPE_LABELS[tx.type]} — ${tx.expenseCategory}`
         : CASH_TYPE_LABELS[tx.type];
+    const isAuto = tx.source === "auto";
     return (
       <tr
         key={tx.id}
         className="hover:bg-slate-50/50 cursor-pointer"
-        onClick={() => setSelected(tx)}
+        onClick={() => openDetail(tx, false)}
       >
         <td className="px-3 py-2 whitespace-nowrap">
           {new Date(tx.occurredAt).toLocaleTimeString("en-GB", {
@@ -72,9 +94,34 @@ export function CashTransactionTable({
         >
           {formatPrice(tx.amount)}
         </td>
+        <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => openDetail(tx, true)}
+            className="p-1.5 text-[#4C3BCF] hover:bg-[#4C3BCF]/10 rounded-lg inline-flex"
+            aria-label="Edit transaction"
+            title="Edit"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => void deleteTx(tx)}
+              disabled={isAuto}
+              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg inline-flex disabled:opacity-40"
+              aria-label="Delete transaction"
+              title={isAuto ? "Auto-posted transactions cannot be deleted" : "Delete"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </td>
       </tr>
     );
   }
+
+  const colSpan = 7;
 
   const table = (
     <table className="w-full text-sm">
@@ -86,12 +133,13 @@ export function CashTransactionTable({
           <th className="text-left px-3 py-2 font-medium">Description</th>
           <th className="text-left px-3 py-2 font-medium">Method</th>
           <th className="text-right px-3 py-2 font-medium">Amount</th>
+          <th className="text-right px-3 py-2 font-medium">Actions</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
         {transactions.length === 0 ? (
           <tr>
-            <td colSpan={6} className="px-3 py-8 text-center text-slate-400">
+            <td colSpan={colSpan} className="px-3 py-8 text-center text-slate-400">
               No transactions yet
             </td>
           </tr>
@@ -100,7 +148,7 @@ export function CashTransactionTable({
             <Fragment key={day}>
               <tr className="bg-slate-50">
                 <td
-                  colSpan={6}
+                  colSpan={colSpan}
                   className="px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide"
                 >
                   {formatBusinessDate(day)}
@@ -130,8 +178,12 @@ export function CashTransactionTable({
       </div>
       <CashTransactionDetailModal
         transaction={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          setStartInEdit(false);
+        }}
         canDelete={canDelete}
+        startInEdit={startInEdit}
       />
     </>
   );
