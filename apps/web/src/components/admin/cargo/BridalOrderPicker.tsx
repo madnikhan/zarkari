@@ -6,15 +6,18 @@ interface OrderResult {
   id: string;
   orderNumber: string;
   customerName?: string;
+  dressType?: string;
 }
 
 interface Props {
   value: OrderResult | null;
   onChange: (order: OrderResult | null) => void;
   disabled?: boolean;
+  /** Restrict to open bridal orders for cargo arrival */
+  cargoOpen?: boolean;
 }
 
-export function BridalOrderPicker({ value, onChange, disabled }: Props) {
+export function BridalOrderPicker({ value, onChange, disabled, cargoOpen }: Props) {
   const [query, setQuery] = useState(value?.orderNumber ?? "");
   const [results, setResults] = useState<OrderResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -45,13 +48,18 @@ export function BridalOrderPicker({ value, onChange, disabled }: Props) {
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/orders/search?q=${encodeURIComponent(q.trim())}`);
+      const params = new URLSearchParams({ q: q.trim() });
+      if (cargoOpen) params.set("cargoOpen", "1");
+      const res = await fetch(`/api/orders/search?${params}`);
       const data = await res.json();
-      const list = (data.results ?? []).map((o: OrderResult) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        customerName: o.customerName,
-      }));
+      const list = (data.results ?? []).map(
+        (o: OrderResult & { dressType?: string }) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName,
+          dressType: o.dressType,
+        })
+      );
       setResults(list);
       setOpen(list.length > 0);
     } catch {
@@ -83,7 +91,7 @@ export function BridalOrderPicker({ value, onChange, disabled }: Props) {
           disabled={disabled}
           onChange={(e) => void search(e.target.value)}
           onFocus={() => results.length && setOpen(true)}
-          placeholder="Search ORD-xxx…"
+          placeholder="Search BR-…"
           className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
         />
         {value && !disabled && (

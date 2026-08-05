@@ -4,11 +4,14 @@ export interface CargoCompany {
   active: boolean;
 }
 
+export type CargoItemKind = "custom" | "sample";
+
 export interface CargoBoxItem {
   id: string;
   boxId: string;
   itemDate: string;
   articleName: string;
+  itemKind: CargoItemKind;
   bridalOrderId?: string;
   orderNumber?: string;
   costPkr: string;
@@ -89,6 +92,7 @@ export let demoCargoBoxItems: CargoBoxItem[] = [
     boxId: "box-demo-1",
     itemDate: "2026-06-15",
     articleName: "Bridal Lehenga — Red",
+    itemKind: "custom",
     bridalOrderId: "bo-1",
     orderNumber: "BR-2026-0152",
     costPkr: "85000",
@@ -102,6 +106,7 @@ export let demoCargoBoxItems: CargoBoxItem[] = [
     boxId: "box-demo-1",
     itemDate: "2026-06-15",
     articleName: "Matching Blouse",
+    itemKind: "custom",
     bridalOrderId: "bo-2",
     orderNumber: "BR-2026-0148",
     costPkr: "22000",
@@ -115,8 +120,7 @@ export let demoCargoBoxItems: CargoBoxItem[] = [
     boxId: "box-demo-2",
     itemDate: "2026-06-20",
     articleName: "Embroidered Dupatta",
-    bridalOrderId: "bo-3",
-    orderNumber: "BR-2026-0140",
+    itemKind: "sample",
     costPkr: "12000",
     costGbp: "33.75",
     exchangeRate: "355.50",

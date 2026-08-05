@@ -193,6 +193,7 @@ export async function addCargoBoxItem(input: {
   boxId: string;
   itemDate: string;
   articleName: string;
+  itemKind?: "custom" | "sample";
   bridalOrderId?: string;
   orderNumber?: string;
   costPkr?: string;
@@ -205,13 +206,16 @@ export async function addCargoBoxItem(input: {
     const { addCargoBoxItemDb } = await import("@/lib/db/cargo-boxes");
     return addCargoBoxItemDb(input);
   }
+  const itemKind: "custom" | "sample" =
+    input.itemKind ?? (input.bridalOrderId ? "custom" : "sample");
   const item: CargoBoxItem = {
     id: `ci-${Date.now()}`,
     boxId: input.boxId,
     itemDate: input.itemDate.slice(0, 10),
     articleName: input.articleName.trim(),
-    bridalOrderId: input.bridalOrderId,
-    orderNumber: input.orderNumber,
+    itemKind,
+    bridalOrderId: itemKind === "custom" ? input.bridalOrderId : undefined,
+    orderNumber: itemKind === "custom" ? input.orderNumber : undefined,
     costPkr: input.costPkr ?? "0",
     costGbp: input.costGbp ?? "0",
     exchangeRate: input.exchangeRate,
@@ -229,6 +233,7 @@ export async function updateCargoBoxItem(
   patch: Partial<{
     itemDate: string;
     articleName: string;
+    itemKind: "custom" | "sample";
     bridalOrderId: string | null;
     orderNumber?: string;
     costPkr: string;
@@ -246,6 +251,10 @@ export async function updateCargoBoxItem(
   const item = demoCargoBoxItems.find((i) => i.id === id);
   if (!item) return null;
   Object.assign(item, patch);
+  if (patch.itemKind === "sample") {
+    item.bridalOrderId = undefined;
+    item.orderNumber = undefined;
+  }
   return item;
 }
 

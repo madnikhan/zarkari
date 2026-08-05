@@ -359,6 +359,31 @@ export async function markReceivedAtShop(orderId: string, byName?: string) {
   return order;
 }
 
+/** Cargo custom item arrival → ready for collection (admin + customer my-order stay in sync). */
+export async function markReadyFromCargoArrival(
+  orderId: string,
+  opts?: { byName?: string; boxNumber?: string }
+) {
+  const order = await resolveOrder(orderId);
+  if (!order) return null;
+
+  const terminal = ["ready_for_collection", "collected", "cancelled", "refunded"];
+  if (terminal.includes(order.status)) {
+    return order;
+  }
+
+  order.status = "ready_for_collection";
+  await syncOrderPatch(orderId, { status: "ready_for_collection" });
+  const boxNote = opts?.boxNumber ? `Arrived in cargo box ${opts.boxNumber}` : "Arrived in cargo box";
+  await syncTimeline(orderId, "ready_for_collection", {
+    comment: boxNote,
+    performedByName: opts?.byName,
+    performedByRole: "staff",
+  });
+  notify("Order ready for collection", `${order.orderNumber} — ${boxNote}`, orderId);
+  return order;
+}
+
 export async function markArrivedAtUkBoutique(orderId: string, byName?: string) {
   const order = await resolveOrder(orderId);
   if (!order) return null;

@@ -105,9 +105,9 @@ export function StockAdjustModal({
               onChange={(e) => setMode(e.target.value as Mode)}
               className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
             >
-              <option value="receive">Receive into internal</option>
-              <option value="to_storefront">Transfer internal → shop</option>
-              <option value="to_internal">Transfer shop → internal</option>
+              <option value="receive">Receive into warehouse</option>
+              <option value="to_storefront">Transfer warehouse → shop stock</option>
+              <option value="to_internal">Transfer shop stock → warehouse</option>
               <option value="adjustment">Write-off / remove</option>
             </select>
           </div>
@@ -119,8 +119,8 @@ export function StockAdjustModal({
                 onChange={(e) => setLocation(e.target.value as "internal" | "storefront")}
                 className="w-full mt-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
               >
-                <option value="internal">Internal</option>
-                <option value="storefront">Shop (storefront)</option>
+                <option value="internal">Warehouse</option>
+                <option value="storefront">Shop stock</option>
               </select>
             </div>
           )}
@@ -138,13 +138,13 @@ export function StockAdjustModal({
                 >
                   {s}
                   <span className="block text-[10px] opacity-80">
-                    I{internalStock[s] ?? 0}/S{sizeStock[s] ?? 0}
+                    W{internalStock[s] ?? 0}/S{sizeStock[s] ?? 0}
                   </span>
                 </button>
               ))}
             </div>
             <p className="text-xs text-slate-400 mt-2">
-              {size}: internal {intQty} · shop {shopQty}
+              {size}: warehouse {intQty} · shop {shopQty}
             </p>
           </div>
           <div>

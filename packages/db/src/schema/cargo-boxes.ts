@@ -37,6 +37,8 @@ export const cargoBoxItems = pgTable("cargo_box_items", {
   boxId: uuid("box_id").notNull(),
   itemDate: date("item_date").notNull(),
   articleName: text("article_name").notNull(),
+  /** custom = linked bridal order; sample = ready-made sample with manual name */
+  itemKind: text("item_kind").$type<"custom" | "sample">().default("sample").notNull(),
   bridalOrderId: uuid("bridal_order_id"),
   costPkr: decimal("cost_pkr", { precision: 14, scale: 2 }).default("0").notNull(),
   costGbp: decimal("cost_gbp", { precision: 12, scale: 2 }).default("0").notNull(),

@@ -79,8 +79,9 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
       )}
 
       <p className="text-xs text-slate-500 mb-3">
-        Each size shows <span className="font-medium text-slate-700">internal / shop</span>. Online and
-        walk-in sales use shop stock only.
+        Each size shows <span className="font-medium text-slate-700">Warehouse / Shop stock</span>.
+        Shop stock is what customers can buy (walk-in and website). When pieces are ready to sell
+        online, set or transfer into shop stock.
       </p>
 
       <AdminTableShell>
@@ -91,12 +92,12 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
               {STANDARD_SIZES.map((s) => (
                 <th key={s} className="text-center px-2 py-3 font-medium text-slate-500">
                   {s}
-                  <span className="block text-[9px] font-normal text-slate-400 normal-case">I / S</span>
+                  <span className="block text-[9px] font-normal text-slate-400 normal-case">W / S</span>
                 </th>
               ))}
               <th className="text-center px-3 py-3 font-medium text-slate-500">
                 Total
-                <span className="block text-[9px] font-normal text-slate-400">I+S</span>
+                <span className="block text-[9px] font-normal text-slate-400">W+S</span>
               </th>
               <th className="text-left px-4 py-3 font-medium text-slate-500" />
             </tr>
@@ -114,7 +115,7 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
                     <div>
                       <p className="font-medium text-slate-900">{p.title}</p>
                       <p className="text-[10px] text-slate-400">
-                        Shop {p.totalStorefront ?? p.totalStock} · Internal {p.totalInternal ?? 0}
+                        Shop {p.totalStorefront ?? p.totalStock} · Warehouse {p.totalInternal ?? 0}
                       </p>
                       {p.lowStock && (
                         <span className="text-[10px] uppercase tracking-wide text-amber-700 font-semibold">
@@ -208,7 +209,7 @@ export function StockPageClient({ products: initial, dateQuery = {} }: Props) {
                           {MOVEMENT_LABELS[m.type] ?? m.type}
                           {m.location ? (
                             <span className="ml-1 text-xs font-normal text-slate-400">
-                              ({m.location === "storefront" ? "shop" : m.location})
+                              ({m.location === "storefront" ? "shop" : "warehouse"})
                             </span>
                           ) : null}
                         </span>

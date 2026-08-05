@@ -688,16 +688,23 @@ export async function searchOrders(query: string): Promise<BridalOrder[]> {
   return results;
 }
 
-export async function searchOrdersWithCustomer(query: string) {
+export async function searchOrdersWithCustomer(query: string, opts?: { cargoOpen?: boolean }) {
   if (isDbConfigured()) {
     const { searchUnifiedOrders } = await import("@/lib/db/unified-orders");
-    return searchUnifiedOrders(query);
+    return searchUnifiedOrders(query, opts);
   }
   const results = await searchOrders(query);
-  return results.map((order) => ({
+  const mapped = results.map((order) => ({
     ...order,
     customerName: demoCustomers.find((c) => c.id === order.customerId)?.name,
+    dressType: order.dressType,
   }));
+  if (opts?.cargoOpen) {
+    return mapped.filter(
+      (o) => !["ready_for_collection", "collected", "cancelled", "refunded"].includes(o.status)
+    );
+  }
+  return mapped;
 }
 
 export async function getPayableOrders() {

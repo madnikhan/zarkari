@@ -10,11 +10,16 @@ function mapItem(
   row: typeof schema.cargoBoxItems.$inferSelect,
   orderNumber?: string
 ): CargoBoxItem {
+  const kind =
+    row.itemKind === "custom" || row.bridalOrderId
+      ? ("custom" as const)
+      : ("sample" as const);
   return {
     id: row.id,
     boxId: row.boxId,
     itemDate: row.itemDate,
     articleName: row.articleName,
+    itemKind: kind,
     bridalOrderId: row.bridalOrderId ?? undefined,
     orderNumber,
     costPkr: row.costPkr,
@@ -303,6 +308,7 @@ export async function addCargoBoxItemDb(input: {
   boxId: string;
   itemDate: string;
   articleName: string;
+  itemKind?: "custom" | "sample";
   bridalOrderId?: string;
   costPkr?: string;
   costGbp?: string;
@@ -314,13 +320,17 @@ export async function addCargoBoxItemDb(input: {
   const db = getDb();
   if (!db) return null;
 
+  const itemKind: "custom" | "sample" =
+    input.itemKind ?? (input.bridalOrderId ? "custom" : "sample");
+
   const [row] = await db
     .insert(schema.cargoBoxItems)
     .values({
       boxId: input.boxId,
       itemDate: input.itemDate.slice(0, 10),
       articleName: input.articleName.trim(),
-      bridalOrderId: input.bridalOrderId ?? null,
+      itemKind,
+      bridalOrderId: itemKind === "custom" ? (input.bridalOrderId ?? null) : null,
       costPkr: input.costPkr ?? "0",
       costGbp: input.costGbp ?? "0",
       exchangeRate: input.exchangeRate ?? null,
@@ -350,6 +360,7 @@ export async function updateCargoBoxItemDb(
   patch: Partial<{
     itemDate: string;
     articleName: string;
+    itemKind: "custom" | "sample";
     bridalOrderId: string | null;
     costPkr: string;
     costGbp: string;

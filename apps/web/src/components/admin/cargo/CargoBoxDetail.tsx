@@ -478,6 +478,7 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                 </th>
                 <th className="py-2.5 px-2 font-medium w-14">Photo</th>
                 <th className="py-2.5 px-2 font-medium">Date</th>
+                <th className="py-2.5 px-2 font-medium">Type</th>
                 <th className="py-2.5 px-2 font-medium">Article Name</th>
                 <th className="py-2.5 px-2 font-medium">Order Number</th>
                 <th className="py-2.5 px-2 font-medium text-right">Cost Price (PKR)</th>
@@ -508,6 +509,17 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                     </td>
                     <td className="py-2 px-2 text-slate-600 whitespace-nowrap">
                       {new Date(item.itemDate).toLocaleDateString("en-GB")}
+                    </td>
+                    <td className="py-2 px-2">
+                      {(item.itemKind ?? (item.bridalOrderId ? "custom" : "sample")) === "custom" ? (
+                        <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">
+                          Custom
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                          Sample
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 px-2 font-medium">{item.articleName}</td>
                     <td className="py-2 px-2 font-mono text-[#4C3BCF] text-xs">
@@ -550,8 +562,8 @@ export function CargoBoxDetail({ box, companies, suppliers, onRefresh, onDeleted
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400 text-sm">
-                    Add items with cost prices (PKR and GBP)
+                  <td colSpan={9} className="py-8 text-center text-slate-400 text-sm">
+                    Add custom orders or sample pieces with cost prices (PKR and GBP)
                   </td>
                 </tr>
               )}

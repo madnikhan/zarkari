@@ -588,10 +588,21 @@ export async function listBridalOrdersForExportDb(since: Date) {
   }));
 }
 
-export async function searchBridalOrdersWithCustomerDb(query: string) {
+export async function searchBridalOrdersWithCustomerDb(
+  query: string,
+  opts?: { cargoOpen?: boolean }
+) {
   const db = getDb();
   if (!db) return [];
   const q = `%${query.trim()}%`;
+
+  const matchQuery = or(
+    ilike(schema.bridalOrders.orderNumber, q),
+    ilike(schema.customers.name, q),
+    ilike(schema.customers.phone, q),
+    ilike(sql`${schema.bridalOrders.status}::text`, q)
+  );
+
   const rows = await db
     .select({
       order: schema.bridalOrders,
@@ -600,12 +611,12 @@ export async function searchBridalOrdersWithCustomerDb(query: string) {
     .from(schema.bridalOrders)
     .leftJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
     .where(
-      or(
-        ilike(schema.bridalOrders.orderNumber, q),
-        ilike(schema.customers.name, q),
-        ilike(schema.customers.phone, q),
-        ilike(sql`${schema.bridalOrders.status}::text`, q)
-      )
+      opts?.cargoOpen
+        ? and(
+            matchQuery,
+            sql`${schema.bridalOrders.status}::text NOT IN ('ready_for_collection', 'collected', 'cancelled', 'refunded')`
+          )
+        : matchQuery
     )
     .orderBy(desc(schema.bridalOrders.bookingDate))
     .limit(50);

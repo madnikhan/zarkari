@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { deleteCargoBoxItem, getCargoBox, updateCargoBoxItem } from "@/lib/cargo/service";
+import { markReadyFromCargoArrival } from "@/lib/data/actions";
 
 type Params = { params: Promise<{ id: string; itemId: string }> };
 
@@ -15,10 +16,25 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!box) return NextResponse.json({ error: "Box not found" }, { status: 404 });
 
   const body = await request.json();
+  const itemKind: "custom" | "sample" | undefined =
+    body.itemKind === "custom" || body.itemKind === "sample"
+      ? body.itemKind
+      : body.bridalOrderId
+        ? "custom"
+        : body.bridalOrderId === null
+          ? "sample"
+          : undefined;
+
+  if (itemKind === "custom" && !body.bridalOrderId) {
+    return NextResponse.json({ error: "Select an open custom order" }, { status: 400 });
+  }
+
   const item = await updateCargoBoxItem(itemId, {
     itemDate: body.itemDate,
     articleName: body.articleName,
-    bridalOrderId: body.bridalOrderId ?? null,
+    itemKind,
+    bridalOrderId:
+      itemKind === "sample" ? null : body.bridalOrderId !== undefined ? body.bridalOrderId : undefined,
     orderNumber: body.orderNumber,
     costPkr: body.costPkr,
     costGbp: body.costGbp,
@@ -28,6 +44,20 @@ export async function PATCH(request: Request, { params }: Params) {
   });
 
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+
+  if (item.itemKind === "custom" && item.bridalOrderId) {
+    try {
+      await markReadyFromCargoArrival(item.bridalOrderId, {
+        byName: session.name,
+        boxNumber: box.boxNumber,
+      });
+      revalidatePath(`/admin/orders/${item.bridalOrderId}`);
+      revalidatePath("/my-order");
+    } catch (err) {
+      console.error("Failed to sync order status from cargo:", err);
+    }
+  }
+
   revalidatePath("/admin/cargo");
   return NextResponse.json({ item });
 }

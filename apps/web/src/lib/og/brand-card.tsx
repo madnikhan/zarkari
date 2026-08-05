@@ -8,6 +8,7 @@ export const LOGO_SQUARE_SIZE = { width: 1080, height: 1080 };
 export const SOCIAL_BANNER_SIZE = { width: 1500, height: 500 };
 
 export type BrandVariant = "dark" | "light";
+export type BrandLang = "en" | "ur";
 
 const BRAND = {
   charcoal: "#1a1814",
@@ -15,16 +16,29 @@ const BRAND = {
   gold: "#c9a962",
 } as const;
 
-const TAGLINE = "Designer formal wear — hand-finished pieces from our catalogue.";
+const TAGLINE_EN = "Designer formal wear — hand-finished pieces from our catalogue.";
+const TAGLINE_UR = "ڈیزائنر فارمل وئیر — ہمارے کیٹلاگ سے ہاتھ سے تیار کردہ پیسز";
+const WORDMARK_UR = "زرکاری";
 
-async function loadMontserratWeight(weight: 100 | 400): Promise<ArrayBuffer | null> {
+async function loadGoogleFont(
+  familyQuery: string,
+  weight: number
+): Promise<ArrayBuffer | null> {
   try {
+    // Prefer TTF/OTF — ImageResponse/Satori cannot use woff2.
     const css = await fetch(
-      `https://fonts.googleapis.com/css2?family=Montserrat:wght@${weight}&display=swap`,
-      { next: { revalidate: 86400 } }
+      `https://fonts.googleapis.com/css2?family=${familyQuery}:wght@${weight}&display=swap`,
+      {
+        next: { revalidate: 86400 },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        },
+      }
     ).then((res) => res.text());
 
-    const match = css.match(/src: url\((.+?)\) format\('(opentype|truetype|woff2)'\)/);
+    const match =
+      css.match(/src: url\((.+?)\) format\('(opentype|truetype)'\)/) ??
+      css.match(/src: url\((.+?)\) format\('(opentype|truetype|woff)'\)/);
     if (!match?.[1]) return null;
 
     return fetch(match[1]).then((res) => res.arrayBuffer());
@@ -86,8 +100,8 @@ function BrandShell({
   );
 }
 
-/** Thin Z/RK/RI + bold barless Λ — matches screenshot wordmark. */
-function BrandWordmark({
+/** Thin Z/RK/RI + barless Λ — English wordmark. */
+function BrandWordmarkEn({
   fontFamily,
   fontSize,
   variant,
@@ -123,47 +137,123 @@ function BrandWordmark({
   );
 }
 
+function BrandWordmarkUr({
+  fontFamily,
+  fontSize,
+  variant,
+}: {
+  fontFamily: string;
+  fontSize: number;
+  variant: BrandVariant;
+}) {
+  const colors = wordmarkColors(variant);
+  return (
+    <div
+      style={{
+        display: "flex",
+        direction: "rtl",
+        fontFamily,
+        fontSize,
+        fontWeight: 400,
+        color: colors.bold,
+        lineHeight: 1.3,
+      }}
+    >
+      {WORDMARK_UR}
+    </div>
+  );
+}
+
 function BrandTagline({
   fontFamily,
   fontSize,
   variant,
   marginTop,
+  lang,
 }: {
   fontFamily: string;
   fontSize: number;
   variant: BrandVariant;
   marginTop: number;
+  lang: BrandLang;
 }) {
   const colors = wordmarkColors(variant);
+  const isUr = lang === "ur";
+  // Split Urdu into words so Satori shapes shorter runs (avoids complex GSUB crashes).
+  const urduWords = TAGLINE_UR.split(/\s+/).filter(Boolean);
   return (
-    <span
+    <div
       style={{
-        fontSize,
-        fontWeight: 100,
-        letterSpacing: "0.12em",
-        color: colors.tagline,
-        fontFamily,
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        alignItems: "center",
         marginTop,
-        textAlign: "center",
         maxWidth: "90%",
+        direction: isUr ? "rtl" : "ltr",
+        gap: isUr ? 8 : 0,
       }}
     >
-      {TAGLINE}
-    </span>
+      {isUr ? (
+        urduWords.map((word, i) => (
+          <span
+            key={`${word}-${i}`}
+            style={{
+              fontSize,
+              fontWeight: 400,
+              color: colors.tagline,
+              fontFamily,
+              lineHeight: 1.5,
+              display: "flex",
+            }}
+          >
+            {word}
+          </span>
+        ))
+      ) : (
+        <span
+          style={{
+            fontSize,
+            fontWeight: 100,
+            letterSpacing: "0.12em",
+            color: colors.tagline,
+            fontFamily,
+            textAlign: "center",
+            lineHeight: 1.5,
+            display: "flex",
+          }}
+        >
+          {TAGLINE_EN}
+        </span>
+      )}
+    </div>
   );
 }
 
 export function BrandOgCard({
   fontFamily,
   variant = "dark",
+  lang = "en",
 }: {
   fontFamily: string;
   variant?: BrandVariant;
+  lang?: BrandLang;
 }) {
   return (
     <BrandShell variant={variant}>
-      <BrandWordmark fontFamily={fontFamily} fontSize={96} variant={variant} />
-      <BrandTagline fontFamily={fontFamily} fontSize={26} variant={variant} marginTop={28} />
+      {lang === "ur" ? (
+        <BrandWordmarkUr fontFamily={fontFamily} fontSize={96} variant={variant} />
+      ) : (
+        <BrandWordmarkEn fontFamily={fontFamily} fontSize={96} variant={variant} />
+      )}
+      <BrandTagline
+        fontFamily={fontFamily}
+        fontSize={lang === "ur" ? 28 : 26}
+        variant={variant}
+        marginTop={28}
+        lang={lang}
+      />
     </BrandShell>
   );
 }
@@ -171,13 +261,19 @@ export function BrandOgCard({
 export function BrandLogoSquareCard({
   fontFamily,
   variant = "dark",
+  lang = "en",
 }: {
   fontFamily: string;
   variant?: BrandVariant;
+  lang?: BrandLang;
 }) {
   return (
     <BrandShell variant={variant} barHeight={8}>
-      <BrandWordmark fontFamily={fontFamily} fontSize={110} variant={variant} />
+      {lang === "ur" ? (
+        <BrandWordmarkUr fontFamily={fontFamily} fontSize={140} variant={variant} />
+      ) : (
+        <BrandWordmarkEn fontFamily={fontFamily} fontSize={110} variant={variant} />
+      )}
     </BrandShell>
   );
 }
@@ -185,25 +281,60 @@ export function BrandLogoSquareCard({
 export function BrandSocialBannerCard({
   fontFamily,
   variant = "dark",
+  lang = "en",
 }: {
   fontFamily: string;
   variant?: BrandVariant;
+  lang?: BrandLang;
 }) {
   return (
     <BrandShell variant={variant} barHeight={6}>
-      <BrandWordmark fontFamily={fontFamily} fontSize={72} variant={variant} />
-      <BrandTagline fontFamily={fontFamily} fontSize={20} variant={variant} marginTop={20} />
+      {lang === "ur" ? (
+        <BrandWordmarkUr fontFamily={fontFamily} fontSize={88} variant={variant} />
+      ) : (
+        <BrandWordmarkEn fontFamily={fontFamily} fontSize={72} variant={variant} />
+      )}
+      <BrandTagline
+        fontFamily={fontFamily}
+        fontSize={lang === "ur" ? 22 : 20}
+        variant={variant}
+        marginTop={20}
+        lang={lang}
+      />
     </BrandShell>
   );
 }
 
 async function withBrandFonts(
+  lang: BrandLang,
   element: (fontFamily: string) => ReactElement,
   size: { width: number; height: number }
 ) {
+  if (lang === "ur") {
+    // IBM Plex Sans Arabic: simpler GSUB than Noto Nastaliq / Noto Sans Arabic
+    // (those throw lookupType 5 substFormat 3 in Satori on longer strings).
+    const urdu = await loadGoogleFont("IBM+Plex+Sans+Arabic", 400);
+    const fontFamily = urdu ? "IBM Plex Sans Arabic" : "serif";
+    return new ImageResponse(element(fontFamily), {
+      ...size,
+      ...(urdu
+        ? {
+            fonts: [
+              {
+                name: "IBM Plex Sans Arabic",
+                data: urdu,
+                style: "normal" as const,
+                weight: 400 as const,
+              },
+            ],
+          }
+        : {}),
+    });
+  }
+
   const [thin, regular] = await Promise.all([
-    loadMontserratWeight(100),
-    loadMontserratWeight(400),
+    loadGoogleFont("Montserrat", 100),
+    loadGoogleFont("Montserrat", 400),
   ]);
   const fontFamily = thin || regular ? "Montserrat" : "ui-sans-serif, system-ui, sans-serif";
 
@@ -221,23 +352,43 @@ export function parseBrandVariant(value: string | null): BrandVariant {
   return value === "light" ? "light" : "dark";
 }
 
-export async function generateBrandOgImage(variant: BrandVariant = "dark") {
+export function parseBrandLang(value: string | null): BrandLang {
+  return value === "ur" ? "ur" : "en";
+}
+
+export async function generateBrandOgImage(
+  variant: BrandVariant = "dark",
+  lang: BrandLang = "en"
+) {
   return withBrandFonts(
-    (fontFamily) => <BrandOgCard fontFamily={fontFamily} variant={variant} />,
+    lang,
+    (fontFamily) => <BrandOgCard fontFamily={fontFamily} variant={variant} lang={lang} />,
     OG_SIZE
   );
 }
 
-export async function generateBrandLogoSquareImage(variant: BrandVariant = "dark") {
+export async function generateBrandLogoSquareImage(
+  variant: BrandVariant = "dark",
+  lang: BrandLang = "en"
+) {
   return withBrandFonts(
-    (fontFamily) => <BrandLogoSquareCard fontFamily={fontFamily} variant={variant} />,
+    lang,
+    (fontFamily) => (
+      <BrandLogoSquareCard fontFamily={fontFamily} variant={variant} lang={lang} />
+    ),
     LOGO_SQUARE_SIZE
   );
 }
 
-export async function generateBrandSocialBannerImage(variant: BrandVariant = "dark") {
+export async function generateBrandSocialBannerImage(
+  variant: BrandVariant = "dark",
+  lang: BrandLang = "en"
+) {
   return withBrandFonts(
-    (fontFamily) => <BrandSocialBannerCard fontFamily={fontFamily} variant={variant} />,
+    lang,
+    (fontFamily) => (
+      <BrandSocialBannerCard fontFamily={fontFamily} variant={variant} lang={lang} />
+    ),
     SOCIAL_BANNER_SIZE
   );
 }

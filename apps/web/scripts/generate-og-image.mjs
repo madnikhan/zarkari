@@ -21,6 +21,19 @@ const jobs = [
     path: "/brand/social-banner?v=light",
     out: join(root, "public/brand/social-banner-light.png"),
   },
+  { path: "/brand/logo-square?lang=ur", out: join(root, "public/brand/logo-square-ur.png") },
+  {
+    path: "/brand/logo-square?lang=ur&v=light",
+    out: join(root, "public/brand/logo-square-ur-light.png"),
+  },
+  {
+    path: "/brand/social-banner?lang=ur",
+    out: join(root, "public/brand/social-banner-ur.png"),
+  },
+  {
+    path: "/brand/social-banner?lang=ur&v=light",
+    out: join(root, "public/brand/social-banner-ur-light.png"),
+  },
 ];
 
 mkdirSync(join(root, "public/brand"), { recursive: true });

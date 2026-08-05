@@ -208,13 +208,29 @@ export async function getUnifiedOrders(params: {
   return { orders, total };
 }
 
-export async function searchUnifiedOrders(query: string): Promise<UnifiedOrder[]> {
+export async function searchUnifiedOrders(
+  query: string,
+  opts?: { cargoOpen?: boolean }
+): Promise<(UnifiedOrder & { dressType?: string })[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
   const { searchBridalOrdersWithCustomerDb } = await import("@/lib/db/bridal-orders");
-  const { searchRetailOrdersDb } = await import("@/lib/db/retail-orders");
 
+  if (opts?.cargoOpen) {
+    const bridal = await searchBridalOrdersWithCustomerDb(query, { cargoOpen: true });
+    return bridal
+      .map((o) => ({
+        ...mapBridalOrder({
+          ...o,
+          customerName: o.customerName,
+        }),
+        dressType: o.dressType,
+      }))
+      .slice(0, 30);
+  }
+
+  const { searchRetailOrdersDb } = await import("@/lib/db/retail-orders");
   const [bridal, retail] = await Promise.all([
     searchBridalOrdersWithCustomerDb(query),
     searchRetailOrdersDb(query),

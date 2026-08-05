@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { searchOrdersWithCustomer } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 
@@ -10,8 +9,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const q = new URL(request.url).searchParams.get("q") ?? "";
-    const results = await searchOrdersWithCustomer(q);
+    const params = new URL(request.url).searchParams;
+    const q = params.get("q") ?? "";
+    const cargoOpen = params.get("cargoOpen") === "1";
+    const results = await searchOrdersWithCustomer(q, { cargoOpen });
     return NextResponse.json({ results });
   } catch (err) {
     console.error("Order search failed:", err);
