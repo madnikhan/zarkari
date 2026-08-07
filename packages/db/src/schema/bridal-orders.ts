@@ -52,6 +52,8 @@ export const bridalOrders = pgTable(
     filesUnlockedAt: timestamp("files_unlocked_at"),
     lastSupplierActionAt: timestamp("last_supplier_action_at"),
     supplierLocked: boolean("supplier_locked").default(false).notNull(),
+    /** Historical / past entry — no live cash or WhatsApp side effects on create */
+    isHistorical: boolean("is_historical").default(false).notNull(),
     createdById: uuid("created_by_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -13,17 +13,22 @@ interface Props {
     from?: string;
     to?: string;
     preset?: string;
+    tab?: string;
   }>;
 }
 
 export default async function StockPage({ searchParams }: Props) {
-  const { page: pageStr = "1", q = "", from, to, preset } = await searchParams;
+  const { page: pageStr = "1", q = "", from, to, preset, tab: tabParam } = await searchParams;
   const page = Math.max(1, parseInt(pageStr, 10) || 1);
   const bounds = resolveSearchDateBounds({ from, to, preset });
   const dateQuery = dateSearchQuery({ from, to, preset });
+  const initialTab =
+    tabParam === "sample" || tabParam === "custom" || tabParam === "ready-made"
+      ? tabParam
+      : "ready-made";
 
   const { products, total } = await listStockOverviewDb({
-    q: q.trim() || undefined,
+    q: initialTab === "ready-made" ? q.trim() || undefined : undefined,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
     from: bounds.from,
@@ -37,12 +42,12 @@ export default async function StockPage({ searchParams }: Props) {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Stock</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Internal warehouse and shop (storefront) inventory by size — website sells shop stock only
+          Ready-made shop stock, plus sample and custom pieces received in cargo
         </p>
       </div>
       <div className="mb-4">
         <Suspense fallback={null}>
-          <AdminDateRangeFilter preserveKeys={["q", "page"]} />
+          <AdminDateRangeFilter preserveKeys={["q", "page", "tab"]} />
         </Suspense>
       </div>
       <StockPageWrapper
@@ -52,6 +57,7 @@ export default async function StockPage({ searchParams }: Props) {
         total={total}
         q={q.trim()}
         dateQuery={dateQuery}
+        initialTab={initialTab}
       />
     </div>
   );

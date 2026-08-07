@@ -38,6 +38,7 @@ function mapOrder(row: typeof schema.bridalOrders.$inferSelect): BridalOrder {
     filesUnlockedAt: row.filesUnlockedAt?.toISOString(),
     lastSupplierActionAt: row.lastSupplierActionAt?.toISOString(),
     supplierLocked: row.supplierLocked,
+    isHistorical: row.isHistorical,
     createdById: row.createdById ?? undefined,
   };
 }
@@ -683,9 +684,8 @@ export async function getBridalOrderByNumberDb(orderNumber: string): Promise<Bri
   return row ? mapOrder(row) : null;
 }
 
-export async function nextBridalOrderNumberDb(): Promise<string> {
+export async function nextBridalOrderNumberDb(year = new Date().getFullYear()): Promise<string> {
   const db = getDb();
-  const year = new Date().getFullYear();
   const prefix = `BR-${year}-`;
   if (!db) return `${prefix}${String(Date.now()).slice(-4)}`;
 
@@ -734,6 +734,10 @@ export async function createBridalOrderDb(input: {
   depositPaid: string;
   remainingBalance: string;
   deliveryDate: string;
+  bookingDate?: string;
+  status?: BridalStatus;
+  isHistorical?: boolean;
+  comments?: string;
   customisationNotes?: string;
   measurements?: BridalMeasurements;
   createdById?: string;
@@ -747,7 +751,8 @@ export async function createBridalOrderDb(input: {
       orderNumber: input.orderNumber,
       customerId: input.customerId,
       supplierId: input.supplierId ?? null,
-      status: "order_created",
+      status: input.status ?? "order_created",
+      ...(input.bookingDate ? { bookingDate: new Date(input.bookingDate) } : {}),
       deliveryDate: new Date(input.deliveryDate),
       totalPrice: input.totalPrice,
       depositPaid: input.depositPaid,
@@ -755,9 +760,15 @@ export async function createBridalOrderDb(input: {
       dressType: input.dressType ?? null,
       colour: input.colour ?? null,
       size: input.size ?? null,
+      comments: input.comments ?? null,
       customisationNotes: input.customisationNotes ?? null,
+      isHistorical: input.isHistorical ?? false,
       measurements,
       createdById: input.createdById ?? null,
+      supplierLocked:
+        input.status === "collected" ||
+        input.status === "cancelled" ||
+        input.status === "refunded",
     })
     .returning();
   return row ? mapOrder(row) : null;
@@ -1005,6 +1016,47 @@ export async function createCustomerDb(input: Omit<Customer, "id">): Promise<Cus
   return row
     ? { id: row.id, name: row.name, phone: row.phone, email: row.email ?? undefined, address: row.address ?? undefined }
     : null;
+}
+
+export async function findCustomerByPhoneDb(phone: string): Promise<Customer | null> {
+  const db = getDb();
+  if (!db) return null;
+  const normalized = phone.replace(/\s/g, "");
+  const [row] = await db
+    .select()
+    .from(schema.customers)
+    .where(eq(schema.customers.phone, normalized))
+    .limit(1);
+  return row
+    ? { id: row.id, name: row.name, phone: row.phone, email: row.email ?? undefined, address: row.address ?? undefined }
+    : null;
+}
+
+/** Find by phone or create; updates name if existing customer found. */
+export async function findOrCreateCustomerByPhoneDb(input: {
+  name: string;
+  phone: string;
+}): Promise<Customer | null> {
+  const phone = input.phone.replace(/\s/g, "");
+  const existing = await findCustomerByPhoneDb(phone);
+  if (existing) {
+    if (input.name.trim() && input.name.trim() !== existing.name) {
+      return updateCustomerDb(existing.id, { name: input.name.trim() });
+    }
+    return existing;
+  }
+  return createCustomerDb({ name: input.name.trim(), phone });
+}
+
+export async function findSupplierIdByNameDb(name: string): Promise<string | null> {
+  const db = getDb();
+  if (!db || !name.trim()) return null;
+  const [row] = await db
+    .select({ id: schema.suppliers.id })
+    .from(schema.suppliers)
+    .where(ilike(schema.suppliers.name, name.trim()))
+    .limit(1);
+  return row?.id ?? null;
 }
 
 export async function getCustomerDb(id: string): Promise<Customer | null> {

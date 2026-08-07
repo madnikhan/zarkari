@@ -72,6 +72,7 @@ export interface BridalOrder {
   filesUnlockedAt?: string;
   lastSupplierActionAt?: string;
   supplierLocked: boolean;
+  isHistorical?: boolean;
   createdById?: string;
 }
 

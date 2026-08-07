@@ -18,6 +18,9 @@ import {
   type TimelineEvent,
 } from "./seed";
 import { isDbConfigured } from "@/lib/db";
+import { isBridalStatus } from "@/lib/orders/status-machine";
+
+export { isBridalStatus as isPastOrderStatus };
 
 function addTimeline(orderId: string, eventType: string, opts?: Partial<TimelineEvent>) {
   demoTimeline.push({
@@ -113,6 +116,150 @@ async function notify(title: string, body: string, orderId?: string, href?: stri
     orderId,
     urgent: true,
   }).catch(console.error);
+}
+
+/** Historical bridal order — no cash ledger or WhatsApp side effects. */
+export async function createPastBridalOrder(input: {
+  customerName: string;
+  customerPhone: string;
+  dressType: string;
+  totalPrice: string;
+  depositPaid: string;
+  remainingBalance?: string;
+  bookingDate: string;
+  deliveryDate: string;
+  status?: BridalStatus;
+  orderNumber?: string;
+  supplierId?: string;
+  notes?: string;
+  createdById?: string;
+  createdByName?: string;
+}): Promise<BridalOrder> {
+  const total = parseFloat(input.totalPrice);
+  const deposit = parseFloat(input.depositPaid);
+  if (!Number.isFinite(total) || total < 0) throw new Error("Invalid total price");
+  if (!Number.isFinite(deposit) || deposit < 0 || deposit > total) {
+    throw new Error("Deposit must be between 0 and total price");
+  }
+  const remaining =
+    input.remainingBalance != null && input.remainingBalance !== ""
+      ? parseFloat(input.remainingBalance).toFixed(2)
+      : (total - deposit).toFixed(2);
+  const status: BridalStatus = input.status ?? "collected";
+  if (!isBridalStatus(status)) throw new Error("Invalid status");
+
+  const booking = new Date(input.bookingDate);
+  const delivery = new Date(input.deliveryDate);
+  if (Number.isNaN(booking.getTime())) throw new Error("Invalid booking date");
+  if (Number.isNaN(delivery.getTime())) throw new Error("Invalid delivery date");
+
+  const year = booking.getFullYear();
+
+  if (isDbConfigured()) {
+    const {
+      findOrCreateCustomerByPhoneDb,
+      createBridalOrderDb,
+      nextBridalOrderNumberDb,
+      getBridalOrderByNumberDb,
+    } = await import("@/lib/db/bridal-orders");
+
+    let orderNumber = input.orderNumber?.trim();
+    if (orderNumber) {
+      const existing = await getBridalOrderByNumberDb(orderNumber);
+      if (existing) throw new Error(`Order number ${orderNumber} already exists`);
+    } else {
+      orderNumber = await nextBridalOrderNumberDb(year);
+    }
+
+    const customer = await findOrCreateCustomerByPhoneDb({
+      name: input.customerName.trim(),
+      phone: input.customerPhone.replace(/\s/g, ""),
+    });
+    if (!customer) throw new Error("Failed to create customer");
+
+    const dbOrder = await createBridalOrderDb({
+      orderNumber,
+      customerId: customer.id,
+      supplierId: input.supplierId,
+      dressType: input.dressType,
+      totalPrice: total.toFixed(2),
+      depositPaid: deposit.toFixed(2),
+      remainingBalance: remaining,
+      bookingDate: booking.toISOString(),
+      deliveryDate: delivery.toISOString(),
+      status,
+      isHistorical: true,
+      comments: input.notes?.trim() || undefined,
+      customisationNotes: input.notes?.trim() || undefined,
+      createdById: input.createdById,
+    });
+    if (!dbOrder) throw new Error("Failed to create past order");
+
+    await syncTimeline(dbOrder.id, "order_created", {
+      comment: "Past order entry",
+      performedByName: input.createdByName,
+      performedByRole: "staff",
+    });
+    if (status === "collected") {
+      await syncTimeline(dbOrder.id, "collected", {
+        comment: "Historical — marked collected on import",
+        performedByName: input.createdByName,
+        performedByRole: "staff",
+      });
+    } else if (status === "ready_for_collection") {
+      await syncTimeline(dbOrder.id, "ready_for_collection", {
+        comment: "Historical entry",
+        performedByName: input.createdByName,
+        performedByRole: "staff",
+      });
+    }
+    return dbOrder;
+  }
+
+  // Demo / in-memory fallback
+  let orderNumber = input.orderNumber?.trim();
+  if (!orderNumber) {
+    orderNumber = `BR-${year}-${String(Date.now()).slice(-4)}`;
+  } else if (demoBridalOrders.some((o) => o.orderNumber === orderNumber)) {
+    throw new Error(`Order number ${orderNumber} already exists`);
+  }
+  const phone = input.customerPhone.replace(/\s/g, "");
+  let customer = demoCustomers.find((c) => c.phone === phone);
+  if (!customer) {
+    customer = {
+      id: `cust-${Date.now()}`,
+      name: input.customerName.trim(),
+      phone,
+    };
+    demoCustomers.push(customer);
+  } else if (input.customerName.trim()) {
+    customer.name = input.customerName.trim();
+  }
+  const order: BridalOrder = {
+    id: `bo-past-${Date.now()}`,
+    orderNumber,
+    customerId: customer.id,
+    supplierId: input.supplierId,
+    status,
+    bookingDate: booking.toISOString(),
+    deliveryDate: delivery.toISOString(),
+    totalPrice: total.toFixed(2),
+    depositPaid: deposit.toFixed(2),
+    remainingBalance: remaining,
+    dressType: input.dressType,
+    comments: input.notes?.trim(),
+    customisationNotes: input.notes?.trim(),
+    supplierLocked: ["collected", "cancelled", "refunded"].includes(status),
+    isHistorical: true,
+    createdById: input.createdById,
+  };
+  demoBridalOrders.push(order);
+  await syncTimeline(order.id, "order_created", {
+    comment: "Past order entry",
+    performedByName: input.createdByName,
+    performedByRole: "staff",
+  });
+  return order;
 }
 
 export async function createBridalOrder(input: {

@@ -428,3 +428,109 @@ export async function getCargoBoxHeaderDb(id: string) {
   const [row] = await db.select().from(schema.cargoBoxes).where(eq(schema.cargoBoxes.id, id)).limit(1);
   return row ?? null;
 }
+
+export type CargoArrivalRow = {
+  id: string;
+  itemDate: string;
+  articleName: string;
+  itemKind: "custom" | "sample";
+  imageUrl?: string;
+  costPkr: string;
+  costGbp: string;
+  boxId: string;
+  boxNumber: string;
+  supplierName?: string;
+  cargoCompanyName?: string;
+  bridalOrderId?: string;
+  orderNumber?: string;
+  orderStatus?: string;
+};
+
+export async function listCargoArrivalsDb(opts: {
+  kind: "sample" | "custom";
+  q?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: CargoArrivalRow[]; total: number }> {
+  const db = getDb();
+  if (!db) return { items: [], total: 0 };
+
+  const kindCond =
+    opts.kind === "custom"
+      ? or(
+          eq(schema.cargoBoxItems.itemKind, "custom"),
+          sql`${schema.cargoBoxItems.bridalOrderId} IS NOT NULL`
+        )
+      : and(
+          eq(schema.cargoBoxItems.itemKind, "sample"),
+          sql`${schema.cargoBoxItems.bridalOrderId} IS NULL`
+        );
+
+  const conditions = [kindCond!];
+  if (opts.from) conditions.push(gte(schema.cargoBoxItems.itemDate, opts.from.slice(0, 10)));
+  if (opts.to) conditions.push(lte(schema.cargoBoxItems.itemDate, opts.to.slice(0, 10)));
+  const q = opts.q?.trim();
+  if (q) {
+    conditions.push(
+      or(
+        ilike(schema.cargoBoxItems.articleName, `%${q}%`),
+        ilike(schema.cargoBoxes.boxNumber, `%${q}%`),
+        ilike(schema.suppliers.name, `%${q}%`),
+        ilike(schema.bridalOrders.orderNumber, `%${q}%`)
+      )!
+    );
+  }
+
+  const whereClause = and(...conditions);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.cargoBoxItems)
+    .innerJoin(schema.cargoBoxes, eq(schema.cargoBoxItems.boxId, schema.cargoBoxes.id))
+    .leftJoin(schema.suppliers, eq(schema.cargoBoxes.supplierId, schema.suppliers.id))
+    .leftJoin(schema.cargoCompanies, eq(schema.cargoBoxes.cargoCompanyId, schema.cargoCompanies.id))
+    .leftJoin(schema.bridalOrders, eq(schema.cargoBoxItems.bridalOrderId, schema.bridalOrders.id))
+    .where(whereClause);
+
+  const rows = await db
+    .select({
+      item: schema.cargoBoxItems,
+      boxNumber: schema.cargoBoxes.boxNumber,
+      supplierName: schema.suppliers.name,
+      cargoCompanyName: schema.cargoCompanies.name,
+      orderNumber: schema.bridalOrders.orderNumber,
+      orderStatus: schema.bridalOrders.status,
+    })
+    .from(schema.cargoBoxItems)
+    .innerJoin(schema.cargoBoxes, eq(schema.cargoBoxItems.boxId, schema.cargoBoxes.id))
+    .leftJoin(schema.suppliers, eq(schema.cargoBoxes.supplierId, schema.suppliers.id))
+    .leftJoin(schema.cargoCompanies, eq(schema.cargoBoxes.cargoCompanyId, schema.cargoCompanies.id))
+    .leftJoin(schema.bridalOrders, eq(schema.cargoBoxItems.bridalOrderId, schema.bridalOrders.id))
+    .where(whereClause)
+    .orderBy(desc(schema.cargoBoxItems.itemDate), desc(schema.cargoBoxItems.createdAt))
+    .limit(opts.limit ?? 50)
+    .offset(opts.offset ?? 0);
+
+  const items: CargoArrivalRow[] = rows.map((r) => ({
+    id: r.item.id,
+    itemDate: r.item.itemDate,
+    articleName: r.item.articleName,
+    itemKind: (r.item.itemKind === "custom" || r.item.bridalOrderId ? "custom" : "sample") as
+      | "custom"
+      | "sample",
+    imageUrl: r.item.imageUrl ?? undefined,
+    costPkr: r.item.costPkr,
+    costGbp: r.item.costGbp,
+    boxId: r.item.boxId,
+    boxNumber: r.boxNumber,
+    supplierName: r.supplierName ?? undefined,
+    cargoCompanyName: r.cargoCompanyName ?? undefined,
+    bridalOrderId: r.item.bridalOrderId ?? undefined,
+    orderNumber: r.orderNumber ?? undefined,
+    orderStatus: r.orderStatus ?? undefined,
+  }));
+
+  return { items, total: Number(countRow?.count ?? 0) };
+}

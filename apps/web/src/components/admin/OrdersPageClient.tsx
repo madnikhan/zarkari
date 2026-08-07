@@ -97,6 +97,18 @@ export function OrdersPageClient({
           >
             Ready-made Sale
           </button>
+          <Link
+            href="/admin/orders/past/new"
+            className="px-4 py-2.5 rounded-lg text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Add past order
+          </Link>
+          <Link
+            href="/admin/orders/import"
+            className="px-4 py-2.5 rounded-lg text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Import CSV
+          </Link>
           <Link href="/admin/orders/new" className="boms-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium">
             New custom order
           </Link>

@@ -1,5 +1,28 @@
 import type { BridalStatus } from "@/lib/data/seed";
 
+export const ALL_BRIDAL_STATUSES: BridalStatus[] = [
+  "order_created",
+  "sent_to_supplier",
+  "supplier_rejected",
+  "order_received",
+  "fabric_preparation",
+  "embroidery",
+  "stitching",
+  "finishing",
+  "packing",
+  "shipping",
+  "delivered_to_shop",
+  "redesign_in_progress",
+  "ready_for_collection",
+  "collected",
+  "cancelled",
+  "refunded",
+];
+
+export function isBridalStatus(value: string): value is BridalStatus {
+  return (ALL_BRIDAL_STATUSES as string[]).includes(value);
+}
+
 export const PRODUCTION_STAGES: BridalStatus[] = [
   "order_received",
   "fabric_preparation",
