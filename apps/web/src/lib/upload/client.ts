@@ -134,7 +134,8 @@ async function probeDirectR2Upload(): Promise<boolean> {
 async function initMultipartVideo(
   file: File,
   category: string,
-  mimeType: string
+  mimeType: string,
+  forceVideo = true
 ): Promise<{
   demo?: boolean;
   uploadId?: string;
@@ -151,6 +152,7 @@ async function initMultipartVideo(
       contentType: mimeType,
       category,
       fileSize: file.size,
+      forceVideo,
     }),
   });
   const initData = await parseJsonResponse<{
@@ -756,7 +758,18 @@ async function uploadViaPresignedPut(
 
   const canDirect = await probeDirectR2Upload();
   if (!canDirect) {
-    return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+    if (isVideoFile(file) || mimeType.startsWith("video/")) {
+      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+    }
+    if (file.size <= MAX_SERVER_UPLOAD_BYTES) {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("category", category);
+      return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
+    }
+    throw new Error(
+      "Direct storage upload unavailable. Configure R2 CORS or use a file under 4 MB."
+    );
   }
 
   try {
@@ -772,13 +785,18 @@ async function uploadViaPresignedPut(
     );
   } catch (err) {
     if (isCorsError(err)) {
+      if (isVideoFile(file) || mimeType.startsWith("video/")) {
+        return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+      }
       if (file.size <= MAX_SERVER_UPLOAD_BYTES) {
         const form = new FormData();
         form.append("file", file);
         form.append("category", category);
         return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
       }
-      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
+      throw new Error(
+        "Large file upload blocked by storage CORS. Configure R2 CORS or use a file under 4 MB."
+      );
     }
     throw err;
   }
@@ -825,9 +843,10 @@ export async function uploadFileWithProgress(
   file: File,
   category: string,
   onProgress?: ProgressCallback,
-  localPreviewUrl?: string
+  localPreviewUrl?: string,
+  kindHint?: "image" | "video" | "audio"
 ): Promise<UploadResult> {
-  const resolved = withResolvedMime(file);
+  const resolved = withResolvedMime(file, kindHint);
   const mimeType = resolveFileMime(resolved);
 
   const label = isVideoFile(resolved)
@@ -874,5 +893,12 @@ export async function uploadBlobWithProgress(
   localPreviewUrl?: string
 ): Promise<UploadResult> {
   const file = new File([blob], fileName, { type: contentType });
-  return uploadFileWithProgress(file, category, onProgress, localPreviewUrl);
+  const hint = contentType.startsWith("video/")
+    ? "video"
+    : contentType.startsWith("audio/")
+      ? "audio"
+      : contentType.startsWith("image/")
+        ? "image"
+        : undefined;
+  return uploadFileWithProgress(file, category, onProgress, localPreviewUrl, hint);
 }

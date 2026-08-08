@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Supplier } from "@/lib/data/seed";
-import { BRIDAL_DRESS_TYPES } from "@/lib/bridal-options";
 import { ALL_BRIDAL_STATUSES, getStatusLabel } from "@/lib/orders/status-machine";
 
 interface Props {
@@ -17,7 +16,7 @@ export function PastOrderForm({ suppliers }: Props) {
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
-    dressType: "Lehenga",
+    dressType: "",
     totalPrice: "",
     depositPaid: "",
     remainingBalance: "",
@@ -92,18 +91,14 @@ export function PastOrderForm({ suppliers }: Props) {
         </label>
         <label className="block text-sm">
           <span className="text-xs uppercase text-slate-500">Dress type</span>
-          <select
+          <input
             required
+            type="text"
             value={form.dressType}
             onChange={(e) => setForm((f) => ({ ...f, dressType: e.target.value }))}
+            placeholder="e.g. Lehenga, Suit…"
             className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2"
-          >
-            {BRIDAL_DRESS_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <label className="block text-sm">
           <span className="text-xs uppercase text-slate-500">Status</span>

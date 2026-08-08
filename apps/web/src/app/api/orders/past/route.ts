@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPastBridalOrder } from "@/lib/data/actions";
 import { getSession } from "@/lib/auth/session";
-import { isBridalDressType } from "@/lib/bridal-options";
 import { isBridalStatus } from "@/lib/orders/status-machine";
 
 export async function POST(request: Request) {
@@ -26,8 +25,8 @@ export async function POST(request: Request) {
   if (!body.deliveryDate) {
     return NextResponse.json({ error: "Delivery date required" }, { status: 400 });
   }
-  if (!body.dressType?.trim() || !isBridalDressType(String(body.dressType).trim())) {
-    return NextResponse.json({ error: "Valid dress type required" }, { status: 400 });
+  if (!body.dressType?.trim()) {
+    return NextResponse.json({ error: "Dress type required" }, { status: 400 });
   }
   const status = body.status ? String(body.status) : "collected";
   if (!isBridalStatus(status)) {

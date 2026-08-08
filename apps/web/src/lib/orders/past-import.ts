@@ -1,4 +1,3 @@
-import { isBridalDressType } from "@/lib/bridal-options";
 import { isBridalStatus } from "@/lib/orders/status-machine";
 
 export const PAST_ORDER_CSV_HEADERS = [
@@ -137,11 +136,11 @@ export function validatePastOrderRows(csvText: string): {
       results.push({ row: i + 1, ok: false, error: "customerName and customerPhone required" });
       continue;
     }
-    if (!isBridalDressType(dressType)) {
+    if (!dressType) {
       results.push({
         row: i + 1,
         ok: false,
-        error: `Invalid dressType "${dressType}" — use allowlist values`,
+        error: "dressType required",
       });
       continue;
     }

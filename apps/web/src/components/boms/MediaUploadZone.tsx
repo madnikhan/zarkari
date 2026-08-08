@@ -66,7 +66,13 @@ export function MediaUploadZone({
         if (isVideoUpload(file)) {
           await assertVideoDurationAllowed(file);
         }
-        const result = await uploadFileWithProgress(file, category, (state) => setProgress(state));
+        const result = await uploadFileWithProgress(
+          file,
+          category,
+          (state) => setProgress(state),
+          undefined,
+          kindHint
+        );
         const item = { name: result.fileName, url: result.url, mediaType: mediaTypeForFile(file) };
         uploaded.push(item);
         onSingleUploaded?.(item);
@@ -173,7 +179,7 @@ export function MediaUploadZone({
       <input
         ref={videoInputRef}
         type="file"
-        accept="video/*,.mov,.mp4,.webm"
+        accept="video/*,.mov,.mp4,.webm,.3gp,.3gpp,.m4v"
         capture="environment"
         className="hidden"
         disabled={uploading}

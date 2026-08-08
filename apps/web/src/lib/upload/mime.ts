@@ -1,4 +1,17 @@
-const VIDEO_EXTENSIONS = new Set([".mov", ".mp4", ".webm", ".m4v", ".avi", ".mkv", ".ogv"]);
+const VIDEO_EXTENSIONS = new Set([
+  ".mov",
+  ".mp4",
+  ".webm",
+  ".m4v",
+  ".avi",
+  ".mkv",
+  ".ogv",
+  ".3gp",
+  ".3gpp",
+  ".hevc",
+  ".mts",
+  ".m2ts",
+]);
 const AUDIO_EXTENSIONS = new Set([".m4a", ".mp3", ".ogg", ".wav", ".aac", ".opus"]);
 
 const EXTENSION_MIME: Record<string, string> = {
@@ -9,6 +22,11 @@ const EXTENSION_MIME: Record<string, string> = {
   ".avi": "video/x-msvideo",
   ".mkv": "video/x-matroska",
   ".ogv": "video/ogg",
+  ".3gp": "video/3gpp",
+  ".3gpp": "video/3gpp",
+  ".hevc": "video/mp4",
+  ".mts": "video/mp2t",
+  ".m2ts": "video/mp2t",
   ".m4a": "audio/mp4",
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
@@ -22,6 +40,10 @@ export type MediaKind = "image" | "video" | "audio";
 function extensionOf(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot >= 0 ? name.slice(dot).toLowerCase() : "";
+}
+
+export function hasVideoExtension(fileName: string): boolean {
+  return VIDEO_EXTENSIONS.has(extensionOf(fileName));
 }
 
 export function resolveFileMime(file: File): string {
@@ -60,12 +82,25 @@ export function getMediaKind(fileName: string, mimeType?: string, category?: str
   return "image";
 }
 
+/** Coerce content-type for multipart when client/phone left MIME blank. */
+export function coerceVideoContentType(fileName: string, contentType: string): string {
+  const ct = contentType?.trim() || "";
+  if (ct.startsWith("video/")) return ct;
+  const ext = extensionOf(fileName);
+  if (EXTENSION_MIME[ext]?.startsWith("video/")) return EXTENSION_MIME[ext];
+  if (VIDEO_EXTENSIONS.has(ext) || !ext) return "video/mp4";
+  return ct || "video/mp4";
+}
+
 export function withResolvedMime(file: File, kindHint?: MediaKind): File {
   let name = file.name?.trim() || "upload";
   let mime = resolveFileMime(file);
 
   if (kindHint === "video" && !mime.startsWith("video/")) {
     mime = "video/mp4";
+  }
+  if (kindHint === "image" && !mime.startsWith("image/") && !mime.startsWith("video/")) {
+    mime = "image/jpeg";
   }
 
   if (mime.startsWith("video/") && !extensionOf(name)) {
@@ -74,7 +109,9 @@ export function withResolvedMime(file: File, kindHint?: MediaKind): File {
         ? ".mov"
         : mime.includes("webm")
           ? ".webm"
-          : ".mp4";
+          : mime.includes("3gpp")
+            ? ".3gp"
+            : ".mp4";
     name = `${name}${ext}`;
   }
 

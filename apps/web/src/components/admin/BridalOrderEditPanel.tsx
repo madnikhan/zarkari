@@ -5,7 +5,6 @@ import { Pencil, Plus, Ruler } from "lucide-react";
 import type { BridalOrder } from "@/lib/data/seed";
 import type { BridalMeasurements } from "@/lib/measurements/bridal-form";
 import { MeasurementFormModal } from "@/components/admin/MeasurementFormModal";
-import { BRIDAL_DRESS_TYPES } from "@/lib/bridal-options";
 import { formatPrice } from "@/lib/utils";
 
 interface Props {
@@ -133,21 +132,13 @@ export function BridalOrderEditPanel({ order, onUpdated }: Props) {
           )}
           <div>
             <label className="text-xs text-slate-500 uppercase">Dress type</label>
-            <select
+            <input
+              type="text"
               value={dressType}
               onChange={(e) => setDressType(e.target.value)}
+              placeholder="e.g. Lehenga, Suit…"
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Select dress type</option>
-              {BRIDAL_DRESS_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-              {dressType && !(BRIDAL_DRESS_TYPES as readonly string[]).includes(dressType) && (
-                <option value={dressType}>{dressType}</option>
-              )}
-            </select>
+            />
           </div>
           <div>
             <label className="text-xs text-slate-500 uppercase">Delivery date</label>

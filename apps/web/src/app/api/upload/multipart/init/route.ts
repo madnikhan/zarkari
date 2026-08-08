@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createMultipartUpload } from "@/lib/r2-multipart";
 import { isR2Configured, r2ObjectKey, r2PublicUrl } from "@/lib/r2";
 import { maxDirectUploadBytesFromEnv } from "@/lib/upload/constants";
+import { coerceVideoContentType, hasVideoExtension } from "@/lib/upload/mime";
 import { requireUploadSession } from "@/lib/upload/upload-auth";
 
 export const maxDuration = 30;
@@ -15,9 +16,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const fileName = String(body.fileName ?? "upload.bin");
-    const contentType = String(body.contentType ?? "application/octet-stream");
+    let contentType = String(body.contentType ?? "application/octet-stream");
     const category = String(body.category ?? "general");
     const fileSize = Number(body.fileSize ?? 0);
+    const forceVideo = body.forceVideo === true;
 
     if (!fileSize || fileSize <= 0) {
       return NextResponse.json({ error: "fileSize required" }, { status: 400 });
@@ -30,8 +32,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Phone cameras often omit MIME / extension — coerce when clearly a video upload.
     if (!contentType.startsWith("video/")) {
-      return NextResponse.json({ error: "Multipart upload is for video files only" }, { status: 400 });
+      if (forceVideo || hasVideoExtension(fileName)) {
+        contentType = coerceVideoContentType(fileName, contentType);
+      } else {
+        return NextResponse.json({ error: "Multipart upload is for video files only" }, { status: 400 });
+      }
     }
 
     if (!isR2Configured()) {

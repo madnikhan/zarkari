@@ -12,7 +12,6 @@ import {
   hasAnyMeasurementValue,
   type BridalMeasurements,
 } from "@/lib/measurements/bridal-form";
-import { BRIDAL_DRESS_TYPES } from "@/lib/bridal-options";
 
 function defaultDeliveryDate(): string {
   const d = new Date(Date.now() + 56 * 86400000);
@@ -202,19 +201,14 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
 
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Dress Type *</span>
-        <select
+        <input
+          type="text"
           value={form.dressType}
           onChange={(e) => setForm({ ...form, dressType: e.target.value })}
+          placeholder="e.g. Lehenga, Suit, Red bridal…"
           className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2.5"
           required
-        >
-          <option value="">Select dress type</option>
-          {BRIDAL_DRESS_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        />
       </label>
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Total Price (£)</span>

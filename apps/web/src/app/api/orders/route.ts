@@ -19,9 +19,8 @@ export async function POST(request: Request) {
   if (!body.totalPrice) {
     return NextResponse.json({ error: "Total price required" }, { status: 400 });
   }
-  const { isBridalDressType } = await import("@/lib/bridal-options");
-  if (!body.dressType?.trim() || !isBridalDressType(String(body.dressType).trim())) {
-    return NextResponse.json({ error: "Valid dress type required" }, { status: 400 });
+  if (!body.dressType?.trim()) {
+    return NextResponse.json({ error: "Dress type required" }, { status: 400 });
   }
 
   try {
