@@ -162,6 +162,8 @@ export async function listBridalOrdersWithRelationsDb(filters: {
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
+  /** Orders with remaining balance &gt; 0, including collected (excludes cancelled/refunded). */
+  outstandingOnly?: boolean;
   q?: string;
   from?: string;
   to?: string;
@@ -173,7 +175,10 @@ export async function listBridalOrdersWithRelationsDb(filters: {
   if (filters.supplierId) conditions.push(eq(schema.bridalOrders.supplierId, filters.supplierId));
   if (filters.supplierTab) conditions.push(supplierTabCondition(filters.supplierTab));
   else if (filters.tab) conditions.push(ordersTabCondition(filters.tab));
-  else if (filters.activeOnly) conditions.push(notInArray(schema.bridalOrders.status, TERMINAL_STATUSES));
+  else if (filters.outstandingOnly) {
+    conditions.push(notInArray(schema.bridalOrders.status, ["cancelled", "refunded"]));
+    conditions.push(sql`${schema.bridalOrders.remainingBalance}::numeric > 0`);
+  } else if (filters.activeOnly) conditions.push(notInArray(schema.bridalOrders.status, TERMINAL_STATUSES));
   if (filters.q?.trim()) {
     const pat = `%${filters.q.trim()}%`;
     conditions.push(
@@ -649,7 +654,7 @@ export async function listPayableBridalOrdersDb(): Promise<PayableBridalOrder[]>
     .leftJoin(schema.customers, eq(schema.bridalOrders.customerId, schema.customers.id))
     .where(
       and(
-        notInArray(schema.bridalOrders.status, ["collected", "cancelled", "refunded"]),
+        notInArray(schema.bridalOrders.status, ["cancelled", "refunded"]),
         sql`${schema.bridalOrders.remainingBalance}::numeric > 0`
       )
     )
@@ -676,10 +681,11 @@ export async function getBridalOrderDb(id: string): Promise<BridalOrder | null> 
 export async function getBridalOrderByNumberDb(orderNumber: string): Promise<BridalOrder | null> {
   const db = getDb();
   if (!db) return null;
+  const normalized = orderNumber.trim();
   const [row] = await db
     .select()
     .from(schema.bridalOrders)
-    .where(eq(schema.bridalOrders.orderNumber, orderNumber))
+    .where(ilike(schema.bridalOrders.orderNumber, normalized))
     .limit(1);
   return row ? mapOrder(row) : null;
 }
@@ -1365,15 +1371,19 @@ export async function addTimelineDb(
 export async function addPaymentDb(
   orderId: string,
   input: { type: string; amount: string; method?: string }
-): Promise<void> {
+): Promise<{ id: string } | null> {
   const db = getDb();
-  if (!db) return;
-  await db.insert(schema.bridalPayments).values({
-    orderId,
-    type: input.type,
-    amount: input.amount,
-    method: input.method ?? null,
-  });
+  if (!db) return null;
+  const [row] = await db
+    .insert(schema.bridalPayments)
+    .values({
+      orderId,
+      type: input.type,
+      amount: input.amount,
+      method: input.method ?? null,
+    })
+    .returning({ id: schema.bridalPayments.id });
+  return row ?? null;
 }
 
 export async function getPaymentsDb(orderId: string) {

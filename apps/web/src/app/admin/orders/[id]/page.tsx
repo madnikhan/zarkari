@@ -23,6 +23,7 @@ import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
 import { CustomerCard } from "@/components/boms/CustomerCard";
 import { OrderWhatsAppBanner } from "@/components/admin/OrderWhatsAppBanner";
 import { InvoiceActions } from "@/components/admin/InvoiceActions";
+import { RecordPaymentForm } from "@/components/boms/RecordPaymentForm";
 import { OrderSummaryGrid, formatOrderDate, formatPrice } from "@/components/boms/OrderSummaryGrid";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 import { BridalOrderEditSection } from "@/components/admin/BridalOrderEditSection";
@@ -118,6 +119,23 @@ export default async function AdminOrderDetailPage({ params }: Props) {
 
       <div className="boms-card p-4 mb-4">
         <h2 className="text-xs font-semibold uppercase text-slate-500 mb-3">Invoice</h2>
+        <p className="text-xs text-slate-500 mb-2">
+          Invoice / Order #: <span className="font-mono text-slate-800">{order.orderNumber}</span>
+        </p>
+        <div className="grid grid-cols-3 gap-2 mb-3 text-sm">
+          <div className="rounded-lg bg-slate-50 px-3 py-2">
+            <p className="text-[10px] uppercase text-slate-400">Total</p>
+            <p className="font-semibold text-slate-900">{formatPrice(order.totalPrice)}</p>
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+            <p className="text-[10px] uppercase text-emerald-600/80">Paid</p>
+            <p className="font-semibold text-emerald-700">{formatPrice(order.depositPaid)}</p>
+          </div>
+          <div className="rounded-lg bg-amber-50 px-3 py-2">
+            <p className="text-[10px] uppercase text-amber-600/80">Remaining</p>
+            <p className="font-semibold text-amber-700">{formatPrice(order.remainingBalance)}</p>
+          </div>
+        </div>
         <InvoiceActions
           kind="bridal"
           orderId={order.id}
@@ -126,6 +144,16 @@ export default async function AdminOrderDetailPage({ params }: Props) {
           customerPhone={customer?.phone}
           size="sm"
         />
+        {(session?.role === "owner" || session?.role === "staff") &&
+          parseFloat(order.remainingBalance) > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <RecordPaymentForm
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                remainingBalance={order.remainingBalance}
+              />
+            </div>
+          )}
       </div>
 
       <div className="mb-4">

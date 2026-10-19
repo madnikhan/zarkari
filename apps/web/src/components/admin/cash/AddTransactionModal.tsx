@@ -164,10 +164,24 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       }
 
       if (type === "order_deposit") {
-        const matched =
+        let matched =
           payableOrders.find(
             (o) => o.orderNumber.toLowerCase() === reference.trim().toLowerCase()
           ) ?? null;
+        // Resolve by invoice/order # even if not in the payable picker cache.
+        if (!matched && reference.trim()) {
+          const lookup = await fetch(
+            `/api/cash/payable-orders?q=${encodeURIComponent(reference.trim())}`
+          );
+          const lookupData = await parseJsonResponse<{
+            orders?: PayableOrder[];
+            error?: string;
+          }>(lookup);
+          matched =
+            lookupData.orders?.find(
+              (o) => o.orderNumber.toLowerCase() === reference.trim().toLowerCase()
+            ) ?? null;
+        }
         if (matched) {
           const res = await fetch(`/api/orders/${matched.id}/payment`, {
             method: "POST",
@@ -183,21 +197,9 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
           const data = await parseJsonResponse<{ error?: string }>(res);
           if (!res.ok) throw new Error(data.error ?? "Failed to save payment");
         } else {
-          const res = await fetch("/api/cash/transactions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              direction,
-              type: "order_deposit",
-              amount,
-              method,
-              reference: reference.trim(),
-              description: description || undefined,
-              businessDate: date,
-            }),
-          });
-          const data = await parseJsonResponse<{ error?: string }>(res);
-          if (!res.ok) throw new Error(data.error ?? "Failed to save");
+          throw new Error(
+            `No bridal order found for invoice/order # ${reference.trim()}. Check the number and try again.`
+          );
         }
       } else if (type === "order_collection" && orderId) {
         const res = await fetch(`/api/orders/${orderId}/payment`, {

@@ -32,6 +32,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
     dressType: "",
     totalPrice: "1000",
     depositPaid: "500",
+    depositMethod: "cash",
     deliveryDate: defaultDeliveryDate(),
     customisationNotes: "",
     sendToSupplier: false,
@@ -222,6 +223,18 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
       </label>
       <div data-tour="deposit-field">
       {field("depositPaid", "Deposit Paid (£)", "number", true)}
+      <label className="block text-sm">
+        <span className="text-slate-500 text-xs uppercase tracking-wide">Deposit Method</span>
+        <select
+          value={form.depositMethod}
+          onChange={(e) => setForm({ ...form, depositMethod: e.target.value })}
+          className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2.5"
+        >
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="bank_transfer">Bank transfer</option>
+        </select>
+      </label>
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Remaining Balance (£)</span>
         <input

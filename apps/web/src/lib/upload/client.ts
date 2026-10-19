@@ -12,15 +12,22 @@ import {
   ADAPTIVE_SPEED_CHECK_MS,
   partUploadTimeoutMs,
   SERVER_RELAY_CHUNK_BYTES,
+  SERVER_RELAY_CHUNK_MAX_RETRIES,
+  SERVER_RELAY_CHUNK_RETRY_DELAYS_MS,
+  SERVER_RELAY_CHUNK_TIMEOUT_MS,
 } from "./constants";
 import { isVideoFile, resolveFileMime, withResolvedMime } from "./mime";
 import { parseJsonResponse, parseXhrJson } from "./parse-json";
+import {
+  isDirectStorageBlockedError,
+  probeDirectR2Upload,
+  R2_RELAY_PROGRESS_LABEL,
+} from "./r2-direct-probe";
 import { formatBytes, UploadSpeedTracker } from "./upload-speed";
 
-const CORS_ERROR_MESSAGE =
-  "Direct storage upload blocked (CORS). Retrying via server…";
-const ETAG_ERROR_MESSAGE =
-  "Upload succeeded but ETag missing — add ETag to R2 CORS ExposeHeaders.";
+/** Internal marker for CORS failures during XHR PUT (not shown to users). */
+const CORS_BLOCKED_INTERNAL = "__STORAGE_CORS_BLOCKED__";
+const ETAG_MISSING_INTERNAL = "__STORAGE_ETAG_MISSING__";
 
 export type UploadProgressStatus = "uploading" | "processing" | "done" | "error";
 
@@ -95,47 +102,11 @@ function rejectAudioPlaceholder(url: string | undefined, file: File): void {
   }
 }
 
-function isCorsError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message;
-  return (
-    msg.includes("CORS") ||
-    msg.includes("Direct storage upload blocked") ||
-    msg.includes("storage CORS")
-  );
-}
-
-async function probeDirectR2Upload(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/upload/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: ".cors-probe",
-        contentType: "application/octet-stream",
-        category: "_probe",
-        fileSize: 32,
-      }),
-    });
-    const data = await parseJsonResponse<{ uploadUrl?: string; demo?: boolean; error?: string }>(res);
-    if (!res.ok || data.demo || !data.uploadUrl) return false;
-    await putPartChunk(
-      data.uploadUrl,
-      new Blob([new Uint8Array(32)]),
-      30_000,
-      () => {}
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function initMultipartVideo(
   file: File,
   category: string,
   mimeType: string,
-  forceVideo = true
+  options?: { forceVideo?: boolean; forceRelay?: boolean }
 ): Promise<{
   demo?: boolean;
   uploadId?: string;
@@ -152,7 +123,8 @@ async function initMultipartVideo(
       contentType: mimeType,
       category,
       fileSize: file.size,
-      forceVideo,
+      forceVideo: options?.forceVideo ?? true,
+      forceRelay: options?.forceRelay ?? false,
     }),
   });
   const initData = await parseJsonResponse<{
@@ -206,31 +178,50 @@ async function postRelayChunkWithProgress(
   chunk: Blob,
   onLoaded: (loaded: number, total: number) => void
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const form = new FormData();
-    form.append("uploadId", uploadId);
-    form.append("key", key);
-    form.append("file", chunk, "relay-chunk");
+  let lastError: Error | null = null;
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload/multipart/relay");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onLoaded(e.loaded, e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else {
-        try {
-          const data = parseXhrJson<{ error?: string }>(xhr.responseText, xhr.status);
-          reject(new Error(data.error ?? `Upload failed (${xhr.status})`));
-        } catch (err) {
-          reject(err instanceof Error ? err : new Error(`Upload failed (${xhr.status})`));
-        }
-      }
-    };
-    xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
-    xhr.send(form);
-  });
+  for (let attempt = 0; attempt < SERVER_RELAY_CHUNK_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = SERVER_RELAY_CHUNK_RETRY_DELAYS_MS[attempt - 1] ?? 8000;
+      await sleep(delay);
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const form = new FormData();
+        form.append("uploadId", uploadId);
+        form.append("key", key);
+        form.append("file", chunk, "relay-chunk");
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/upload/multipart/relay");
+        xhr.timeout = SERVER_RELAY_CHUNK_TIMEOUT_MS;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onLoaded(e.loaded, e.total);
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            try {
+              const data = parseXhrJson<{ error?: string }>(xhr.responseText, xhr.status);
+              reject(new Error(data.error ?? `Upload failed (${xhr.status})`));
+            } catch (err) {
+              reject(err instanceof Error ? err : new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Upload failed — check your connection or try again"));
+        xhr.ontimeout = () =>
+          reject(new Error("Upload relay timed out — try Wi‑Fi, turn off VPN, or fix R2 CORS for direct upload"));
+        xhr.send(form);
+      });
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw lastError ?? new Error("Upload relay failed");
 }
 
 async function uploadViaServerRelay(
@@ -241,10 +232,13 @@ async function uploadViaServerRelay(
   onProgress?: ProgressCallback
 ): Promise<UploadResult> {
   const speedTracker = new UploadSpeedTracker();
-  const relayLabel = label.includes("server") ? label : `${label.replace(/…$/, "")} via server…`;
+  const relayLabel = R2_RELAY_PROGRESS_LABEL;
   onProgress?.(buildProgressState(relayLabel, "uploading", 5, 0, file.size, speedTracker));
 
-  const initData = await initMultipartVideo(file, category, mimeType);
+  const initData = await initMultipartVideo(file, category, mimeType, {
+    forceVideo: isVideoFile(file) || mimeType.startsWith("video/"),
+    forceRelay: true,
+  });
   if (initData.demo) {
     if (file.size > MAX_SERVER_UPLOAD_BYTES) {
       throw new Error(
@@ -315,8 +309,7 @@ async function uploadViaServerRelay(
 }
 
 function isRetryableUploadError(err: Error): boolean {
-  const msg = err.message;
-  if (msg.includes("CORS") || msg.includes("ETag missing") || msg.includes("Direct storage upload blocked")) {
+  if (err.message === CORS_BLOCKED_INTERNAL || err.message === ETAG_MISSING_INTERNAL) {
     return false;
   }
   return true;
@@ -371,7 +364,7 @@ function putWithProgress(
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`Upload failed (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error(CORS_ERROR_MESSAGE));
+    xhr.onerror = () => reject(new Error(CORS_BLOCKED_INTERNAL));
     xhr.ontimeout = () =>
       reject(new Error("Upload timed out — check your connection and try again"));
     xhr.send(body);
@@ -479,19 +472,19 @@ async function putPartChunk(
       if (xhr.status >= 200 && xhr.status < 300) {
         const raw = xhr.getResponseHeader("ETag") ?? xhr.getResponseHeader("etag");
         if (!raw) {
-          reject(new Error(ETAG_ERROR_MESSAGE));
+          reject(new Error(ETAG_MISSING_INTERNAL));
           return;
         }
         resolve(raw.replace(/"/g, ""));
         return;
       }
       if (xhr.status === 403 || xhr.status === 0) {
-        reject(new Error(CORS_ERROR_MESSAGE));
+        reject(new Error(CORS_BLOCKED_INTERNAL));
         return;
       }
       reject(new Error(`Upload part failed (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error(CORS_ERROR_MESSAGE));
+    xhr.onerror = () => reject(new Error(CORS_BLOCKED_INTERNAL));
     xhr.ontimeout = () => reject(new Error("__PART_TIMEOUT__"));
     xhr.send(chunk);
   });
@@ -572,7 +565,10 @@ async function uploadVideoViaParallelMultipart(
   const speedTracker = new UploadSpeedTracker();
   onProgress?.(buildProgressState(label, "uploading", 5, 0, file.size, speedTracker));
 
-  if (!(await probeDirectR2Upload())) {
+  onProgress?.(buildProgressState("Checking storage…", "uploading", 2, 0, file.size, speedTracker));
+  const probe = await probeDirectR2Upload();
+  if (!probe.ok) {
+    onProgress?.(buildProgressState(R2_RELAY_PROGRESS_LABEL, "uploading", 5, 0, file.size, speedTracker));
     return uploadViaServerRelay(file, category, mimeType, label, onProgress);
   }
 
@@ -704,7 +700,8 @@ async function uploadVideoViaParallelMultipart(
     };
   } catch (err) {
     await abortMultipartUploadClient(uploadId, key);
-    if (isCorsError(err)) {
+    if (isDirectStorageBlockedError(err)) {
+      onProgress?.(buildProgressState(R2_RELAY_PROGRESS_LABEL, "uploading", 5, 0, file.size, speedTracker));
       return uploadViaServerRelay(file, category, mimeType, label, onProgress);
     }
     throw err;
@@ -756,20 +753,17 @@ async function uploadViaPresignedPut(
     throw new Error(presignData.error ?? "Could not start upload");
   }
 
-  const canDirect = await probeDirectR2Upload();
-  if (!canDirect) {
-    if (isVideoFile(file) || mimeType.startsWith("video/")) {
-      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
-    }
+  onProgress?.(buildProgressState("Checking storage…", "uploading", 2, 0, file.size, speedTracker));
+  const probe = await probeDirectR2Upload();
+  if (!probe.ok) {
     if (file.size <= MAX_SERVER_UPLOAD_BYTES) {
       const form = new FormData();
       form.append("file", file);
       form.append("category", category);
       return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
     }
-    throw new Error(
-      "Direct storage upload unavailable. Configure R2 CORS or use a file under 4 MB."
-    );
+    onProgress?.(buildProgressState(R2_RELAY_PROGRESS_LABEL, "uploading", 5, 0, file.size, speedTracker));
+    return uploadViaServerRelay(file, category, mimeType, label, onProgress);
   }
 
   try {
@@ -784,19 +778,15 @@ async function uploadViaPresignedPut(
       }
     );
   } catch (err) {
-    if (isCorsError(err)) {
-      if (isVideoFile(file) || mimeType.startsWith("video/")) {
-        return uploadViaServerRelay(file, category, mimeType, label, onProgress);
-      }
+    if (isDirectStorageBlockedError(err)) {
       if (file.size <= MAX_SERVER_UPLOAD_BYTES) {
         const form = new FormData();
         form.append("file", file);
         form.append("category", category);
         return postFormWithStagedProgress("/api/upload", form, label, file, onProgress, localPreviewUrl);
       }
-      throw new Error(
-        "Large file upload blocked by storage CORS. Configure R2 CORS or use a file under 4 MB."
-      );
+      onProgress?.(buildProgressState(R2_RELAY_PROGRESS_LABEL, "uploading", 5, 0, file.size, speedTracker));
+      return uploadViaServerRelay(file, category, mimeType, label, onProgress);
     }
     throw err;
   }

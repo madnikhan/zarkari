@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const category = String(body.category ?? "general");
     const fileSize = Number(body.fileSize ?? 0);
     const forceVideo = body.forceVideo === true;
+    const forceRelay = body.forceRelay === true;
 
     if (!fileSize || fileSize <= 0) {
       return NextResponse.json({ error: "fileSize required" }, { status: 400 });
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     if (!contentType.startsWith("video/")) {
       if (forceVideo || hasVideoExtension(fileName)) {
         contentType = coerceVideoContentType(fileName, contentType);
-      } else {
+      } else if (!forceRelay) {
         return NextResponse.json({ error: "Multipart upload is for video files only" }, { status: 400 });
       }
     }

@@ -7,7 +7,7 @@
 | Vercel | Next.js hosting | Hobby |
 | Neon | PostgreSQL | Free |
 | Firebase | Live sync + push (optional) | Spark + usage |
-| Cloudflare R2 | File storage | Free |
+| Cloudflare R2 | File storage (browser direct upload) | Free — **CORS required** |
 | Stripe | Retail checkout | Pay per transaction |
 | Soro | SEO blog webhook | Paid |
 | Meta | Pixel + catalog | Paid |
@@ -51,6 +51,9 @@ See [firebase-setup.md](./firebase-setup.md) for Firebase project configuration.
 5. Configure Stripe webhook to `https://zarkari.co.uk/api/stripe/webhook`.
 6. Point Meta catalog to `https://zarkari.co.uk/api/meta/catalog.xml`.
 7. Configure Soro publish webhook to `POST https://zarkari.co.uk/api/soro/publish`.
+8. Configure **R2 bucket CORS** and verify **Admin → Settings → Storage** (see [r2-cors-setup.md](./r2-cors-setup.md)).
+
+Commercial production sites should use **Vercel Pro** (Hobby is non-commercial and has usage caps). Scale **Neon** when traffic grows.
 
 ## Demo Mode
 

@@ -270,6 +270,7 @@ export async function createBridalOrder(input: {
   size?: string;
   totalPrice: string;
   depositPaid?: string;
+  depositMethod?: string;
   deliveryDate?: string;
   customisationNotes?: string;
   measurements?: import("@/lib/measurements/bridal-form").BridalMeasurements;
@@ -320,15 +321,20 @@ export async function createBridalOrder(input: {
           performedByRole: "staff",
         });
         if (parseFloat(deposit) > 0) {
+          const depositMethod = input.depositMethod ?? "cash";
           const { addPaymentDb } = await import("@/lib/db/bridal-orders");
-          await addPaymentDb(dbOrder.id, { type: "deposit", amount: deposit, method: "cash" });
+          const payment = await addPaymentDb(dbOrder.id, {
+            type: "deposit",
+            amount: deposit,
+            method: depositMethod,
+          });
           const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
           await autoPostCashTransaction({
             direction: "in",
             type: "order_deposit",
             amount: deposit,
-            method: "cash",
-            reference: dbOrder.orderNumber,
+            method: depositMethod,
+            reference: payment?.id ? `${dbOrder.orderNumber}#${payment.id}` : dbOrder.orderNumber,
             description: "Deposit from customer",
             orderId: dbOrder.id,
           });
@@ -631,10 +637,23 @@ export async function refundOrder(orderId: string, amount: string, reason: strin
 export async function markCollected(
   orderId: string,
   byName?: string,
-  details?: { balancePaid: boolean; amountPaid?: string; alterationNotes?: string }
+  details?: { balancePaid: boolean; amountPaid?: string; alterationNotes?: string; method?: string }
 ) {
   const order = await resolveOrder(orderId);
   if (!order) return null;
+
+  const paidAmount = details?.amountPaid ?? order.remainingBalance;
+  const paid = parseFloat(paidAmount);
+  // Sync balances + bridal_payments + cash via recordPayment before marking collected.
+  if (paid > 0) {
+    await recordPayment(orderId, {
+      type: "balance",
+      amount: paidAmount,
+      method: details?.method ?? "cash",
+      description: "Balance received on collection",
+    });
+  }
+
   order.status = "collected";
   order.supplierLocked = true;
   demoOrderCollections.push({
@@ -642,29 +661,16 @@ export async function markCollected(
     orderId,
     collectionDate: new Date().toISOString(),
     balancePaid: details?.balancePaid ?? true,
-    amountPaid: details?.amountPaid ?? order.remainingBalance,
+    amountPaid: paidAmount,
     alterationNotes: details?.alterationNotes,
   });
   if (isDbConfigured()) {
     const { addCollectionDb } = await import("@/lib/db/bridal-orders");
     await addCollectionDb(orderId, {
       balancePaid: details?.balancePaid ?? true,
-      amountPaid: details?.amountPaid ?? order.remainingBalance,
+      amountPaid: paidAmount,
       alterationNotes: details?.alterationNotes,
     });
-    const paidAmount = details?.amountPaid ?? order.remainingBalance;
-    if (parseFloat(paidAmount) > 0) {
-      const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
-      await autoPostCashTransaction({
-        direction: "in",
-        type: "order_collection",
-        amount: paidAmount,
-        method: "cash",
-        reference: order.orderNumber,
-        description: "Balance received on collection",
-        orderId,
-      });
-    }
   }
   await syncOrderPatch(orderId, { status: "collected", supplierLocked: true });
   await syncTimeline(orderId, "collected", { performedByName: byName, performedByRole: "staff" });
@@ -1036,15 +1042,19 @@ export async function recordPayment(
   }
   if (isDbConfigured()) {
     const { addPaymentDb } = await import("@/lib/db/bridal-orders");
-    await addPaymentDb(orderId, input);
+    const payment = await addPaymentDb(orderId, input);
     const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
     const cashType = input.type === "deposit" ? "order_deposit" : "order_collection";
+    // Unique reference per payment so repeated deposits/collections each post to the till.
+    const paymentRef = payment?.id
+      ? `${order?.orderNumber ?? orderId}#${payment.id}`
+      : `${order?.orderNumber ?? orderId}#${Date.now()}`;
     await autoPostCashTransaction({
       direction: "in",
       type: cashType,
       amount: input.amount,
       method: input.method,
-      reference: order?.orderNumber,
+      reference: paymentRef,
       description:
         input.description ??
         (cashType === "order_deposit" ? `Deposit from customer` : `Balance received`),

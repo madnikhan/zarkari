@@ -23,7 +23,7 @@ export default async function AdminPaymentsPage({ searchParams }: Props) {
   const [summary, { orders, total }] = await Promise.all([
     getActiveFinanceSummary(),
     getBridalOrdersWithRelations({
-      activeOnly: true,
+      outstandingOnly: true,
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
       q: q.trim() || undefined,

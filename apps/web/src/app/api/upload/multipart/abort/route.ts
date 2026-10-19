@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deleteUploadRelaySession } from "@/lib/db/upload-relay";
 import { abortMultipartUpload } from "@/lib/r2-multipart";
 import { isR2Configured } from "@/lib/r2";
 import { requireUploadSession } from "@/lib/upload/upload-auth";
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     }
 
     await abortMultipartUpload(key, uploadId);
+    await deleteUploadRelaySession(uploadId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Multipart abort failed:", err);

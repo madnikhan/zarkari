@@ -54,7 +54,7 @@ export function PaymentsPageClient({
 
       <div className="mb-4">
         <Suspense fallback={null}>
-          <AdminTableSearch placeholder="Search order # or customer…" defaultValue={q} />
+          <AdminTableSearch placeholder="Search order / invoice # or customer…" defaultValue={q} />
         </Suspense>
       </div>
 
@@ -62,7 +62,7 @@ export function PaymentsPageClient({
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-slate-50/95 z-10">
             <tr className="border-b border-slate-100">
-              <th className="text-left px-4 py-3 font-medium text-slate-500">Order</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Order / Invoice #</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Total</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Deposit</th>
               <th className="text-left px-4 py-3 font-medium text-slate-500">Balance</th>

@@ -356,6 +356,7 @@ export async function getBridalOrdersWithRelations(filters: {
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
+  outstandingOnly?: boolean;
   q?: string;
   from?: string;
   to?: string;
@@ -409,6 +410,11 @@ export async function getBridalOrdersWithRelations(filters: {
       const d = new Date(o.deliveryDate);
       return d >= now && d <= weekEnd && !["collected", "cancelled", "refunded"].includes(o.status);
     });
+  } else if (filters.outstandingOnly) {
+    orders = orders.filter(
+      (o) =>
+        !["cancelled", "refunded"].includes(o.status) && parseFloat(o.remainingBalance) > 0
+    );
   } else if (filters.activeOnly || filters.tab === "active") {
     orders = orders.filter((o) => !["collected", "cancelled", "refunded"].includes(o.status));
   }
@@ -715,7 +721,7 @@ export async function getPayableOrders() {
   return demoBridalOrders
     .filter(
       (o) =>
-        !["collected", "cancelled", "refunded"].includes(o.status) &&
+        !["cancelled", "refunded"].includes(o.status) &&
         parseFloat(o.remainingBalance) > 0
     )
     .map((o) => ({

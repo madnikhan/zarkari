@@ -2,6 +2,7 @@ import { getShopSettings } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { SettingsEditor } from "@/components/admin/SettingsEditor";
 import { SocialInboxSetupCard } from "@/components/admin/inbox/SocialInboxSetupCard";
+import { StorageSetupCard } from "@/components/admin/StorageSetupCard";
 
 export default async function AdminSettingsPage() {
   const settings = await getShopSettings();
@@ -29,6 +30,7 @@ export default async function AdminSettingsPage() {
       )}
 
       <div className="mt-8">
+        <StorageSetupCard />
         <SocialInboxSetupCard
           siteUrl={process.env.NEXT_PUBLIC_SITE_URL ?? "https://zarkari-web.vercel.app"}
           metaConfigured={Boolean(process.env.META_VERIFY_TOKEN?.trim())}

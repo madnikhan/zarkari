@@ -28,7 +28,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // CORS probe uses a tiny octet-stream PUT — allow category "_probe" so the
+  // client can detect direct browser→R2 upload without forcing the Vercel relay.
+  const isProbe = category === "_probe";
   const isMedia =
+    isProbe ||
     contentType.startsWith("video/") ||
     contentType.startsWith("audio/") ||
     fileSize > 4 * 1024 * 1024;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { OrderFilesPanel } from "@/components/admin/OrderFilesPanel";
+import { RecordPaymentForm } from "@/components/boms/RecordPaymentForm";
 import { OrderTimeline } from "./OrderTimeline";
 import type { TimelineEvent, OrderFile, BridalOrder } from "@/lib/data/seed";
 import { formatPrice } from "@/lib/utils";
@@ -55,16 +56,47 @@ export function OrderDetailTabs({
       )}
 
       {tab === "Payments" && (
-        <ul className="space-y-3 text-sm">
-          {data.payments.map((p) => (
-            <li key={p.id} className="flex justify-between border-b border-sand pb-2">
-              <span className="capitalize">{p.type}</span>
-              <span>
-                {formatPrice(p.amount)} · {p.method}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-4 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-slate-500">
+                Remaining balance:{" "}
+                <span className="font-semibold text-amber-700">
+                  {formatPrice(data.order.remainingBalance)}
+                </span>
+              </p>
+            </div>
+            {parseFloat(data.order.remainingBalance) > 0 && (
+              <RecordPaymentForm
+                orderId={data.order.id}
+                orderNumber={data.order.orderNumber}
+                remainingBalance={data.order.remainingBalance}
+              />
+            )}
+          </div>
+          {data.payments.length === 0 ? (
+            <p className="text-slate-400">No payments recorded yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {data.payments.map((p) => (
+                <li key={p.id} className="flex justify-between gap-3 border-b border-sand pb-2">
+                  <div>
+                    <span className="capitalize">{p.type}</span>
+                    {p.createdAt && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {new Date(p.createdAt).toLocaleString("en-GB")}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-right shrink-0">
+                    {formatPrice(p.amount)}
+                    {p.method ? ` · ${p.method}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {tab === "Notes" && (

@@ -43,6 +43,9 @@ export function bridalOrderToInvoice(
       .filter(Boolean)
       .join(" — ") || `Bridal / custom order ${order.orderNumber}`;
 
+  const paid = parseFloat(order.depositPaid || "0");
+  const remaining = parseFloat(order.remainingBalance || "0");
+
   return {
     serialNo: order.orderNumber,
     orderNumber: order.orderNumber,
@@ -56,7 +59,8 @@ export function bridalOrderToInvoice(
     totalAmount: order.totalPrice,
     deposit: order.depositPaid,
     balance: order.remainingBalance,
+    // When fully paid show Online (typical card/transfer); leave both unchecked if unpaid.
     paymentCash: false,
-    paymentOnline: parseFloat(order.depositPaid || "0") > 0,
+    paymentOnline: paid > 0 && remaining <= 0,
   };
 }

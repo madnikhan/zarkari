@@ -149,9 +149,8 @@ export function renderStoreInvoiceHtml(data: StoreInvoiceData): string {
     <div class="wave"></div>
     <div class="title">INVOICE</div>
 
-    <div class="row"><label>S.No</label><div class="val">${escapeHtml(data.serialNo)}</div></div>
+    <div class="row"><label>Invoice / Order No</label><div class="val">${escapeHtml(data.orderNumber)}</div></div>
     <div class="row"><label>Date</label><div class="val">${escapeHtml(data.date)}</div></div>
-    <div class="row"><label>Order No</label><div class="val">${escapeHtml(data.orderNumber)}</div></div>
     <div class="row"><label>Name</label><div class="val">${escapeHtml(data.customerName)}</div></div>
 
     <div class="desc-block">

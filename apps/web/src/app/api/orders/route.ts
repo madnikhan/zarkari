@@ -43,6 +43,10 @@ export async function POST(request: Request) {
       dressType: body.dressType,
       totalPrice: String(body.totalPrice),
       depositPaid: deposit.toFixed(2),
+      depositMethod:
+        typeof body.depositMethod === "string" && body.depositMethod.trim()
+          ? body.depositMethod.trim()
+          : "cash",
       deliveryDate: body.deliveryDate
         ? new Date(body.deliveryDate).toISOString()
         : undefined,
