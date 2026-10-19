@@ -235,8 +235,20 @@ async function main() {
       .from(schema.users)
       .where(eq(schema.users.email, u.email))
       .limit(1);
-    if (existing.length) continue;
     const passwordHash = await bcrypt.hash(u.password, 10);
+    if (existing.length) {
+      await db
+        .update(schema.users)
+        .set({
+          passwordHash,
+          name: u.name,
+          role: u.role,
+          supplierId: u.role === "supplier" ? supplierId : null,
+        })
+        .where(eq(schema.users.id, existing[0].id));
+      console.log(`Updated demo user password: ${u.email}`);
+      continue;
+    }
     await db.insert(schema.users).values({
       email: u.email,
       passwordHash,

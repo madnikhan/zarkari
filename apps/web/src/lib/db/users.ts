@@ -75,20 +75,71 @@ export async function deleteUserDb(id: string): Promise<boolean> {
   return true;
 }
 
-export async function seedDemoUsersDb(): Promise<void> {
+export const DEMO_LOGIN_ACCOUNTS = [
+  { email: "owner@zarkari.co.uk", password: "demo123", name: "Owner", role: "owner" as UserRole },
+  { email: "staff@zarkari.co.uk", password: "demo123", name: "Staff", role: "staff" as UserRole },
+  {
+    email: "supplier@zarkari.co.uk",
+    password: "demo123",
+    name: "Karachi Atelier",
+    role: "supplier" as UserRole,
+    needsSupplier: true,
+  },
+] as const;
+
+export function isDemoLoginEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return DEMO_LOGIN_ACCOUNTS.some((a) => a.email === normalized);
+}
+
+/**
+ * Ensures README login accounts exist in Neon with password demo123.
+ * Creates missing users; resets password only when demo123 no longer matches.
+ * Does not touch other accounts (e.g. waqas@ / custom suppliers).
+ */
+export async function ensureDemoLoginUsersDb(): Promise<void> {
   const db = getDb();
   if (!db) return;
-  const { hashPassword } = await import("@/lib/auth/password");
-  const { demoUsers } = await import("@/lib/data/seed");
-  for (const u of demoUsers) {
-    const existing = await findUserByEmailDb(u.email);
-    if (existing) continue;
+  const { hashPassword, verifyPassword } = await import("@/lib/auth/password");
+
+  let supplierId: string | undefined;
+  if (DEMO_LOGIN_ACCOUNTS.some((a) => "needsSupplier" in a && a.needsSupplier)) {
+    const [existingSupplier] = await db.select().from(schema.suppliers).limit(1);
+    if (existingSupplier) {
+      supplierId = existingSupplier.id;
+    } else {
+      const [created] = await db
+        .insert(schema.suppliers)
+        .values({ name: "Karachi Atelier", email: "supplier@zarkari.co.uk" })
+        .returning();
+      supplierId = created.id;
+    }
+  }
+
+  for (const account of DEMO_LOGIN_ACCOUNTS) {
+    const needsSupplier = "needsSupplier" in account && account.needsSupplier;
+    const existing = await findUserByEmailDb(account.email);
+    if (existing) {
+      const passwordOk = await verifyPassword(account.password, existing.passwordHash);
+      if (!passwordOk) {
+        await updateUserDb(existing.id, { passwordHash: await hashPassword(account.password) });
+      }
+      if (needsSupplier && !existing.supplierId && supplierId) {
+        await updateUserDb(existing.id, { supplierId });
+      }
+      continue;
+    }
     await createUserDb({
-      email: u.email,
-      passwordHash: await hashPassword(u.password),
-      name: u.name,
-      role: u.role,
-      supplierId: u.supplierId,
+      email: account.email,
+      passwordHash: await hashPassword(account.password),
+      name: account.name,
+      role: account.role,
+      supplierId: needsSupplier ? supplierId : undefined,
     });
   }
+}
+
+/** @deprecated Use ensureDemoLoginUsersDb */
+export async function seedDemoUsersDb(): Promise<void> {
+  return ensureDemoLoginUsersDb();
 }
