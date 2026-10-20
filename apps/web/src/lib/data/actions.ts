@@ -70,6 +70,7 @@ async function syncOrderPatch(
     supplierLocked: boolean;
     remainingBalance: string;
     depositPaid: string;
+    totalPrice: string;
   }>
 ) {
   if (isDbConfigured()) {
@@ -271,6 +272,8 @@ export async function createBridalOrder(input: {
   totalPrice: string;
   depositPaid?: string;
   depositMethod?: string;
+  depositCashAmount?: string;
+  depositCardAmount?: string;
   deliveryDate?: string;
   customisationNotes?: string;
   measurements?: import("@/lib/measurements/bridal-form").BridalMeasurements;
@@ -323,21 +326,34 @@ export async function createBridalOrder(input: {
         if (parseFloat(deposit) > 0) {
           const depositMethod = input.depositMethod ?? "cash";
           const { addPaymentDb } = await import("@/lib/db/bridal-orders");
-          const payment = await addPaymentDb(dbOrder.id, {
-            type: "deposit",
-            amount: deposit,
-            method: depositMethod,
-          });
           const { autoPostCashTransaction } = await import("@/lib/db/cash-ledger");
-          await autoPostCashTransaction({
-            direction: "in",
-            type: "order_deposit",
-            amount: deposit,
-            method: depositMethod,
-            reference: payment?.id ? `${dbOrder.orderNumber}#${payment.id}` : dbOrder.orderNumber,
-            description: "Deposit from customer",
-            orderId: dbOrder.id,
-          });
+
+          async function postDepositPart(amount: string, method: string, label: string) {
+            if (parseFloat(amount) <= 0) return;
+            const payment = await addPaymentDb(dbOrder!.id, {
+              type: "deposit",
+              amount,
+              method,
+            });
+            await autoPostCashTransaction({
+              direction: "in",
+              type: "order_deposit",
+              amount,
+              method,
+              reference: payment?.id ? `${dbOrder!.orderNumber}#${payment.id}` : dbOrder!.orderNumber,
+              description: label,
+              orderId: dbOrder!.id,
+            });
+          }
+
+          if (depositMethod === "hybrid") {
+            const cashAmt = (parseFloat(input.depositCashAmount ?? "0") || 0).toFixed(2);
+            const cardAmt = (parseFloat(input.depositCardAmount ?? "0") || 0).toFixed(2);
+            await postDepositPart(cashAmt, "cash", "Deposit (cash portion)");
+            await postDepositPart(cardAmt, "card", "Deposit (card portion)");
+          } else {
+            await postDepositPart(deposit, depositMethod, "Deposit from customer");
+          }
         }
         await attachMedia(dbOrder.id);
         return dbOrder;
@@ -637,10 +653,25 @@ export async function refundOrder(orderId: string, amount: string, reason: strin
 export async function markCollected(
   orderId: string,
   byName?: string,
-  details?: { balancePaid: boolean; amountPaid?: string; alterationNotes?: string; method?: string }
+  details?: {
+    balancePaid: boolean;
+    amountPaid?: string;
+    alterationNotes?: string;
+    method?: string;
+    discount?: string;
+  }
 ) {
   const order = await resolveOrder(orderId);
   if (!order) return null;
+
+  const discount = Math.max(0, parseFloat(details?.discount ?? "0") || 0);
+  if (discount > 0) {
+    const newTotal = Math.max(0, parseFloat(order.totalPrice) - discount).toFixed(2);
+    const newRemaining = Math.max(0, parseFloat(newTotal) - parseFloat(order.depositPaid)).toFixed(2);
+    order.totalPrice = newTotal;
+    order.remainingBalance = newRemaining;
+    await syncOrderPatch(orderId, { totalPrice: newTotal, remainingBalance: newRemaining });
+  }
 
   const paidAmount = details?.amountPaid ?? order.remainingBalance;
   const paid = parseFloat(paidAmount);
@@ -654,26 +685,40 @@ export async function markCollected(
     });
   }
 
+  // If discount cleared remaining without full cash take, zero any leftover.
+  const refreshed = await resolveOrder(orderId);
+  if (refreshed && parseFloat(refreshed.remainingBalance) > 0 && discount > 0 && paid <= 0) {
+    refreshed.remainingBalance = "0.00";
+    await syncOrderPatch(orderId, { remainingBalance: "0.00" });
+  }
+
   order.status = "collected";
   order.supplierLocked = true;
+  const notes = [details?.alterationNotes, discount > 0 ? `Discount £${discount.toFixed(2)}` : ""]
+    .filter(Boolean)
+    .join(" · ");
   demoOrderCollections.push({
     id: `col-${Date.now()}`,
     orderId,
     collectionDate: new Date().toISOString(),
     balancePaid: details?.balancePaid ?? true,
     amountPaid: paidAmount,
-    alterationNotes: details?.alterationNotes,
+    alterationNotes: notes || undefined,
   });
   if (isDbConfigured()) {
     const { addCollectionDb } = await import("@/lib/db/bridal-orders");
     await addCollectionDb(orderId, {
       balancePaid: details?.balancePaid ?? true,
       amountPaid: paidAmount,
-      alterationNotes: details?.alterationNotes,
+      alterationNotes: notes || undefined,
     });
   }
   await syncOrderPatch(orderId, { status: "collected", supplierLocked: true });
-  await syncTimeline(orderId, "collected", { performedByName: byName, performedByRole: "staff" });
+  await syncTimeline(orderId, "collected", {
+    performedByName: byName,
+    performedByRole: "staff",
+    comment: discount > 0 ? `Collected with £${discount.toFixed(2)} discount` : undefined,
+  });
   return order;
 }
 

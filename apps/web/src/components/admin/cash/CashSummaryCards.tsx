@@ -1,4 +1,4 @@
-import { Wallet, ArrowDownLeft, ArrowUpRight, Scale } from "lucide-react";
+import { Banknote, Landmark, Scale } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import type { DailyCashSummary, RangeCashSummary } from "@/lib/db/cash-ledger";
 
@@ -7,44 +7,33 @@ interface Props {
   viewMode?: "day" | "period";
 }
 
-function isRangeSummary(summary: DailyCashSummary | RangeCashSummary): summary is RangeCashSummary {
-  return "netPeriod" in summary;
-}
-
-export function CashSummaryCards({ summary, viewMode = "day" }: Props) {
-  const netLabel = viewMode === "period" || isRangeSummary(summary) ? "Net Balance (Period)" : "Net Balance (Today)";
-  const netValue = isRangeSummary(summary) ? summary.netPeriod : summary.netToday;
-
+export function CashSummaryCards({ summary }: Props) {
   const cards = [
     {
-      label: "Opening Balance",
-      value: formatPrice(String(summary.openingTotal)),
-      sub: `Cash ${formatPrice(String(summary.openingCash))} · Online ${formatPrice(String(summary.openingOnline))}`,
-      icon: Wallet,
-      accent: "text-slate-900",
-    },
-    {
-      label: "Total Cash In",
-      value: formatPrice(String(summary.totalCashIn)),
-      icon: ArrowDownLeft,
+      label: "Total Cash",
+      value: formatPrice(String(summary.closingCash)),
+      sub: "Cash in hand",
+      icon: Banknote,
       accent: "text-emerald-600",
     },
     {
-      label: "Total Cash Out",
-      value: formatPrice(String(summary.totalCashOut)),
-      icon: ArrowUpRight,
-      accent: "text-red-600",
+      label: "Total Bank",
+      value: formatPrice(String(summary.closingOnline)),
+      sub: "Card / online / bank",
+      icon: Landmark,
+      accent: "text-[#4C3BCF]",
     },
     {
-      label: netLabel,
-      value: formatPrice(String(netValue)),
+      label: "Grand Total",
+      value: formatPrice(String(summary.closingTotal)),
+      sub: "Cash + bank",
       icon: Scale,
-      accent: "text-[#4C3BCF]",
+      accent: "text-slate-900",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="cash-summary">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" data-tour="cash-summary">
       {cards.map((card) => (
         <div key={card.label} className="boms-card p-5">
           <div className="flex items-start justify-between gap-2">

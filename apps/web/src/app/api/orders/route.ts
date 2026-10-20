@@ -29,6 +29,16 @@ export async function POST(request: Request) {
     if (deposit < 0 || deposit > total) {
       return NextResponse.json({ error: "Deposit must be between 0 and total price" }, { status: 400 });
     }
+    if (body.depositMethod === "hybrid") {
+      const cash = parseFloat(String(body.depositCashAmount ?? 0)) || 0;
+      const card = parseFloat(String(body.depositCardAmount ?? 0)) || 0;
+      if (Math.abs(cash + card - deposit) > 0.009) {
+        return NextResponse.json(
+          { error: "Hybrid cash + card amounts must equal the deposit" },
+          { status: 400 }
+        );
+      }
+    }
 
     const { normalizeBridalMeasurements, hasAnyMeasurementValue } = await import(
       "@/lib/measurements/bridal-form"
@@ -47,6 +57,10 @@ export async function POST(request: Request) {
         typeof body.depositMethod === "string" && body.depositMethod.trim()
           ? body.depositMethod.trim()
           : "cash",
+      depositCashAmount:
+        body.depositCashAmount != null ? String(body.depositCashAmount) : undefined,
+      depositCardAmount:
+        body.depositCardAmount != null ? String(body.depositCardAmount) : undefined,
       deliveryDate: body.deliveryDate
         ? new Date(body.deliveryDate).toISOString()
         : undefined,

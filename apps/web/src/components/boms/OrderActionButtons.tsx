@@ -30,6 +30,8 @@ export function OrderActionButtons({
   const [refundAmount, setRefundAmount] = useState(remainingBalance);
   const [refundReason, setRefundReason] = useState("");
   const [collectAmount, setCollectAmount] = useState(remainingBalance);
+  const [collectDiscount, setCollectDiscount] = useState("");
+  const [collectMethod, setCollectMethod] = useState("cash");
   const [alterationNotes, setAlterationNotes] = useState("");
 
   async function action(name: string, body?: Record<string, string | boolean>) {
@@ -228,6 +230,23 @@ export function OrderActionButtons({
       {activeModal === "collect" && (
         <div className="boms-card p-5 space-y-3">
           <h3 className="font-semibold text-slate-900">Order Completed</h3>
+          <p className="text-xs text-slate-500">
+            Remaining before discount: £{parseFloat(remainingBalance || "0").toFixed(2)}
+          </p>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={collectDiscount}
+            onChange={(e) => {
+              setCollectDiscount(e.target.value);
+              const disc = parseFloat(e.target.value) || 0;
+              const rem = Math.max(0, parseFloat(remainingBalance || "0") - disc);
+              setCollectAmount(rem.toFixed(2));
+            }}
+            placeholder="Discount (£) — optional"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+          />
           <input
             type="number"
             step="0.01"
@@ -237,6 +256,15 @@ export function OrderActionButtons({
             placeholder="Balance collected (£)"
             className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
           />
+          <select
+            value={collectMethod}
+            onChange={(e) => setCollectMethod(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+          >
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="bank_transfer">Bank transfer</option>
+          </select>
           <textarea
             value={alterationNotes}
             onChange={(e) => setAlterationNotes(e.target.value)}
@@ -250,7 +278,13 @@ export function OrderActionButtons({
               color="blue"
               disabled={!!loading}
               onClick={() =>
-                action("collect", { balancePaid: true, amountPaid: collectAmount, alterationNotes })
+                action("collect", {
+                  balancePaid: true,
+                  amountPaid: collectAmount,
+                  alterationNotes,
+                  method: collectMethod,
+                  discount: collectDiscount || "0",
+                })
               }
             >
               Confirm Completion
@@ -263,7 +297,7 @@ export function OrderActionButtons({
         <div className="boms-card p-5 space-y-3">
           <h3 className="font-semibold text-slate-900">Delete Order</h3>
           <p className="text-sm text-slate-600">
-            Permanently delete this order and related files, timeline, payments, and messages. This cannot be undone.
+            Permanently delete this order and related files, timeline, payments, auto cash posts, and messages. This cannot be undone.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <BomsActionButton color="slate" onClick={() => setActiveModal(null)}>Back</BomsActionButton>

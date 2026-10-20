@@ -39,6 +39,11 @@ Open http://localhost:3000
 
 Customer portal: order `BR-2026-0152`, phone `447700900123`
 
+## Client UAT (full system test)
+
+Shareable end-to-end checklist for **customer + staff + supplier**:  
+[docs/client-uat-workflow.md](docs/client-uat-workflow.md)
+
 ## Deployment
 
 See [docs/platform-deploy.md](docs/platform-deploy.md).

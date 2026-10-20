@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { PRODUCTION_STAGES } from "@/lib/orders/status-machine";
 import type { BridalOrder, BridalStatus, OrderFile, TimelineEvent } from "@/lib/data/seed";
 import type { BridalOrderWithRelations } from "@/lib/data";
-import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { OrderStatusLive } from "@/components/orders/OrderStatusLive";
 import { ProductionStageStepper } from "@/components/supplier/ProductionStageStepper";
 import { SupplierOtherOrders } from "@/components/supplier/SupplierOtherOrders";
@@ -13,8 +12,7 @@ import { MediaUploadZone } from "@/components/boms/MediaUploadZone";
 import { OrderFileGallery } from "@/components/orders/OrderFileGallery";
 import { SupplierMessagesPanel } from "@/components/supplier/SupplierMessagesPanel";
 import type { CustomerMessage } from "@/lib/data/seed";
-import { CheckCircle, Printer } from "lucide-react";
-import { CustomerOrderProgressTracker } from "@/components/customer/OrderProgressTracker";
+import { CheckCircle, Printer, Camera } from "lucide-react";
 import { MeasurementsReadOnly } from "@/components/orders/MeasurementsReadOnly";
 import { CountdownBadge } from "@/components/orders/CountdownBadge";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -47,7 +45,7 @@ export function SupplierOrderClient({
   const [customerName] = useState(initialCustomerName);
   const [files, setFiles] = useState(initialFiles);
   const [supplierMessages] = useState(initialMessages);
-  const [timeline, setTimeline] = useState(initialTimeline);
+  const [, setTimeline] = useState(initialTimeline);
   const [loading, setLoading] = useState(false);
   const [stageLoading, setStageLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -214,10 +212,52 @@ export function SupplierOrderClient({
       </div>
       <OrderStatusLive orderId={order.id} initialStatus={order.status} className="mb-6" />
 
-      <div className="boms-card p-5 mb-6">
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">Order Journey</h2>
-        <CustomerOrderProgressTracker status={order.status} />
-      </div>
+      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+        <section className="boms-card p-4 mb-6">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">Production Stages</h2>
+          <ProductionStageStepper
+            status={order.status}
+            loading={stageLoading}
+            onAdvance={(stage) => action("advance", { stage })}
+          />
+        </section>
+      )}
+
+      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
+        <section className="boms-card p-4 mb-6 border-2 border-green-200 bg-green-50/40">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-green-800 mb-1">
+            <Camera className="h-5 w-5" />
+            Upload photo or video
+          </h2>
+          <p className="text-xs text-green-700/80 mb-3">
+            Share progress with ZARKARI — use the green buttons below to take or choose media.
+          </p>
+          <textarea
+            value={progressNote}
+            onChange={(e) => setProgressNote(e.target.value)}
+            rows={2}
+            placeholder="Optional note about this update…"
+            className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm mb-3 resize-none bg-white"
+          />
+          <div className="[&_button]:!bg-green-600 [&_button]:!text-white [&_button]:hover:!bg-green-700 [&_label]:!border-green-300">
+            <MediaUploadZone
+              label="Upload photo or video"
+              category="supplier-progress"
+              accept="image/*,video/*,.mov,.mp4"
+              showCameraButtons
+              sizeHint="Photos or videos for customer progress"
+              onSingleUploaded={(file) => void submitProgress(file)}
+            />
+          </div>
+          {progressUploading && <p className="text-xs text-slate-500 mt-2">Sending to ZARKARI…</p>}
+          {progressError && <p className="text-xs text-red-600 mt-2">{progressError}</p>}
+          {progressSuccess && (
+            <p className="text-xs text-emerald-700 mt-2 font-medium">
+              Update sent — ZARKARI will review before sharing with customer.
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="mb-6">
         <MeasurementsReadOnly measurements={order.measurements} showEmpty />
@@ -308,44 +348,6 @@ export function SupplierOrderClient({
         <SupplierMessagesPanel orderId={order.id} initialMessages={supplierMessages} />
       )}
 
-      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
-        <section className="boms-card p-4 mb-6">
-          <h2 className="text-sm font-semibold mb-1">Send progress update</h2>
-          <p className="text-xs text-slate-500 mb-3">
-            Upload a photo or video so ZARKARI can share progress with the customer.
-          </p>
-          <textarea
-            value={progressNote}
-            onChange={(e) => setProgressNote(e.target.value)}
-            rows={2}
-            placeholder="Optional note about this update…"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 resize-none"
-          />
-          <MediaUploadZone
-            label="Upload progress photo or video"
-            category="supplier-progress"
-            accept="image/*,video/*,.mov,.mp4"
-            onSingleUploaded={(file) => void submitProgress(file)}
-          />
-          {progressUploading && <p className="text-xs text-slate-500 mt-2">Sending to ZARKARI…</p>}
-          {progressError && <p className="text-xs text-red-600 mt-2">{progressError}</p>}
-          {progressSuccess && (
-            <p className="text-xs text-emerald-600 mt-2">Update sent — ZARKARI will review before sharing with customer.</p>
-          )}
-        </section>
-      )}
-
-      {productionUnlocked && !canComplete && order.status !== "ready_for_collection" && !order.supplierLocked && (
-        <section className="boms-card p-4 mb-6">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Production Stages</h2>
-          <ProductionStageStepper
-            status={order.status}
-            loading={stageLoading}
-            onAdvance={(stage) => action("advance", { stage })}
-          />
-        </section>
-      )}
-
       {canComplete && !order.supplierLocked && (
         <>
           {!showComplete ? (
@@ -417,11 +419,6 @@ export function SupplierOrderClient({
           )}
         </>
       )}
-
-      <section className="boms-card p-6 mb-6">
-        <h2 className="text-sm font-semibold mb-4">Timeline</h2>
-        <OrderTimeline events={timeline} />
-      </section>
 
       <SupplierOtherOrders orders={otherOrders} currentOrderId={order.id} />
     </div>

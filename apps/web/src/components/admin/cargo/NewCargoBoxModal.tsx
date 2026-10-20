@@ -24,7 +24,6 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
   const [weightKg, setWeightKg] = useState("");
   const [notes, setNotes] = useState("");
   const [exchangeRate, setExchangeRate] = useState("");
-  const [postToKhata, setPostToKhata] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,7 +44,6 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
           weightKg: weightKg || undefined,
           notes: notes || undefined,
           exchangeRate: exchangeRate || undefined,
-          postToKhata,
         }),
       });
       const data = await parseJsonResponse<{ box?: CargoBox; error?: string }>(res);
@@ -146,18 +144,10 @@ export function NewCargoBoxModal({ companies, suppliers, onClose, onCreated }: P
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={postToKhata}
-              onChange={(e) => setPostToKhata(e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            Post costs to supplier khata on save
-          </label>
           <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-            After creating the box, add each dress with its name and detailed cost price (PKR / GBP).
-            Post to khata after dresses are added if the box starts empty.
+            After creating the box, add each dress with name and cost (PKR / GBP). Then use{" "}
+            <strong>Post to khata</strong> on the box page so Supplier Payments updates automatically.
+            Costs stay synced when you edit items later.
           </p>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg">

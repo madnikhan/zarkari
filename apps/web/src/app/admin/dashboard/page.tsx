@@ -37,13 +37,13 @@ export default async function AdminDashboardPage() {
       <BrowserNotificationsCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8" data-tour="stat-cards">
-        <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders" icon={Package} />
-        <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders" icon={Clock} accent="default" />
-        <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders?tab=due-week" icon={Clock} accent="warning" />
-        <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders?tab=overdue" icon={AlertTriangle} accent="danger" />
-        <StatCard label="Completed" value={stats.completed} subtitle="Completed" href="/admin/orders?tab=completed" icon={CheckCircle} accent="success" />
-        <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders?tab=refunded" icon={RotateCcw} />
-        <StatCard label="Cancelled" value={stats.cancelled} subtitle="Total cancelled" href="/admin/orders?tab=cancelled" icon={XCircle} accent="danger" />
+        <StatCard label="Total Orders" value={stats.totalOrders} subtitle="All time" href="/admin/orders?type=all&tab=recent" icon={Package} />
+        <StatCard label="Active Orders" value={stats.totalActive} subtitle="In progress" href="/admin/orders?type=custom&tab=active" icon={Clock} accent="default" />
+        <StatCard label="Due This Week" value={stats.dueThisWeek} subtitle="Next 7 days" href="/admin/orders?type=custom&tab=due-week" icon={Clock} accent="warning" />
+        <StatCard label="Overdue" value={stats.late} subtitle="Past delivery" href="/admin/orders?type=custom&tab=overdue" icon={AlertTriangle} accent="danger" />
+        <StatCard label="Completed" value={stats.completed} subtitle="Completed" href="/admin/orders?type=custom&tab=completed" icon={CheckCircle} accent="success" />
+        <StatCard label="Refunded" value={stats.refunded} subtitle="This period" href="/admin/orders?type=custom&tab=refunded" icon={RotateCcw} />
+        <StatCard label="Cancelled" value={stats.cancelled} subtitle="Total cancelled" href="/admin/orders?type=custom&tab=cancelled" icon={XCircle} accent="danger" />
         <StatCard label="Low Stock" value={stats.lowStockItems ?? 0} subtitle="Ready-made sizes" href="/admin/stock" icon={Boxes} accent="warning" />
       </div>
 

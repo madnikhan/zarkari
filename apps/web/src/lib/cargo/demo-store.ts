@@ -20,6 +20,10 @@ export interface CargoBoxItem {
   sortOrder: number;
   imageUrl?: string;
   imageKey?: string;
+  soldAt?: string;
+  soldPriceGbp?: string;
+  soldMethod?: "cash" | "online";
+  soldCashTransactionId?: string;
   createdAt: string;
 }
 

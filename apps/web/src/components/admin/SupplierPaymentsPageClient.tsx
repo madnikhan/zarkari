@@ -89,7 +89,14 @@ export function SupplierPaymentsPageClient({ balances, q, page, dateQuery = {} }
           </tbody>
         </table>
         {!paged.length && (
-          <p className="text-center text-slate-400 py-12 text-sm">No supplier ledger entries yet.</p>
+          <div className="text-center text-slate-400 py-12 text-sm space-y-2 px-4">
+            <p>No supplier ledger balances to show.</p>
+            <p className="text-xs max-w-md mx-auto">
+              Post cargo box costs with <strong className="text-slate-600">Post to khata</strong> after
+              adding items (empty boxes cannot be posted). Clear any date filter if entries exist
+              outside the selected range.
+            </p>
+          </div>
         )}
       </AdminTableShell>
       <AdminPagination

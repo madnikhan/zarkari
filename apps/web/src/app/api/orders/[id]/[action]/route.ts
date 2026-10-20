@@ -66,6 +66,8 @@ export async function POST(request: Request, { params }: Props) {
           balancePaid: body.balancePaid ?? true,
           amountPaid: body.amountPaid,
           alterationNotes: body.alterationNotes,
+          method: body.method,
+          discount: body.discount,
         });
         break;
       case "arrived-uk":

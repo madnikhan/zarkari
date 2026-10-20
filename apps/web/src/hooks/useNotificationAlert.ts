@@ -2,8 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-let alertInterval: ReturnType<typeof setInterval> | null = null;
-
 function playBeep() {
   if (typeof window === "undefined") return;
   try {
@@ -23,50 +21,25 @@ function playBeep() {
   }
 }
 
-function startAlertLoop() {
-  if (alertInterval) return;
-  playBeep();
-  alertInterval = setInterval(playBeep, 2000);
-}
-
-function stopAlertLoop() {
-  if (alertInterval) {
-    clearInterval(alertInterval);
-    alertInterval = null;
-  }
-}
-
+/** Beep once when unread count increases — no looping. */
 export function useNotificationAlert(unreadCount: number, enabled = true) {
   const prevUnread = useRef(unreadCount);
-  const playing = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      prevUnread.current = unreadCount;
+      return;
+    }
 
     const increased = unreadCount > prevUnread.current && unreadCount > 0;
     prevUnread.current = unreadCount;
 
-    if (increased && !playing.current) {
-      playing.current = true;
-      startAlertLoop();
-    }
-
-    if (unreadCount === 0 && playing.current) {
-      stopAlertLoop();
-      playing.current = false;
+    if (increased) {
+      playBeep();
     }
   }, [unreadCount, enabled]);
-
-  useEffect(() => {
-    return () => {
-      if (playing.current) {
-        stopAlertLoop();
-        playing.current = false;
-      }
-    };
-  }, []);
 }
 
 export function stopNotificationAlert() {
-  stopAlertLoop();
+  /* no-op: alerts are single-shot now */
 }

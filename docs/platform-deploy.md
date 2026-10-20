@@ -47,6 +47,9 @@ See [firebase-setup.md](./firebase-setup.md) for Firebase project configuration.
 1. Push repo to GitHub and import into Vercel.
 2. Set root directory to repo root; build command `npm run build`.
 3. Run `npm run db:push` locally with production `DATABASE_URL` to migrate schema.
+   - One-shot cleanup after the order-delete cash fix: orphan auto deposits that were nullified instead of deleted can be removed with:
+     `DELETE FROM cash_transactions WHERE order_id IS NULL AND source = 'auto' AND type IN ('order_deposit','order_collection','refund');`
+     Review rows first with a `SELECT` before deleting.
 4. Point `zarkari.co.uk` DNS to Vercel.
 5. Configure Stripe webhook to `https://zarkari.co.uk/api/stripe/webhook`.
 6. Point Meta catalog to `https://zarkari.co.uk/api/meta/catalog.xml`.

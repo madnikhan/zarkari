@@ -10,6 +10,7 @@ import {
   type CashTransactionType,
 } from "@/lib/db/cash-ledger";
 import { addSupplierLedgerEntry } from "@/lib/supplier-ledger/service";
+import { markSampleSold } from "@/lib/cargo/service";
 import { todayDateString } from "@/lib/cash/labels";
 
 export async function GET(request: Request) {
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
       supplierId,
       amountPkr,
       exchangeRate,
+      cargoBoxItemId,
     } = body as {
       direction?: CashDirection;
       type?: CashTransactionType;
@@ -69,11 +71,15 @@ export async function POST(request: Request) {
       supplierId?: string;
       amountPkr?: string;
       exchangeRate?: string;
+      cargoBoxItemId?: string;
     };
 
     if (!direction || !type || !amount || !method) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const linkingSample =
+      type === "ready_made_sale" && cargoBoxItemId && isUuid(cargoBoxItemId);
 
     const tx = await createCashTransaction({
       direction,
@@ -89,6 +95,7 @@ export async function POST(request: Request) {
       supplierId: supplierId && isUuid(supplierId) ? supplierId : undefined,
       createdByUserId: isUuid(session.id) ? session.id : undefined,
       source: "manual",
+      isSample: linkingSample || undefined,
     });
 
     if (!tx) {
@@ -96,6 +103,29 @@ export async function POST(request: Request) {
         { error: "Failed to create transaction — database unavailable" },
         { status: 500 }
       );
+    }
+
+    if (linkingSample && cargoBoxItemId) {
+      try {
+        await markSampleSold(cargoBoxItemId, {
+          soldPriceGbp: amount,
+          soldMethod: method,
+          soldCashTransactionId: tx.id,
+        });
+      } catch (err) {
+        console.error("[cash/transactions] markSampleSold failed", err);
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error
+                ? err.message
+                : "Sale recorded but sample stock update failed",
+            transaction: tx,
+          },
+          { status: 500 }
+        );
+      }
+      revalidatePath("/admin/stock");
     }
 
     if (type === "supplier_payment" && supplierId && isUuid(supplierId)) {

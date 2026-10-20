@@ -1182,10 +1182,16 @@ export async function deleteBridalOrderDb(id: string): Promise<boolean> {
     await tx.delete(schema.bridalPayments).where(eq(schema.bridalPayments.orderId, id));
     await tx.delete(schema.notifications).where(eq(schema.notifications.orderId, id));
 
+    // Remove auto-posted till rows so Daily Cash totals drop with the order.
     await tx
-      .update(schema.cashTransactions)
-      .set({ orderId: null })
-      .where(eq(schema.cashTransactions.orderId, id));
+      .delete(schema.cashTransactions)
+      .where(
+        and(
+          eq(schema.cashTransactions.orderId, id),
+          eq(schema.cashTransactions.source, "auto"),
+          inArray(schema.cashTransactions.type, ["order_deposit", "order_collection", "refund"])
+        )
+      );
     await tx
       .update(schema.cargoBoxItems)
       .set({ bridalOrderId: null })

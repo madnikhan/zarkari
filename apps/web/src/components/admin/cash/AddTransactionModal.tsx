@@ -23,6 +23,14 @@ interface SupplierOption {
   name: string;
 }
 
+interface AvailableSample {
+  id: string;
+  articleName: string;
+  costGbp: string;
+  boxNumber: string;
+  itemDate: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -54,6 +62,8 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
   const [payableOrders, setPayableOrders] = useState<PayableOrder[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [supplierId, setSupplierId] = useState("");
+  const [samples, setSamples] = useState<AvailableSample[]>([]);
+  const [sampleId, setSampleId] = useState("");
   const [amountPkr, setAmountPkr] = useState("");
   const [exchangeRate, setExchangeRate] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -67,6 +77,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
     setMethod("cash");
     setOrderId("");
     setSupplierId("");
+    setSampleId("");
     setAmountPkr("");
     setExchangeRate("");
     setReference("");
@@ -88,6 +99,10 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       .then((r) => r.json())
       .then((d) => setSuppliers(d.suppliers ?? []))
       .catch(() => setSuppliers([]));
+    fetch("/api/stock/available-samples")
+      .then((r) => r.json())
+      .then((d) => setSamples(d.samples ?? []))
+      .catch(() => setSamples([]));
   }, [open]);
 
   if (!open) return null;
@@ -96,8 +111,10 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
   const showOrderPicker = needsOrderPicker(type);
   const showManualOrderNumber = needsManualOrderNumber(type);
   const showSupplierPicker = type === "supplier_payment";
+  const showSamplePicker = type === "ready_made_sale";
   const showExpenseCategory = type === "business_expense";
   const selectedOrder = payableOrders.find((o) => o.id === orderId);
+  const selectedSample = samples.find((s) => s.id === sampleId);
 
   const filteredOrders = (() => {
     if (!showOrderPicker) return payableOrders;
@@ -122,6 +139,22 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
       setSupplierId("");
       setAmountPkr("");
       setExchangeRate("");
+    }
+    if (next !== "ready_made_sale") {
+      setSampleId("");
+    }
+  }
+
+  function handleSampleSelect(id: string) {
+    setSampleId(id);
+    const sample = samples.find((s) => s.id === id);
+    if (sample) {
+      setDescription(sample.articleName);
+      setReference(`${sample.boxNumber} · ${sample.articleName}`);
+      if (!amount || parseFloat(amount) <= 0) {
+        const cost = parseFloat(sample.costGbp || "0");
+        if (cost > 0) setAmount(sample.costGbp);
+      }
     }
   }
 
@@ -237,6 +270,7 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
             supplierId: supplierId || undefined,
             amountPkr: showSupplierPicker ? amountPkr || undefined : undefined,
             exchangeRate: showSupplierPicker ? exchangeRate || undefined : undefined,
+            cargoBoxItemId: showSamplePicker && sampleId ? sampleId : undefined,
           }),
         });
         const data = await parseJsonResponse<{ error?: string }>(res);
@@ -335,6 +369,32 @@ export function AddTransactionModal({ open, onClose, date, direction, defaultTyp
                   Remaining {formatPrice(selectedOrder.remainingBalance)}
                 </p>
               )}
+            </div>
+          )}
+
+          {showSamplePicker && (
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Sample piece (optional)</label>
+              <select
+                value={sampleId}
+                onChange={(e) => handleSampleSelect(e.target.value)}
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">No sample — walk-in / other ready-made</option>
+                {samples.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.articleName} · {s.boxNumber}
+                    {parseFloat(s.costGbp) > 0 ? ` · cost ${formatPrice(s.costGbp)}` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedSample ? (
+                <p className="text-xs text-emerald-700 mt-1">
+                  Marks this sample as Sold in Stock after save. Enter the sell price below.
+                </p>
+              ) : samples.length === 0 ? (
+                <p className="text-xs text-slate-400 mt-1">No unsold samples in cargo right now.</p>
+              ) : null}
             </div>
           )}
 

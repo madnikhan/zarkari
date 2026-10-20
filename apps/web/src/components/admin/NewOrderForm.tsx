@@ -33,6 +33,8 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
     totalPrice: "1000",
     depositPaid: "500",
     depositMethod: "cash",
+    depositCashAmount: "",
+    depositCardAmount: "",
     deliveryDate: defaultDeliveryDate(),
     customisationNotes: "",
     sendToSupplier: false,
@@ -112,12 +114,23 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
     setLoading(true);
     setError("");
     try {
+      if (form.depositMethod === "hybrid") {
+        const cash = parseFloat(form.depositCashAmount) || 0;
+        const card = parseFloat(form.depositCardAmount) || 0;
+        const deposit = parseFloat(form.depositPaid) || 0;
+        if (Math.abs(cash + card - deposit) > 0.009) {
+          throw new Error("Hybrid cash + card amounts must equal the deposit paid");
+        }
+      }
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
           depositPaid: form.depositPaid,
+          depositMethod: form.depositMethod,
+          depositCashAmount: form.depositCashAmount || undefined,
+          depositCardAmount: form.depositCardAmount || undefined,
           remainingBalance: remaining,
           measurements: hasAnyMeasurementValue(measurements) ? measurements : undefined,
           mediaFiles: mapMediaCategories(mediaFiles),
@@ -221,7 +234,7 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
           required
         />
       </label>
-      <div data-tour="deposit-field">
+      <div data-tour="deposit-field" className="space-y-3">
       {field("depositPaid", "Deposit Paid (£)", "number", true)}
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Deposit Method</span>
@@ -232,9 +245,37 @@ export function NewOrderForm({ suppliers }: { suppliers: Supplier[] }) {
         >
           <option value="cash">Cash</option>
           <option value="card">Card</option>
-          <option value="bank_transfer">Bank transfer</option>
+          <option value="hybrid">Hybrid (cash + card)</option>
         </select>
       </label>
+      {form.depositMethod === "hybrid" && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            <span className="text-slate-500 text-xs uppercase tracking-wide">Cash amount (£)</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.depositCashAmount}
+              onChange={(e) => setForm({ ...form, depositCashAmount: e.target.value })}
+              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2.5"
+              required
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-slate-500 text-xs uppercase tracking-wide">Card amount (£)</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.depositCardAmount}
+              onChange={(e) => setForm({ ...form, depositCardAmount: e.target.value })}
+              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2.5"
+              required
+            />
+          </label>
+        </div>
+      )}
       <label className="block text-sm">
         <span className="text-slate-500 text-xs uppercase tracking-wide">Remaining Balance (£)</span>
         <input

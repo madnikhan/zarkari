@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb, isUuid, schema } from "./index";
 import type { CargoBox, CargoBoxItem, CargoCompany } from "@/lib/cargo/demo-store";
 
@@ -28,6 +28,10 @@ function mapItem(
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl ?? undefined,
     imageKey: row.imageKey ?? undefined,
+    soldAt: row.soldAt?.toISOString(),
+    soldPriceGbp: row.soldPriceGbp ?? undefined,
+    soldMethod: row.soldMethod ?? undefined,
+    soldCashTransactionId: row.soldCashTransactionId ?? undefined,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -392,6 +396,27 @@ export async function updateCargoBoxItemDb(
   return mapItem(row, orderNumber);
 }
 
+export async function getCargoBoxItemDb(id: string): Promise<CargoBoxItem | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(schema.cargoBoxItems)
+    .where(eq(schema.cargoBoxItems.id, id))
+    .limit(1);
+  if (!row) return null;
+  let orderNumber: string | undefined;
+  if (row.bridalOrderId) {
+    const [order] = await db
+      .select({ orderNumber: schema.bridalOrders.orderNumber })
+      .from(schema.bridalOrders)
+      .where(eq(schema.bridalOrders.id, row.bridalOrderId))
+      .limit(1);
+    orderNumber = order?.orderNumber;
+  }
+  return mapItem(row, orderNumber);
+}
+
 export async function deleteCargoBoxItemDb(id: string): Promise<boolean> {
   const db = getDb();
   if (!db) return false;
@@ -444,6 +469,9 @@ export type CargoArrivalRow = {
   bridalOrderId?: string;
   orderNumber?: string;
   orderStatus?: string;
+  soldAt?: string;
+  soldPriceGbp?: string;
+  soldMethod?: "cash" | "online";
 };
 
 export async function listCargoArrivalsDb(opts: {
@@ -530,7 +558,78 @@ export async function listCargoArrivalsDb(opts: {
     bridalOrderId: r.item.bridalOrderId ?? undefined,
     orderNumber: r.orderNumber ?? undefined,
     orderStatus: r.orderStatus ?? undefined,
+    soldAt: r.item.soldAt?.toISOString(),
+    soldPriceGbp: r.item.soldPriceGbp ?? undefined,
+    soldMethod: r.item.soldMethod ?? undefined,
   }));
 
   return { items, total: Number(countRow?.count ?? 0) };
+}
+
+export type AvailableSampleRow = {
+  id: string;
+  articleName: string;
+  costGbp: string;
+  boxNumber: string;
+  itemDate: string;
+};
+
+export async function listAvailableSamplesDb(): Promise<AvailableSampleRow[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: schema.cargoBoxItems.id,
+      articleName: schema.cargoBoxItems.articleName,
+      costGbp: schema.cargoBoxItems.costGbp,
+      boxNumber: schema.cargoBoxes.boxNumber,
+      itemDate: schema.cargoBoxItems.itemDate,
+    })
+    .from(schema.cargoBoxItems)
+    .innerJoin(schema.cargoBoxes, eq(schema.cargoBoxItems.boxId, schema.cargoBoxes.id))
+    .where(
+      and(
+        eq(schema.cargoBoxItems.itemKind, "sample"),
+        isNull(schema.cargoBoxItems.bridalOrderId),
+        isNull(schema.cargoBoxItems.soldAt)
+      )
+    )
+    .orderBy(desc(schema.cargoBoxItems.itemDate), desc(schema.cargoBoxItems.createdAt));
+  return rows;
+}
+
+export async function markSampleSoldDb(
+  id: string,
+  input: {
+    soldPriceGbp: string;
+    soldMethod: "cash" | "online";
+    soldCashTransactionId: string;
+    soldAt?: Date;
+  }
+): Promise<CargoBoxItem | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [existing] = await db
+    .select()
+    .from(schema.cargoBoxItems)
+    .where(eq(schema.cargoBoxItems.id, id))
+    .limit(1);
+  if (!existing) return null;
+  if (existing.itemKind === "custom" || existing.bridalOrderId) {
+    throw new Error("Only sample items can be sold this way");
+  }
+  if (existing.soldAt) {
+    throw new Error("This sample is already sold");
+  }
+  const [row] = await db
+    .update(schema.cargoBoxItems)
+    .set({
+      soldAt: input.soldAt ?? new Date(),
+      soldPriceGbp: input.soldPriceGbp,
+      soldMethod: input.soldMethod,
+      soldCashTransactionId: input.soldCashTransactionId,
+    })
+    .where(eq(schema.cargoBoxItems.id, id))
+    .returning();
+  return row ? mapItem(row) : null;
 }

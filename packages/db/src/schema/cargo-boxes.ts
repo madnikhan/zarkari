@@ -46,5 +46,10 @@ export const cargoBoxItems = pgTable("cargo_box_items", {
   sortOrder: integer("sort_order").default(0).notNull(),
   imageUrl: text("image_url"),
   imageKey: text("image_key"),
+  /** Sample sell-through (Daily Cash ready-made / sample sale) */
+  soldAt: timestamp("sold_at"),
+  soldPriceGbp: decimal("sold_price_gbp", { precision: 12, scale: 2 }),
+  soldMethod: text("sold_method").$type<"cash" | "online">(),
+  soldCashTransactionId: uuid("sold_cash_transaction_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

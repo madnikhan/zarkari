@@ -252,9 +252,14 @@ export async function deleteRetailOrderDb(id: string): Promise<boolean> {
   return db.transaction(async (tx) => {
     await tx.delete(schema.retailOrderItems).where(eq(schema.retailOrderItems.orderId, id));
     await tx
-      .update(schema.cashTransactions)
-      .set({ retailOrderId: null })
-      .where(eq(schema.cashTransactions.retailOrderId, id));
+      .delete(schema.cashTransactions)
+      .where(
+        and(
+          eq(schema.cashTransactions.retailOrderId, id),
+          eq(schema.cashTransactions.source, "auto"),
+          inArray(schema.cashTransactions.type, ["ready_made_sale", "refund"])
+        )
+      );
     await tx
       .delete(schema.stockMovements)
       .where(

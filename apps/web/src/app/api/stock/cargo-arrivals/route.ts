@@ -43,6 +43,9 @@ export async function GET(request: Request) {
         bridalOrderId: i.bridalOrderId,
         orderNumber: i.orderNumber,
         orderStatus: undefined as string | undefined,
+        soldAt: i.soldAt,
+        soldPriceGbp: i.soldPriceGbp,
+        soldMethod: i.soldMethod,
       };
     });
   if (q?.trim()) {

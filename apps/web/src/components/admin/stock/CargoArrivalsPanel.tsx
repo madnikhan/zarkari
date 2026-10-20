@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -22,6 +22,9 @@ export type CargoArrivalRow = {
   bridalOrderId?: string;
   orderNumber?: string;
   orderStatus?: string;
+  soldAt?: string;
+  soldPriceGbp?: string;
+  soldMethod?: "cash" | "online";
 };
 
 interface Props {
@@ -65,6 +68,18 @@ export function CargoArrivalsPanel({ kind, q = "", dateQuery = {} }: Props) {
     };
   }, [kind, q, dateQuery.from, dateQuery.to]);
 
+  const sampleStats = useMemo(() => {
+    if (kind !== "sample") return null;
+    const sold = items.filter((i) => i.soldAt);
+    const available = items.filter((i) => !i.soldAt);
+    return {
+      received: items.length,
+      sold: sold.length,
+      available: available.length,
+      soldItems: sold,
+    };
+  }, [kind, items]);
+
   if (loading) {
     return <p className="text-sm text-slate-400 py-8 text-center">Loading arrivals…</p>;
   }
@@ -78,12 +93,28 @@ export function CargoArrivalsPanel({ kind, q = "", dateQuery = {} }: Props) {
         Pieces received in cargo boxes. Ready-made shop/online stock is on the Ready-made tab.{" "}
         <span className="text-slate-400">({total} items)</span>
       </p>
+
+      {sampleStats && (
+        <div className="mb-4 flex flex-wrap gap-3 text-sm">
+          <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-slate-700">
+            Received <strong>{sampleStats.received}</strong>
+          </span>
+          <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-emerald-800">
+            Available <strong>{sampleStats.available}</strong>
+          </span>
+          <span className="rounded-lg bg-slate-800 px-3 py-1.5 text-white">
+            Sold <strong>{sampleStats.sold}</strong>
+          </span>
+        </div>
+      )}
+
       <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
         <table className="w-full text-sm min-w-[800px]">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-3 py-2.5 font-medium w-14">Photo</th>
               <th className="px-3 py-2.5 font-medium">Name</th>
+              {kind === "sample" && <th className="px-3 py-2.5 font-medium">Status</th>}
               <th className="px-3 py-2.5 font-medium">Date</th>
               <th className="px-3 py-2.5 font-medium">Box</th>
               <th className="px-3 py-2.5 font-medium">Supplier</th>
@@ -107,6 +138,19 @@ export function CargoArrivalsPanel({ kind, q = "", dateQuery = {} }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-2 font-medium">{item.articleName}</td>
+                  {kind === "sample" && (
+                    <td className="px-3 py-2">
+                      {item.soldAt ? (
+                        <span className="inline-flex rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-white">
+                          Sold
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                          Available
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
                     {new Date(item.itemDate).toLocaleDateString("en-GB")}
                   </td>
@@ -149,7 +193,10 @@ export function CargoArrivalsPanel({ kind, q = "", dateQuery = {} }: Props) {
               ))
             ) : (
               <tr>
-                <td colSpan={kind === "custom" ? 9 : 8} className="px-3 py-10 text-center text-slate-400">
+                <td
+                  colSpan={kind === "custom" ? 9 : kind === "sample" ? 9 : 8}
+                  className="px-3 py-10 text-center text-slate-400"
+                >
                   No {kind === "sample" ? "sample" : "custom"} arrivals yet. Add items in Box &amp; Cargo.
                 </td>
               </tr>
@@ -157,6 +204,51 @@ export function CargoArrivalsPanel({ kind, q = "", dateQuery = {} }: Props) {
           </tbody>
         </table>
       </div>
+
+      {sampleStats && sampleStats.soldItems.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">Sample sales</h3>
+          <p className="text-xs text-slate-500 mb-3">
+            Record of samples sold from Daily Cash (Ready Made Sale). Remaining = Available above.
+          </p>
+          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2.5 font-medium">Sample</th>
+                  <th className="px-3 py-2.5 font-medium">Sold</th>
+                  <th className="px-3 py-2.5 font-medium">Method</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Price</th>
+                  <th className="px-3 py-2.5 font-medium">Box</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sampleStats.soldItems.map((item) => (
+                  <tr key={`sold-${item.id}`}>
+                    <td className="px-3 py-2 font-medium">{item.articleName}</td>
+                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                      {item.soldAt
+                        ? new Date(item.soldAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2 capitalize text-slate-600">
+                      {item.soldMethod === "online" ? "Card / bank" : item.soldMethod ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {item.soldPriceGbp ? formatPrice(item.soldPriceGbp) : "—"}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">{item.boxNumber}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
